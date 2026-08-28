@@ -7,7 +7,8 @@ import {
   CheckCircle2,
   XCircle,
   Eye,
-  PackageCheck
+  PackageCheck,
+  Truck
 } from "lucide-react";
 import api from "../services/api";
 
@@ -24,6 +25,7 @@ const Solicitudes = () => {
   const [estadoFiltro, setEstadoFiltro] = useState("");
 
   const [mostrarNueva, setMostrarNueva] = useState(false);
+
   const [destino, setDestino] = useState(
     usuario.ubicacion_id || ""
   );
@@ -51,16 +53,27 @@ const Solicitudes = () => {
       setLoading(true);
       setError("");
 
-      const [solicitudesRes, productosRes, ubicacionesRes] =
-        await Promise.all([
-          api.get("/solicitudes"),
-          api.get("/productos"),
-          api.get("/ubicaciones")
-        ]);
+      const [
+        solicitudesRes,
+        productosRes,
+        ubicacionesRes
+      ] = await Promise.all([
+        api.get("/solicitudes"),
+        api.get("/productos"),
+        api.get("/ubicaciones")
+      ]);
 
-      setSolicitudes(solicitudesRes.data || []);
-      setProductos(productosRes.data || []);
-      setUbicaciones(ubicacionesRes.data || []);
+      setSolicitudes(
+        solicitudesRes.data || []
+      );
+
+      setProductos(
+        productosRes.data || []
+      );
+
+      setUbicaciones(
+        ubicacionesRes.data || []
+      );
     } catch (error) {
       setError(
         error.response?.data?.message ||
@@ -73,7 +86,9 @@ const Solicitudes = () => {
 
   const solicitudesFiltradas = useMemo(() => {
     return solicitudes.filter((item) => {
-      const texto = busqueda.toLowerCase().trim();
+      const texto = busqueda
+        .toLowerCase()
+        .trim();
 
       const coincideBusqueda =
         !texto ||
@@ -89,9 +104,16 @@ const Solicitudes = () => {
         !estadoFiltro ||
         item.estado === estadoFiltro;
 
-      return coincideBusqueda && coincideEstado;
+      return (
+        coincideBusqueda &&
+        coincideEstado
+      );
     });
-  }, [solicitudes, busqueda, estadoFiltro]);
+  }, [
+    solicitudes,
+    busqueda,
+    estadoFiltro
+  ]);
 
   const agregarLinea = () => {
     setLineas([
@@ -105,7 +127,9 @@ const Solicitudes = () => {
 
   const eliminarLinea = (index) => {
     setLineas(
-      lineas.filter((_, i) => i !== index)
+      lineas.filter(
+        (_, i) => i !== index
+      )
     );
   };
 
@@ -131,17 +155,26 @@ const Solicitudes = () => {
       setGuardando(true);
       setError("");
 
-      await api.post("/solicitudes", {
-        destino_ubicacion_id: Number(destino),
-        lineas: lineas.map((linea) => ({
-          producto_id: Number(
-            linea.producto_id
-          ),
-          cantidad_solicitada: Number(
-            linea.cantidad_solicitada
+      await api.post(
+        "/solicitudes",
+        {
+          destino_ubicacion_id:
+            Number(destino),
+
+          lineas: lineas.map(
+            (linea) => ({
+              producto_id: Number(
+                linea.producto_id
+              ),
+
+              cantidad_solicitada:
+                Number(
+                  linea.cantidad_solicitada
+                )
+            })
           )
-        }))
-      });
+        }
+      );
 
       setMostrarNueva(false);
 
@@ -165,9 +198,12 @@ const Solicitudes = () => {
 
   const verDetalle = async (id) => {
     try {
-      const response = await api.get(
-        `/solicitudes/${id}`
-      );
+      setError("");
+
+      const response =
+        await api.get(
+          `/solicitudes/${id}`
+        );
 
       setSeleccionada(id);
       setDetalle(response.data);
@@ -181,6 +217,8 @@ const Solicitudes = () => {
 
   const iniciarRevision = async (id) => {
     try {
+      setError("");
+
       await api.patch(
         `/solicitudes/${id}/revision`
       );
@@ -199,13 +237,20 @@ const Solicitudes = () => {
     if (!detalle) return;
 
     try {
+      setGuardando(true);
+      setError("");
+
       const lineasAprobadas =
-        detalle.lineas.map((linea) => ({
-          linea_id: linea.id,
-          cantidad_aprobada: Number(
-            linea.cantidad_solicitada
-          )
-        }));
+        detalle.lineas.map(
+          (linea) => ({
+            linea_id: linea.id,
+
+            cantidad_aprobada:
+              Number(
+                linea.cantidad_solicitada
+              )
+          })
+        );
 
       await api.patch(
         `/solicitudes/${seleccionada}/aprobar`,
@@ -215,12 +260,16 @@ const Solicitudes = () => {
       );
 
       await cargarDatos();
-      await verDetalle(seleccionada);
+      await verDetalle(
+        seleccionada
+      );
     } catch (error) {
       setError(
         error.response?.data?.message ||
           "No fue posible aprobar la solicitud"
       );
+    } finally {
+      setGuardando(false);
     }
   };
 
@@ -232,6 +281,9 @@ const Solicitudes = () => {
     if (!motivo) return;
 
     try {
+      setGuardando(true);
+      setError("");
+
       await api.patch(
         `/solicitudes/${seleccionada}/rechazar`,
         {
@@ -240,12 +292,16 @@ const Solicitudes = () => {
       );
 
       await cargarDatos();
-      await verDetalle(seleccionada);
+      await verDetalle(
+        seleccionada
+      );
     } catch (error) {
       setError(
         error.response?.data?.message ||
           "No fue posible rechazar la solicitud"
       );
+    } finally {
+      setGuardando(false);
     }
   };
 
@@ -255,6 +311,9 @@ const Solicitudes = () => {
     );
 
     try {
+      setGuardando(true);
+      setError("");
+
       await api.patch(
         `/solicitudes/${seleccionada}/cerrar`,
         {
@@ -263,18 +322,110 @@ const Solicitudes = () => {
       );
 
       await cargarDatos();
-      await verDetalle(seleccionada);
+      await verDetalle(
+        seleccionada
+      );
     } catch (error) {
       setError(
         error.response?.data?.message ||
           "No fue posible cerrar la solicitud"
       );
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  const crearEnvio = async () => {
+    if (!detalle) return;
+
+    const lineasEnvio =
+      detalle.lineas
+        .map((linea) => {
+          const aprobada =
+            Number(
+              linea.cantidad_aprobada
+            );
+
+          const enviada =
+            Number(
+              linea.cantidad_enviada_acumulada
+            );
+
+          return {
+            solicitud_linea_id:
+              linea.id,
+
+            cantidad_enviada:
+              aprobada - enviada
+          };
+        })
+        .filter(
+          (linea) =>
+            linea.cantidad_enviada > 0
+        );
+
+    if (
+      lineasEnvio.length === 0
+    ) {
+      setError(
+        "Esta solicitud no tiene productos pendientes de envío"
+      );
+
+      return;
+    }
+
+    const confirmar =
+      window.confirm(
+        "¿Deseas crear el envío con todas las cantidades aprobadas pendientes?"
+      );
+
+    if (!confirmar) {
+      return;
+    }
+
+    try {
+      setGuardando(true);
+      setError("");
+
+      const response =
+        await api.post(
+          "/envios",
+          {
+            solicitud_id:
+              Number(
+                detalle.solicitud.id
+              ),
+
+            lineas:
+              lineasEnvio
+          }
+        );
+
+      await cargarDatos();
+
+      await verDetalle(
+        detalle.solicitud.id
+      );
+
+      window.alert(
+        `Envío #${response.data.envio_id} creado correctamente.`
+      );
+    } catch (error) {
+      setError(
+        error.response?.data?.message ||
+          "No fue posible crear el envío"
+      );
+    } finally {
+      setGuardando(false);
     }
   };
 
   const puedeRevisar =
     usuario.rol === "principal" &&
-    ["operador", "aprobador_admin"].includes(
+    [
+      "operador",
+      "aprobador_admin"
+    ].includes(
       usuario.nivel_permiso
     );
 
@@ -295,7 +446,10 @@ const Solicitudes = () => {
     <div>
       <header className="page-header">
         <div>
-          <h1>Solicitudes</h1>
+          <h1>
+            Solicitudes
+          </h1>
+
           <p>
             Reabastecimiento entre Central y
             ubicaciones.
@@ -311,7 +465,8 @@ const Solicitudes = () => {
             Actualizar
           </button>
 
-          {usuario.rol !== "principal" && (
+          {usuario.rol !==
+            "principal" && (
             <button
               className="primary-button icon-button"
               onClick={() =>
@@ -341,7 +496,9 @@ const Solicitudes = () => {
               placeholder="Buscar solicitud..."
               value={busqueda}
               onChange={(event) =>
-                setBusqueda(event.target.value)
+                setBusqueda(
+                  event.target.value
+                )
               }
             />
           </div>
@@ -349,37 +506,47 @@ const Solicitudes = () => {
           <select
             value={estadoFiltro}
             onChange={(event) =>
-              setEstadoFiltro(event.target.value)
+              setEstadoFiltro(
+                event.target.value
+              )
             }
           >
             <option value="">
               Todos los estados
             </option>
+
             <option value="solicitada">
               Solicitada
             </option>
+
             <option value="en_revision">
               En revisión
             </option>
+
             <option value="aprobada">
               Aprobada
             </option>
+
             <option value="en_transito">
               En tránsito
             </option>
+
             <option value="recibida">
               Recibida
             </option>
+
             <option value="cerrada">
               Cerrada
             </option>
+
             <option value="rechazada">
               Rechazada
             </option>
           </select>
         </div>
 
-        {solicitudesFiltradas.length === 0 ? (
+        {solicitudesFiltradas.length ===
+        0 ? (
           <div className="empty-state">
             No hay solicitudes disponibles.
           </div>
@@ -401,7 +568,9 @@ const Solicitudes = () => {
                 {solicitudesFiltradas.map(
                   (item) => (
                     <tr key={item.id}>
-                      <td>#{item.id}</td>
+                      <td>
+                        #{item.id}
+                      </td>
 
                       <td>
                         {
@@ -433,7 +602,9 @@ const Solicitudes = () => {
                         <button
                           className="table-action"
                           onClick={() =>
-                            verDetalle(item.id)
+                            verDetalle(
+                              item.id
+                            )
                           }
                         >
                           <Eye size={17} />
@@ -454,7 +625,10 @@ const Solicitudes = () => {
           <div className="modal-card large-modal">
             <div className="modal-header">
               <div>
-                <h2>Nueva solicitud</h2>
+                <h2>
+                  Nueva solicitud
+                </h2>
+
                 <p>
                   Selecciona destino y productos.
                 </p>
@@ -470,9 +644,15 @@ const Solicitudes = () => {
               </button>
             </div>
 
-            <form onSubmit={crearSolicitud}>
+            <form
+              onSubmit={
+                crearSolicitud
+              }
+            >
               <div className="form-group">
-                <label>Ubicación destino</label>
+                <label>
+                  Ubicación destino
+                </label>
 
                 <select
                   className="form-control"
@@ -489,37 +669,50 @@ const Solicitudes = () => {
                   </option>
 
                   {ubicaciones
-                    .filter((ubicacion) => {
-                      if (
-                        Number(
-                          ubicacion.id
-                        ) ===
-                        Number(
-                          usuario.ubicacion_id
-                        )
-                      ) {
-                        return true;
-                      }
+                    .filter(
+                      (ubicacion) => {
+                        if (
+                          Number(
+                            ubicacion.id
+                          ) ===
+                          Number(
+                            usuario.ubicacion_id
+                          )
+                        ) {
+                          return true;
+                        }
 
-                      return (
-                        usuario.rol ===
-                        "equipo_interno"
-                      );
-                    })
-                    .map((ubicacion) => (
-                      <option
-                        key={ubicacion.id}
-                        value={ubicacion.id}
-                      >
-                        {ubicacion.nombre}
-                      </option>
-                    ))}
+                        return (
+                          usuario.rol ===
+                          "equipo_interno"
+                        );
+                      }
+                    )
+                    .map(
+                      (ubicacion) => (
+                        <option
+                          key={
+                            ubicacion.id
+                          }
+                          value={
+                            ubicacion.id
+                          }
+                        >
+                          {
+                            ubicacion.nombre
+                          }
+                        </option>
+                      )
+                    )}
                 </select>
               </div>
 
               <div className="modal-lines">
                 {lineas.map(
-                  (linea, index) => (
+                  (
+                    linea,
+                    index
+                  ) => (
                     <div
                       className="request-line"
                       key={index}
@@ -529,11 +722,14 @@ const Solicitudes = () => {
                         value={
                           linea.producto_id
                         }
-                        onChange={(event) =>
+                        onChange={(
+                          event
+                        ) =>
                           actualizarLinea(
                             index,
                             "producto_id",
-                            event.target.value
+                            event.target
+                              .value
                           )
                         }
                         required
@@ -543,7 +739,9 @@ const Solicitudes = () => {
                         </option>
 
                         {productos.map(
-                          (producto) => (
+                          (
+                            producto
+                          ) => (
                             <option
                               key={
                                 producto.id
@@ -555,7 +753,11 @@ const Solicitudes = () => {
                               {
                                 producto.nombre
                               }{" "}
-                              ({producto.sku})
+                              (
+                              {
+                                producto.sku
+                              }
+                              )
                             </option>
                           )
                         )}
@@ -569,22 +771,28 @@ const Solicitudes = () => {
                         value={
                           linea.cantidad_solicitada
                         }
-                        onChange={(event) =>
+                        onChange={(
+                          event
+                        ) =>
                           actualizarLinea(
                             index,
                             "cantidad_solicitada",
-                            event.target.value
+                            event.target
+                              .value
                           )
                         }
                         required
                       />
 
-                      {lineas.length > 1 && (
+                      {lineas.length >
+                        1 && (
                         <button
                           type="button"
                           className="danger-icon-button"
                           onClick={() =>
-                            eliminarLinea(index)
+                            eliminarLinea(
+                              index
+                            )
                           }
                         >
                           ×
@@ -608,7 +816,9 @@ const Solicitudes = () => {
                   type="button"
                   className="secondary-button"
                   onClick={() =>
-                    setMostrarNueva(false)
+                    setMostrarNueva(
+                      false
+                    )
                   }
                 >
                   Cancelar
@@ -616,7 +826,9 @@ const Solicitudes = () => {
 
                 <button
                   className="primary-button"
-                  disabled={guardando}
+                  disabled={
+                    guardando
+                  }
                 >
                   {guardando
                     ? "Creando..."
@@ -634,7 +846,11 @@ const Solicitudes = () => {
             <div className="modal-header">
               <div>
                 <h2>
-                  Solicitud #{detalle.solicitud.id}
+                  Solicitud #
+                  {
+                    detalle.solicitud
+                      .id
+                  }
                 </h2>
 
                 <p>
@@ -662,38 +878,60 @@ const Solicitudes = () => {
               <table>
                 <thead>
                   <tr>
-                    <th>Producto</th>
-                    <th>Solicitada</th>
-                    <th>Aprobada</th>
-                    <th>Enviada</th>
-                    <th>Recibida</th>
+                    <th>
+                      Producto
+                    </th>
+
+                    <th>
+                      Solicitada
+                    </th>
+
+                    <th>
+                      Aprobada
+                    </th>
+
+                    <th>
+                      Enviada
+                    </th>
+
+                    <th>
+                      Recibida
+                    </th>
                   </tr>
                 </thead>
 
                 <tbody>
                   {detalle.lineas.map(
                     (linea) => (
-                      <tr key={linea.id}>
+                      <tr
+                        key={
+                          linea.id
+                        }
+                      >
                         <td>
                           {
                             linea.producto_nombre
                           }
                         </td>
+
                         <td>
                           {
                             linea.cantidad_solicitada
                           }
                         </td>
+
                         <td>
                           {
                             linea.cantidad_aprobada
                           }
                         </td>
+
                         <td>
                           {
                             linea.cantidad_enviada_acumulada
                           }
                         </td>
+
                         <td>
                           {
                             linea.cantidad_recibida_acumulada
@@ -708,23 +946,28 @@ const Solicitudes = () => {
 
             <div className="modal-actions">
               {puedeRevisar &&
-                detalle.solicitud.estado ===
+                detalle.solicitud
+                  .estado ===
                   "solicitada" && (
                   <button
                     className="secondary-button"
                     onClick={() =>
                       iniciarRevision(
-                        detalle.solicitud.id
+                        detalle.solicitud
+                          .id
                       )
                     }
                   >
-                    <ClipboardList size={17} />
+                    <ClipboardList
+                      size={17}
+                    />
                     Iniciar revisión
                   </button>
                 )}
 
               {puedeAprobar &&
-                detalle.solicitud.estado ===
+                detalle.solicitud
+                  .estado ===
                   "en_revision" && (
                   <>
                     <button
@@ -732,8 +975,13 @@ const Solicitudes = () => {
                       onClick={
                         rechazarSolicitud
                       }
+                      disabled={
+                        guardando
+                      }
                     >
-                      <XCircle size={17} />
+                      <XCircle
+                        size={17}
+                      />
                       Rechazar
                     </button>
 
@@ -742,13 +990,51 @@ const Solicitudes = () => {
                       onClick={
                         aprobarSolicitud
                       }
+                      disabled={
+                        guardando
+                      }
                     >
                       <CheckCircle2
                         size={17}
                       />
-                      Aprobar completa
+
+                      {guardando
+                        ? "Procesando..."
+                        : "Aprobar completa"}
                     </button>
                   </>
+                )}
+
+              {puedeRevisar &&
+                detalle.solicitud
+                  .estado ===
+                  "aprobada" &&
+                detalle.lineas.some(
+                  (linea) =>
+                    Number(
+                      linea.cantidad_aprobada
+                    ) >
+                    Number(
+                      linea.cantidad_enviada_acumulada
+                    )
+                ) && (
+                  <button
+                    className="primary-button icon-button"
+                    onClick={
+                      crearEnvio
+                    }
+                    disabled={
+                      guardando
+                    }
+                  >
+                    <Truck
+                      size={17}
+                    />
+
+                    {guardando
+                      ? "Creando envío..."
+                      : "Crear envío"}
+                  </button>
                 )}
 
               {puedeAprobar &&
@@ -757,15 +1043,21 @@ const Solicitudes = () => {
                   "en_transito",
                   "recibida"
                 ].includes(
-                  detalle.solicitud.estado
+                  detalle.solicitud
+                    .estado
                 ) && (
                   <button
                     className="secondary-button"
                     onClick={
                       cerrarSolicitud
                     }
+                    disabled={
+                      guardando
+                    }
                   >
-                    <PackageCheck size={17} />
+                    <PackageCheck
+                      size={17}
+                    />
                     Cerrar solicitud
                   </button>
                 )}
