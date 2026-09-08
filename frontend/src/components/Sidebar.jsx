@@ -1,4 +1,8 @@
-import { NavLink, useNavigate } from "react-router-dom";
+import {
+  NavLink,
+  useNavigate
+} from "react-router-dom";
+
 import {
   LayoutDashboard,
   Package,
@@ -8,6 +12,8 @@ import {
   ShoppingCart,
   BarChart3,
   Users,
+  MapPin,
+  FolderTree,
   LogOut
 } from "lucide-react";
 
@@ -15,7 +21,8 @@ const Sidebar = () => {
   const navigate = useNavigate();
 
   const usuario = JSON.parse(
-    localStorage.getItem("usuario") || "{}"
+    localStorage.getItem("usuario") ||
+      "{}"
   );
 
   const cerrarSesion = () => {
@@ -33,6 +40,11 @@ const Sidebar = () => {
 
   const esEquipoInterno =
     usuario.rol === "equipo_interno";
+
+  const esAdminCentral =
+    esPrincipal &&
+    usuario.nivel_permiso ===
+      "aprobador_admin";
 
   return (
     <aside className="sidebar">
@@ -74,6 +86,11 @@ const Sidebar = () => {
           Inventario
         </NavLink>
 
+        <NavLink to="/categorias">
+          <FolderTree size={20} />
+          Categorías
+        </NavLink>
+
         <NavLink to="/solicitudes">
           <ClipboardList size={20} />
           Solicitudes
@@ -101,12 +118,18 @@ const Sidebar = () => {
               Reportes
             </NavLink>
 
-            {usuario.nivel_permiso ===
-              "aprobador_admin" && (
-              <NavLink to="/usuarios">
-                <Users size={20} />
-                Usuarios
-              </NavLink>
+            {esAdminCentral && (
+              <>
+                <NavLink to="/ubicaciones">
+                  <MapPin size={20} />
+                  Ubicaciones
+                </NavLink>
+
+                <NavLink to="/usuarios">
+                  <Users size={20} />
+                  Usuarios
+                </NavLink>
+              </>
             )}
           </>
         )}

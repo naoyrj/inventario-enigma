@@ -60,21 +60,18 @@ app.get(
   "/api/test-db",
   async (req, res) => {
     try {
-      const connection =
-        await pool.getConnection();
-
-      connection.release();
+      await pool.query("SELECT 1");
 
       res.json({
         success: true,
         message:
-          "Conexión con MySQL exitosa"
+          "Conexión con PostgreSQL exitosa"
       });
     } catch (error) {
       res.status(500).json({
         success: false,
         message:
-          "No se pudo conectar con MySQL",
+          "No se pudo conectar con PostgreSQL",
         error: error.message
       });
     }
@@ -93,22 +90,69 @@ app.get(
 );
 
 app.use("/api/auth", authRoutes);
-app.use("/api/ubicaciones", ubicacionesRoutes);
-app.use("/api/categorias", categoriasRoutes);
-app.use("/api/productos", productosRoutes);
-app.use("/api/inventario", inventarioRoutes);
-app.use("/api/usuarios", usuariosRoutes);
-app.use("/api/movimientos", movimientosRoutes);
-app.use("/api/solicitudes", solicitudesRoutes);
-app.use("/api/envios", enviosRoutes);
-app.use("/api/proveedores", proveedoresRoutes);
-app.use("/api/compras", comprasRoutes);
-app.use("/api/reportes", reportesRoutes);
+app.use(
+  "/api/ubicaciones",
+  ubicacionesRoutes
+);
+app.use(
+  "/api/categorias",
+  categoriasRoutes
+);
+app.use(
+  "/api/productos",
+  productosRoutes
+);
+app.use(
+  "/api/inventario",
+  inventarioRoutes
+);
+app.use(
+  "/api/usuarios",
+  usuariosRoutes
+);
+app.use(
+  "/api/movimientos",
+  movimientosRoutes
+);
+app.use(
+  "/api/solicitudes",
+  solicitudesRoutes
+);
+app.use(
+  "/api/envios",
+  enviosRoutes
+);
+app.use(
+  "/api/proveedores",
+  proveedoresRoutes
+);
+app.use(
+  "/api/compras",
+  comprasRoutes
+);
+app.use(
+  "/api/reportes",
+  reportesRoutes
+);
 
-const PORT = process.env.PORT || 5000;
+const PORT =
+  process.env.PORT || 5000;
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(
     `Servidor ejecutándose en http://localhost:${PORT}`
   );
+
+  try {
+    await pool.query("SELECT 1");
+
+    console.log(
+      "Base de datos PostgreSQL conectada"
+    );
+  } catch (error) {
+    console.error(
+      "Error al conectar con PostgreSQL:",
+      error.message
+    );
+  }
 });

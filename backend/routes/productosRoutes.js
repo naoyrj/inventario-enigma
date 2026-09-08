@@ -8,12 +8,40 @@ const {
   deactivateProducto
 } = require("../controllers/productosController");
 
+const {
+  verifyToken
+} = require("../middlewares/authMiddleware");
+
 const router = express.Router();
 
-router.get("/", getProductos);
-router.get("/:id", getProductoById);
-router.post("/", createProducto);
-router.put("/:id", updateProducto);
-router.patch("/:id/desactivar", deactivateProducto);
+router.get(
+  "/",
+  verifyToken,
+  getProductos
+);
+
+router.get(
+  "/:id",
+  verifyToken,
+  getProductoById
+);
+
+router.post(
+  "/",
+  verifyToken,
+  createProducto
+);
+
+router.put(
+  "/:id",
+  verifyToken,
+  updateProducto
+);
+
+router.patch(
+  "/:id/desactivar",
+  verifyToken,
+  deactivateProducto
+);
 
 module.exports = router;

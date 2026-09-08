@@ -1,4 +1,6 @@
-CREATE DATABASE IF NOT EXISTS inventario_enigma;
+CREATE DATABASE IF NOT EXISTS inventario_enigma
+CHARACTER SET utf8mb4
+COLLATE utf8mb4_unicode_ci;
 USE inventario_enigma;
 
 CREATE TABLE categorias (

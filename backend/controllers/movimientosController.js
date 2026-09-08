@@ -2,7 +2,7 @@ const pool = require("../config/db");
 
 const getMovimientos = async (req, res) => {
   try {
-    const [rows] = await pool.query(`
+    const result = await pool.query(`
       SELECT
         m.id,
         m.tipo,
@@ -37,7 +37,7 @@ const getMovimientos = async (req, res) => {
       ORDER BY m.created_at DESC
     `);
 
-    res.json(rows);
+    res.json(result.rows);
   } catch (error) {
     res.status(500).json({
       message: "Error al obtener los movimientos",
@@ -50,7 +50,7 @@ const getMovimientosByUbicacion = async (req, res) => {
   try {
     const { ubicacionId } = req.params;
 
-    const [rows] = await pool.query(
+    const result = await pool.query(
       `
         SELECT
           m.id,
@@ -77,14 +77,14 @@ const getMovimientosByUbicacion = async (req, res) => {
         INNER JOIN usuarios us
           ON m.usuario_id = us.id
 
-        WHERE m.ubicacion_id = ?
+        WHERE m.ubicacion_id = $1
 
         ORDER BY m.created_at DESC
       `,
       [ubicacionId]
     );
 
-    res.json(rows);
+    res.json(result.rows);
   } catch (error) {
     res.status(500).json({
       message:
@@ -95,7 +95,7 @@ const getMovimientosByUbicacion = async (req, res) => {
 };
 
 const registrarEntrada = async (req, res) => {
-  const connection = await pool.getConnection();
+  const client = await pool.connect();
 
   try {
     const {
@@ -130,53 +130,57 @@ const registrarEntrada = async (req, res) => {
       });
     }
 
-    await connection.beginTransaction();
+    await client.query("BEGIN");
 
-    const [ubicaciones] = await connection.query(
+    const ubicacionResult = await client.query(
       `
         SELECT id
         FROM ubicaciones
-        WHERE id = ? AND activo = TRUE
+        WHERE id = $1
+          AND activo = TRUE
       `,
       [ubicacion_id]
     );
 
-    if (ubicaciones.length === 0) {
-      await connection.rollback();
+    if (ubicacionResult.rows.length === 0) {
+      await client.query("ROLLBACK");
 
       return res.status(404).json({
         message: "La ubicación no existe"
       });
     }
 
-    const [productos] = await connection.query(
+    const productoResult = await client.query(
       `
         SELECT id
         FROM productos
-        WHERE id = ? AND activo = TRUE
+        WHERE id = $1
+          AND activo = TRUE
       `,
       [producto_id]
     );
 
-    if (productos.length === 0) {
-      await connection.rollback();
+    if (productoResult.rows.length === 0) {
+      await client.query("ROLLBACK");
 
       return res.status(404).json({
         message: "El producto no existe"
       });
     }
 
-    await connection.query(
+    await client.query(
       `
         INSERT INTO inventario (
           ubicacion_id,
           producto_id,
           cantidad
         )
-        VALUES (?, ?, ?)
+        VALUES ($1, $2, $3)
 
-        ON DUPLICATE KEY UPDATE
-          cantidad = cantidad + VALUES(cantidad)
+        ON CONFLICT (ubicacion_id, producto_id)
+        DO UPDATE SET
+          cantidad = inventario.cantidad + EXCLUDED.cantidad,
+          updated_at = CURRENT_TIMESTAMP
       `,
       [
         ubicacion_id,
@@ -185,7 +189,7 @@ const registrarEntrada = async (req, res) => {
       ]
     );
 
-    const [movimiento] = await connection.query(
+    const movimientoResult = await client.query(
       `
         INSERT INTO movimientos (
           ubicacion_id,
@@ -197,7 +201,8 @@ const registrarEntrada = async (req, res) => {
           referencia_id,
           motivo
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        RETURNING id
       `,
       [
         ubicacion_id,
@@ -211,29 +216,36 @@ const registrarEntrada = async (req, res) => {
       ]
     );
 
-    await connection.commit();
+    await client.query("COMMIT");
 
     res.status(201).json({
       message: "Entrada registrada correctamente",
-      movimiento_id: movimiento.insertId,
+      movimiento_id: movimientoResult.rows[0].id,
       ubicacion_id,
       producto_id,
       cantidad: cantidadNumero
     });
   } catch (error) {
-    await connection.rollback();
+    try {
+      await client.query("ROLLBACK");
+    } catch (rollbackError) {
+      console.error(
+        "Error al revertir la transacción:",
+        rollbackError
+      );
+    }
 
     res.status(500).json({
       message: "Error al registrar la entrada",
       error: error.message
     });
   } finally {
-    connection.release();
+    client.release();
   }
 };
 
 const registrarSalida = async (req, res) => {
-  const connection = await pool.getConnection();
+  const client = await pool.connect();
 
   try {
     const {
@@ -268,16 +280,16 @@ const registrarSalida = async (req, res) => {
       });
     }
 
-    await connection.beginTransaction();
+    await client.query("BEGIN");
 
-    const [inventario] = await connection.query(
+    const inventarioResult = await client.query(
       `
         SELECT
           id,
           cantidad
         FROM inventario
-        WHERE ubicacion_id = ?
-          AND producto_id = ?
+        WHERE ubicacion_id = $1
+          AND producto_id = $2
         FOR UPDATE
       `,
       [
@@ -286,8 +298,8 @@ const registrarSalida = async (req, res) => {
       ]
     );
 
-    if (inventario.length === 0) {
-      await connection.rollback();
+    if (inventarioResult.rows.length === 0) {
+      await client.query("ROLLBACK");
 
       return res.status(404).json({
         message:
@@ -296,11 +308,11 @@ const registrarSalida = async (req, res) => {
     }
 
     const stockActual = Number(
-      inventario[0].cantidad
+      inventarioResult.rows[0].cantidad
     );
 
     if (stockActual < cantidadNumero) {
-      await connection.rollback();
+      await client.query("ROLLBACK");
 
       return res.status(400).json({
         message: "Stock insuficiente",
@@ -309,12 +321,14 @@ const registrarSalida = async (req, res) => {
       });
     }
 
-    await connection.query(
+    await client.query(
       `
         UPDATE inventario
-        SET cantidad = cantidad - ?
-        WHERE ubicacion_id = ?
-          AND producto_id = ?
+        SET
+          cantidad = cantidad - $1,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE ubicacion_id = $2
+          AND producto_id = $3
       `,
       [
         cantidadNumero,
@@ -323,7 +337,7 @@ const registrarSalida = async (req, res) => {
       ]
     );
 
-    const [movimiento] = await connection.query(
+    const movimientoResult = await client.query(
       `
         INSERT INTO movimientos (
           ubicacion_id,
@@ -335,7 +349,8 @@ const registrarSalida = async (req, res) => {
           referencia_id,
           motivo
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        RETURNING id
       `,
       [
         ubicacion_id,
@@ -349,11 +364,11 @@ const registrarSalida = async (req, res) => {
       ]
     );
 
-    await connection.commit();
+    await client.query("COMMIT");
 
     res.status(201).json({
       message: "Salida registrada correctamente",
-      movimiento_id: movimiento.insertId,
+      movimiento_id: movimientoResult.rows[0].id,
       ubicacion_id,
       producto_id,
       cantidad: cantidadNumero,
@@ -361,14 +376,21 @@ const registrarSalida = async (req, res) => {
         stockActual - cantidadNumero
     });
   } catch (error) {
-    await connection.rollback();
+    try {
+      await client.query("ROLLBACK");
+    } catch (rollbackError) {
+      console.error(
+        "Error al revertir la transacción:",
+        rollbackError
+      );
+    }
 
     res.status(500).json({
       message: "Error al registrar la salida",
       error: error.message
     });
   } finally {
-    connection.release();
+    client.release();
   }
 };
 

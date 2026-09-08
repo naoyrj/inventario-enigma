@@ -18,7 +18,7 @@ const validarAdminCentral = (req, res) => {
 
 const getProveedores = async (req, res) => {
   try {
-    const [rows] = await pool.query(`
+    const result = await pool.query(`
       SELECT
         id,
         nombre,
@@ -31,7 +31,7 @@ const getProveedores = async (req, res) => {
       ORDER BY nombre
     `);
 
-    res.json(rows);
+    res.json(result.rows);
   } catch (error) {
     res.status(500).json({
       message: "Error al obtener proveedores",
@@ -44,22 +44,22 @@ const getProveedorById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const [proveedores] = await pool.query(
+    const proveedorResult = await pool.query(
       `
         SELECT *
         FROM proveedores
-        WHERE id = ?
+        WHERE id = $1
       `,
       [id]
     );
 
-    if (proveedores.length === 0) {
+    if (proveedorResult.rows.length === 0) {
       return res.status(404).json({
         message: "Proveedor no encontrado"
       });
     }
 
-    const [productos] = await pool.query(
+    const productosResult = await pool.query(
       `
         SELECT
           p.id,
@@ -69,15 +69,15 @@ const getProveedorById = async (req, res) => {
         FROM proveedor_productos pp
         INNER JOIN productos p
           ON pp.producto_id = p.id
-        WHERE pp.proveedor_id = ?
+        WHERE pp.proveedor_id = $1
         ORDER BY p.nombre
       `,
       [id]
     );
 
     res.json({
-      proveedor: proveedores[0],
-      productos
+      proveedor: proveedorResult.rows[0],
+      productos: productosResult.rows
     });
   } catch (error) {
     res.status(500).json({
@@ -104,7 +104,7 @@ const createProveedor = async (req, res) => {
       });
     }
 
-    const [result] = await pool.query(
+    const result = await pool.query(
       `
         INSERT INTO proveedores (
           nombre,
@@ -112,7 +112,8 @@ const createProveedor = async (req, res) => {
           telefono,
           email
         )
-        VALUES (?, ?, ?, ?)
+        VALUES ($1, $2, $3, $4)
+        RETURNING id
       `,
       [
         nombre.trim(),
@@ -124,7 +125,7 @@ const createProveedor = async (req, res) => {
 
     res.status(201).json({
       message: "Proveedor creado correctamente",
-      id: result.insertId
+      id: result.rows[0].id
     });
   } catch (error) {
     res.status(500).json({
@@ -147,31 +148,33 @@ const asociarProducto = async (req, res) => {
       });
     }
 
-    const [proveedor] = await pool.query(
+    const proveedorResult = await pool.query(
       `
         SELECT id
         FROM proveedores
-        WHERE id = ? AND activo = 1
+        WHERE id = $1
+          AND activo = TRUE
       `,
       [proveedorId]
     );
 
-    if (proveedor.length === 0) {
+    if (proveedorResult.rows.length === 0) {
       return res.status(404).json({
         message: "Proveedor no encontrado o inactivo"
       });
     }
 
-    const [producto] = await pool.query(
+    const productoResult = await pool.query(
       `
         SELECT id
         FROM productos
-        WHERE id = ? AND activo = 1
+        WHERE id = $1
+          AND activo = TRUE
       `,
       [productoId]
     );
 
-    if (producto.length === 0) {
+    if (productoResult.rows.length === 0) {
       return res.status(404).json({
         message: "Producto no encontrado o inactivo"
       });
@@ -179,11 +182,13 @@ const asociarProducto = async (req, res) => {
 
     await pool.query(
       `
-        INSERT IGNORE INTO proveedor_productos (
+        INSERT INTO proveedor_productos (
           proveedor_id,
           producto_id
         )
-        VALUES (?, ?)
+        VALUES ($1, $2)
+        ON CONFLICT (proveedor_id, producto_id)
+        DO NOTHING
       `,
       [proveedorId, productoId]
     );
@@ -192,6 +197,12 @@ const asociarProducto = async (req, res) => {
       message: "Producto asociado al proveedor correctamente"
     });
   } catch (error) {
+    if (error.code === "23503") {
+      return res.status(400).json({
+        message: "Proveedor o producto no válido"
+      });
+    }
+
     res.status(500).json({
       message: "Error al asociar el producto",
       error: error.message

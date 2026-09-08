@@ -13,6 +13,8 @@ import Proveedores from "./pages/Proveedores";
 import Compras from "./pages/Compras";
 import Reportes from "./pages/Reportes";
 import Usuarios from "./pages/Usuarios";
+import Ubicaciones from "./pages/Ubicaciones";
+import Categorias from "./pages/Categorias";
 
 import Layout from "./components/Layout";
 
@@ -92,6 +94,11 @@ const App = () => {
         />
 
         <Route
+          path="/categorias"
+          element={<Categorias />}
+        />
+
+        <Route
           path="/solicitudes"
           element={<Solicitudes />}
         />
@@ -129,6 +136,15 @@ const App = () => {
           element={
             <PrincipalRoute adminOnly>
               <Usuarios />
+            </PrincipalRoute>
+          }
+        />
+
+        <Route
+          path="/ubicaciones"
+          element={
+            <PrincipalRoute adminOnly>
+              <Ubicaciones />
             </PrincipalRoute>
           }
         />

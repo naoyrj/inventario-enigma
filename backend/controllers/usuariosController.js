@@ -1,9 +1,62 @@
 const pool = require("../config/db");
 const bcrypt = require("bcrypt");
 
+const PERMISOS_VALIDOS = [
+  "consulta",
+  "operador",
+  "aprobador_admin"
+];
+
+const ROLES_VALIDOS = [
+  "principal",
+  "sucursal",
+  "equipo_interno"
+];
+
+const esAdministradorCentral = (req) => {
+  return (
+    req.usuario?.rol === "principal" &&
+    req.usuario?.nivel_permiso === "aprobador_admin"
+  );
+};
+
+const rolPorTipoUbicacion = (tipo) => {
+  if (tipo === "central") {
+    return "principal";
+  }
+
+  if (tipo === "sucursal") {
+    return "sucursal";
+  }
+
+  if (tipo === "equipo_interno") {
+    return "equipo_interno";
+  }
+
+  return null;
+};
+
+const obtenerUbicacion = async (ubicacionId) => {
+  const result = await pool.query(
+    `
+      SELECT
+        id,
+        nombre,
+        tipo,
+        activo
+      FROM ubicaciones
+      WHERE id = $1
+      LIMIT 1
+    `,
+    [ubicacionId]
+  );
+
+  return result.rows[0] || null;
+};
+
 const getUsuarios = async (req, res) => {
   try {
-    const [rows] = await pool.query(`
+    const result = await pool.query(`
       SELECT
         u.id,
         u.nombre,
@@ -21,9 +74,9 @@ const getUsuarios = async (req, res) => {
       ORDER BY u.nombre
     `);
 
-    res.json(rows);
+    return res.json(result.rows);
   } catch (error) {
-    res.status(500).json({
+    return res.status(500).json({
       message: "Error al obtener los usuarios",
       error: error.message
     });
@@ -34,7 +87,7 @@ const getUsuarioById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const [rows] = await pool.query(
+    const result = await pool.query(
       `
         SELECT
           u.id,
@@ -50,20 +103,20 @@ const getUsuarioById = async (req, res) => {
         FROM usuarios u
         LEFT JOIN ubicaciones ub
           ON u.ubicacion_id = ub.id
-        WHERE u.id = ?
+        WHERE u.id = $1
       `,
       [id]
     );
 
-    if (rows.length === 0) {
+    if (result.rows.length === 0) {
       return res.status(404).json({
         message: "Usuario no encontrado"
       });
     }
 
-    res.json(rows[0]);
+    return res.json(result.rows[0]);
   } catch (error) {
-    res.status(500).json({
+    return res.status(500).json({
       message: "Error al obtener el usuario",
       error: error.message
     });
@@ -72,6 +125,13 @@ const getUsuarioById = async (req, res) => {
 
 const createUsuario = async (req, res) => {
   try {
+    if (!esAdministradorCentral(req)) {
+      return res.status(403).json({
+        message:
+          "Solo un Aprobador/Administrador puede crear usuarios"
+      });
+    }
+
     const {
       nombre,
       email,
@@ -82,136 +142,97 @@ const createUsuario = async (req, res) => {
       nivel_permiso = null
     } = req.body;
 
-    if (
-      req.usuario.rol !== "principal" ||
-      req.usuario.nivel_permiso !== "aprobador_admin"
-    ) {
-      return res.status(403).json({
-        message:
-          "Solo un Aprobador/Administrador puede crear usuarios"
-      });
-    }
-
-    if (!nombre || !rol || !ubicacion_id) {
+    if (!nombre || !ubicacion_id) {
       return res.status(400).json({
         message:
-          "Nombre, rol y ubicación son obligatorios"
+          "Nombre y ubicación son obligatorios"
       });
     }
 
-    const rolesValidos = [
-      "principal",
-      "sucursal",
-      "equipo_interno"
-    ];
-
-    if (!rolesValidos.includes(rol)) {
-      return res.status(400).json({
-        message: "Rol de usuario no válido"
-      });
-    }
-
-    if (
-      rol === "sucursal" &&
-      (!pin || !/^\d{4,6}$/.test(pin))
-    ) {
-      return res.status(400).json({
-        message:
-          "Los usuarios de sucursal necesitan un PIN de 4 a 6 dígitos"
-      });
-    }
-
-    if (
-      rol !== "sucursal" &&
-      (!email || !password)
-    ) {
-      return res.status(400).json({
-        message:
-          "Central y Equipos Internos necesitan email y contraseña"
-      });
-    }
-
-    const permisosValidos = [
-      "consulta",
-      "operador",
-      "aprobador_admin"
-    ];
-
-    if (
-      rol === "principal" &&
-      (!nivel_permiso ||
-        !permisosValidos.includes(nivel_permiso))
-    ) {
-      return res.status(400).json({
-        message:
-          "El usuario de Central necesita un nivel de permiso válido"
-      });
-    }
-
-    const [ubicaciones] = await pool.query(
-      `
-        SELECT id, tipo
-        FROM ubicaciones
-        WHERE id = ?
-          AND activo = TRUE
-      `,
-      [ubicacion_id]
+    const ubicacion = await obtenerUbicacion(
+      ubicacion_id
     );
 
-    if (ubicaciones.length === 0) {
+    if (!ubicacion || !ubicacion.activo) {
       return res.status(404).json({
-        message: "Ubicación no encontrada"
+        message:
+          "La ubicación no existe o está inactiva"
+      });
+    }
+
+    const rolEsperado = rolPorTipoUbicacion(
+      ubicacion.tipo
+    );
+
+    if (!rolEsperado) {
+      return res.status(400).json({
+        message:
+          "El tipo de ubicación no admite usuarios"
       });
     }
 
     if (
-      rol === "sucursal" &&
-      ubicaciones[0].tipo !== "sucursal"
+      rol &&
+      (
+        !ROLES_VALIDOS.includes(rol) ||
+        rol !== rolEsperado
+      )
     ) {
       return res.status(400).json({
         message:
-          "Un usuario de sucursal debe pertenecer a una ubicación tipo sucursal"
+          "El rol no corresponde al tipo de ubicación seleccionada"
       });
     }
 
-    if (
-      rol === "equipo_interno" &&
-      ubicaciones[0].tipo !== "equipo_interno"
-    ) {
-      return res.status(400).json({
-        message:
-          "El usuario debe pertenecer a un Equipo Interno"
-      });
+    if (rolEsperado === "sucursal") {
+      if (
+        !pin ||
+        !/^\d{4,6}$/.test(String(pin))
+      ) {
+        return res.status(400).json({
+          message:
+            "Los usuarios de Sucursal necesitan un PIN de 4 a 6 dígitos"
+        });
+      }
+    } else {
+      if (!email || !password) {
+        return res.status(400).json({
+          message:
+            "Central y Equipos Internos necesitan email y contraseña"
+        });
+      }
     }
 
-    if (
-      rol === "principal" &&
-      ubicaciones[0].tipo !== "central"
-    ) {
-      return res.status(400).json({
-        message:
-          "Un usuario Principal debe pertenecer a Central"
-      });
+    if (rolEsperado === "principal") {
+      if (
+        !nivel_permiso ||
+        !PERMISOS_VALIDOS.includes(
+          nivel_permiso
+        )
+      ) {
+        return res.status(400).json({
+          message:
+            "El usuario de Central necesita un nivel de permiso válido"
+        });
+      }
     }
 
     let passwordHash = null;
     let pinHash = null;
 
-    if (password) {
+    if (rolEsperado === "sucursal") {
+      pinHash = await bcrypt.hash(
+        String(pin),
+        10
+      );
+    } else {
       passwordHash = await bcrypt.hash(
         password,
         10
       );
     }
 
-    if (pin) {
-      pinHash = await bcrypt.hash(
-        pin,
-        10
-      );
-    }
-
-    const [result] = await pool.query(
+    const result = await pool.query(
       `
         INSERT INTO usuarios (
           nombre,
@@ -220,41 +241,330 @@ const createUsuario = async (req, res) => {
           pin_hash,
           rol,
           nivel_permiso,
-          ubicacion_id
+          ubicacion_id,
+          activo
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        VALUES (
+          $1,
+          $2,
+          $3,
+          $4,
+          $5,
+          $6,
+          $7,
+          TRUE
+        )
+        RETURNING id
       `,
       [
         nombre.trim(),
-        email
-          ? email.trim().toLowerCase()
-          : null,
+        rolEsperado === "sucursal"
+          ? null
+          : email.trim().toLowerCase(),
         passwordHash,
         pinHash,
-        rol,
-        rol === "principal"
+        rolEsperado,
+        rolEsperado === "principal"
           ? nivel_permiso
           : null,
-        ubicacion_id
+        Number(ubicacion_id)
       ]
     );
 
-    res.status(201).json({
+    return res.status(201).json({
       message: "Usuario creado correctamente",
-      id: result.insertId
+      id: result.rows[0].id
     });
   } catch (error) {
-    if (error.code === "ER_DUP_ENTRY") {
+    if (error.code === "23505") {
       return res.status(409).json({
         message:
           "Ya existe un usuario con ese email"
       });
     }
 
-    res.status(500).json({
+    return res.status(500).json({
       message: "Error al crear el usuario",
       error: error.message
     });
+  }
+};
+
+const updateUsuario = async (req, res) => {
+  const client = await pool.connect();
+
+  try {
+    if (!esAdministradorCentral(req)) {
+      return res.status(403).json({
+        message:
+          "Solo un Aprobador/Administrador puede editar usuarios"
+      });
+    }
+
+    const { id } = req.params;
+
+    const {
+      nombre,
+      email,
+      password,
+      pin,
+      rol,
+      ubicacion_id,
+      nivel_permiso
+    } = req.body;
+
+    if (!nombre || !ubicacion_id) {
+      return res.status(400).json({
+        message:
+          "Nombre y ubicación son obligatorios"
+      });
+    }
+
+    await client.query("BEGIN");
+
+    const usuarioResult = await client.query(
+      `
+        SELECT
+          id,
+          email,
+          password_hash,
+          pin_hash,
+          rol,
+          nivel_permiso,
+          ubicacion_id,
+          activo
+        FROM usuarios
+        WHERE id = $1
+        FOR UPDATE
+      `,
+      [id]
+    );
+
+    if (usuarioResult.rows.length === 0) {
+      await client.query("ROLLBACK");
+
+      return res.status(404).json({
+        message: "Usuario no encontrado"
+      });
+    }
+
+    const usuarioActual =
+      usuarioResult.rows[0];
+
+    const ubicacionResult =
+      await client.query(
+        `
+          SELECT
+            id,
+            nombre,
+            tipo,
+            activo
+          FROM ubicaciones
+          WHERE id = $1
+          LIMIT 1
+        `,
+        [ubicacion_id]
+      );
+
+    if (
+      ubicacionResult.rows.length === 0 ||
+      !ubicacionResult.rows[0].activo
+    ) {
+      await client.query("ROLLBACK");
+
+      return res.status(404).json({
+        message:
+          "La ubicación no existe o está inactiva"
+      });
+    }
+
+    const ubicacion =
+      ubicacionResult.rows[0];
+
+    const rolEsperado =
+      rolPorTipoUbicacion(
+        ubicacion.tipo
+      );
+
+    if (!rolEsperado) {
+      await client.query("ROLLBACK");
+
+      return res.status(400).json({
+        message:
+          "El tipo de ubicación no admite usuarios"
+      });
+    }
+
+    if (
+      rol &&
+      (
+        !ROLES_VALIDOS.includes(rol) ||
+        rol !== rolEsperado
+      )
+    ) {
+      await client.query("ROLLBACK");
+
+      return res.status(400).json({
+        message:
+          "El rol no corresponde al tipo de ubicación seleccionada"
+      });
+    }
+
+    if (rolEsperado === "principal") {
+      if (
+        !nivel_permiso ||
+        !PERMISOS_VALIDOS.includes(
+          nivel_permiso
+        )
+      ) {
+        await client.query("ROLLBACK");
+
+        return res.status(400).json({
+          message:
+            "El usuario de Central necesita un nivel de permiso válido"
+        });
+      }
+    }
+
+    let emailFinal = null;
+    let passwordHashFinal = null;
+    let pinHashFinal = null;
+
+    if (rolEsperado === "sucursal") {
+      if (
+        String(pin || "").trim()
+      ) {
+        if (
+          !/^\d{4,6}$/.test(
+            String(pin)
+          )
+        ) {
+          await client.query(
+            "ROLLBACK"
+          );
+
+          return res.status(400).json({
+            message:
+              "El PIN debe contener entre 4 y 6 dígitos"
+          });
+        }
+
+        pinHashFinal =
+          await bcrypt.hash(
+            String(pin),
+            10
+          );
+      } else if (
+        usuarioActual.rol ===
+          "sucursal" &&
+        usuarioActual.pin_hash
+      ) {
+        pinHashFinal =
+          usuarioActual.pin_hash;
+      } else {
+        await client.query(
+          "ROLLBACK"
+        );
+
+        return res.status(400).json({
+          message:
+            "Debes configurar un PIN para este usuario de Sucursal"
+        });
+      }
+    } else {
+      emailFinal =
+        String(email || "")
+          .trim()
+          .toLowerCase();
+
+      if (!emailFinal) {
+        await client.query(
+          "ROLLBACK"
+        );
+
+        return res.status(400).json({
+          message:
+            "El correo es obligatorio para Central y Equipos Internos"
+        });
+      }
+
+      if (
+        String(password || "").trim()
+      ) {
+        passwordHashFinal =
+          await bcrypt.hash(
+            password,
+            10
+          );
+      } else if (
+        usuarioActual.rol !==
+          "sucursal" &&
+        usuarioActual.password_hash
+      ) {
+        passwordHashFinal =
+          usuarioActual.password_hash;
+      } else {
+        await client.query(
+          "ROLLBACK"
+        );
+
+        return res.status(400).json({
+          message:
+            "Debes configurar una contraseña para este usuario"
+        });
+      }
+    }
+
+    await client.query(
+      `
+        UPDATE usuarios
+        SET
+          nombre = $1,
+          email = $2,
+          password_hash = $3,
+          pin_hash = $4,
+          rol = $5,
+          nivel_permiso = $6,
+          ubicacion_id = $7
+        WHERE id = $8
+      `,
+      [
+        nombre.trim(),
+        emailFinal,
+        passwordHashFinal,
+        pinHashFinal,
+        rolEsperado,
+        rolEsperado === "principal"
+          ? nivel_permiso
+          : null,
+        Number(ubicacion_id),
+        id
+      ]
+    );
+
+    await client.query("COMMIT");
+
+    return res.json({
+      message:
+        "Usuario actualizado correctamente"
+    });
+  } catch (error) {
+    await client.query("ROLLBACK");
+
+    if (error.code === "23505") {
+      return res.status(409).json({
+        message:
+          "Ya existe un usuario con ese email"
+      });
+    }
+
+    return res.status(500).json({
+      message:
+        "Error al actualizar el usuario",
+      error: error.message
+    });
+  } finally {
+    client.release();
   }
 };
 
@@ -272,7 +582,7 @@ const validarPin = async (req, res) => {
       });
     }
 
-    const [rows] = await pool.query(
+    const result = await pool.query(
       `
         SELECT
           id,
@@ -282,31 +592,40 @@ const validarPin = async (req, res) => {
           ubicacion_id,
           activo
         FROM usuarios
-        WHERE id = ?
+        WHERE id = $1
           AND rol = 'sucursal'
       `,
       [usuario_id]
     );
 
-    if (rows.length === 0) {
+    if (result.rows.length === 0) {
       return res.status(404).json({
         message:
           "Usuario de sucursal no encontrado"
       });
     }
 
-    const usuario = rows[0];
+    const usuario = result.rows[0];
 
     if (!usuario.activo) {
       return res.status(403).json({
-        message: "Usuario desactivado"
+        message:
+          "Usuario desactivado"
       });
     }
 
-    const correcto = await bcrypt.compare(
-      pin,
-      usuario.pin_hash
-    );
+    if (!usuario.pin_hash) {
+      return res.status(401).json({
+        message:
+          "El usuario no tiene un PIN configurado"
+      });
+    }
+
+    const correcto =
+      await bcrypt.compare(
+        String(pin),
+        usuario.pin_hash
+      );
 
     if (!correcto) {
       return res.status(401).json({
@@ -314,7 +633,7 @@ const validarPin = async (req, res) => {
       });
     }
 
-    res.json({
+    return res.json({
       message: "PIN válido",
       usuario: {
         id: usuario.id,
@@ -325,19 +644,19 @@ const validarPin = async (req, res) => {
       }
     });
   } catch (error) {
-    res.status(500).json({
+    return res.status(500).json({
       message: "Error al validar PIN",
       error: error.message
     });
   }
 };
 
-const deactivateUsuario = async (req, res) => {
+const deactivateUsuario = async (
+  req,
+  res
+) => {
   try {
-    if (
-      req.usuario.rol !== "principal" ||
-      req.usuario.nivel_permiso !== "aprobador_admin"
-    ) {
+    if (!esAdministradorCentral(req)) {
       return res.status(403).json({
         message:
           "Solo un Aprobador/Administrador puede desactivar usuarios"
@@ -346,27 +665,29 @@ const deactivateUsuario = async (req, res) => {
 
     const { id } = req.params;
 
-    const [result] = await pool.query(
+    const result = await pool.query(
       `
         UPDATE usuarios
         SET activo = FALSE
-        WHERE id = ?
+        WHERE id = $1
+        RETURNING id
       `,
       [id]
     );
 
-    if (result.affectedRows === 0) {
+    if (result.rowCount === 0) {
       return res.status(404).json({
-        message: "Usuario no encontrado"
+        message:
+          "Usuario no encontrado"
       });
     }
 
-    res.json({
+    return res.json({
       message:
         "Usuario desactivado correctamente"
     });
   } catch (error) {
-    res.status(500).json({
+    return res.status(500).json({
       message:
         "Error al desactivar el usuario",
       error: error.message
@@ -378,6 +699,7 @@ module.exports = {
   getUsuarios,
   getUsuarioById,
   createUsuario,
+  updateUsuario,
   validarPin,
   deactivateUsuario
 };

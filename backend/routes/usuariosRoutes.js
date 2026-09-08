@@ -4,6 +4,7 @@ const {
   getUsuarios,
   getUsuarioById,
   createUsuario,
+  updateUsuario,
   validarPin,
   deactivateUsuario
 } = require("../controllers/usuariosController");
@@ -30,6 +31,12 @@ router.post(
   "/",
   verifyToken,
   createUsuario
+);
+
+router.patch(
+  "/:id",
+  verifyToken,
+  updateUsuario
 );
 
 router.post(

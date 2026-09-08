@@ -25,11 +25,12 @@ const login = async (req, res) => {
 
     if (!email || !password) {
       return res.status(400).json({
-        message: "Correo y contraseña son obligatorios"
+        message:
+          "Correo y contraseña son obligatorios"
       });
     }
 
-    const [usuarios] = await pool.query(
+    const result = await pool.query(
       `
         SELECT
           u.id,
@@ -45,36 +46,49 @@ const login = async (req, res) => {
         FROM usuarios u
         LEFT JOIN ubicaciones ub
           ON ub.id = u.ubicacion_id
-        WHERE u.email = ?
+        WHERE LOWER(u.email) = LOWER($1)
         LIMIT 1
       `,
       [email]
     );
 
-    if (usuarios.length === 0) {
+    if (result.rows.length === 0) {
       return res.status(401).json({
         message: "Credenciales incorrectas"
       });
     }
 
-    const usuario = usuarios[0];
+    const usuario = result.rows[0];
 
     if (!usuario.activo) {
       return res.status(403).json({
-        message: "El usuario está desactivado"
+        message:
+          "El usuario está desactivado"
+      });
+    }
+
+    if (
+      usuario.rol !== "principal" &&
+      usuario.rol !== "equipo_interno"
+    ) {
+      return res.status(403).json({
+        message:
+          "Este usuario debe ingresar mediante PIN"
       });
     }
 
     if (!usuario.password_hash) {
       return res.status(401).json({
-        message: "Este usuario debe ingresar mediante PIN"
+        message:
+          "El usuario no tiene contraseña configurada"
       });
     }
 
-    const passwordValido = await bcrypt.compare(
-      password,
-      usuario.password_hash
-    );
+    const passwordValido =
+      await bcrypt.compare(
+        password,
+        usuario.password_hash
+      );
 
     if (!passwordValido) {
       return res.status(401).json({
@@ -87,22 +101,103 @@ const login = async (req, res) => {
     delete usuario.password_hash;
 
     return res.json({
-      message: "Inicio de sesión exitoso",
+      message:
+        "Inicio de sesión exitoso",
       token,
       usuario
     });
   } catch (error) {
-    console.error("Error login:", error);
+    console.error(
+      "Error login:",
+      error
+    );
 
     return res.status(500).json({
-      message: "Error al iniciar sesión"
+      message:
+        "Error al iniciar sesión"
     });
   }
 };
 
-const getUsuariosSucursal = async (req, res) => {
+const getSucursales = async (
+  req,
+  res
+) => {
   try {
-    const [usuarios] = await pool.query(
+    const result = await pool.query(
+      `
+        SELECT
+          id,
+          nombre
+        FROM ubicaciones
+        WHERE
+          tipo = 'sucursal'
+          AND activo = TRUE
+        ORDER BY nombre ASC
+      `
+    );
+
+    return res.json(result.rows);
+  } catch (error) {
+    console.error(
+      "Error obteniendo sucursales:",
+      error
+    );
+
+    return res.status(500).json({
+      message:
+        "No fue posible obtener las sucursales"
+    });
+  }
+};
+
+const getUsuariosSucursal = async (
+  req,
+  res
+) => {
+  try {
+    const ubicacionId = Number(
+      req.query.ubicacion_id
+    );
+
+    if (
+      !ubicacionId ||
+      Number.isNaN(ubicacionId)
+    ) {
+      return res.status(400).json({
+        message:
+          "La sucursal del dispositivo es obligatoria"
+      });
+    }
+
+    const sucursalResult =
+      await pool.query(
+        `
+          SELECT
+            id,
+            nombre,
+            tipo,
+            activo
+          FROM ubicaciones
+          WHERE
+            id = $1
+            AND tipo = 'sucursal'
+            AND activo = TRUE
+          LIMIT 1
+        `,
+        [ubicacionId]
+      );
+
+    if (
+      sucursalResult.rows.length === 0
+    ) {
+      return res.status(404).json({
+        message:
+          "La sucursal configurada no existe o está inactiva"
+      });
+    }
+
+    const result = await pool.query(
       `
         SELECT
           u.id,
@@ -114,40 +209,82 @@ const getUsuariosSucursal = async (req, res) => {
           ON ub.id = u.ubicacion_id
         WHERE
           u.rol = 'sucursal'
-          AND u.activo = 1
+          AND u.activo = TRUE
+          AND u.ubicacion_id = $1
+          AND ub.tipo = 'sucursal'
+          AND ub.activo = TRUE
         ORDER BY
-          ub.nombre ASC,
           u.nombre ASC
-      `
+      `,
+      [ubicacionId]
     );
 
-    return res.json(usuarios);
+    return res.json(result.rows);
   } catch (error) {
-    console.error(error);
+    console.error(
+      "Error obteniendo usuarios de sucursal:",
+      error
+    );
 
     return res.status(500).json({
-      message: "No fue posible obtener usuarios de sucursal"
+      message:
+        "No fue posible obtener usuarios de sucursal"
     });
   }
 };
 
-const loginPin = async (req, res) => {
+const loginPin = async (
+  req,
+  res
+) => {
   try {
-    const { usuario_id, pin } = req.body;
+    const {
+      usuario_id,
+      pin,
+      ubicacion_id
+    } = req.body;
 
-    if (!usuario_id || !pin) {
+    const usuarioId = Number(
+      usuario_id
+    );
+
+    const ubicacionId = Number(
+      ubicacion_id
+    );
+
+    if (
+      !usuarioId ||
+      !ubicacionId ||
+      !pin
+    ) {
       return res.status(400).json({
-        message: "Usuario y PIN son obligatorios"
+        message:
+          "Usuario, sucursal y PIN son obligatorios"
       });
     }
 
-    if (!/^\d{4,6}$/.test(String(pin))) {
+    if (
+      Number.isNaN(usuarioId) ||
+      Number.isNaN(ubicacionId)
+    ) {
       return res.status(400).json({
-        message: "El PIN debe contener entre 4 y 6 dígitos"
+        message:
+          "Usuario o sucursal inválidos"
       });
     }
 
-    const [usuarios] = await pool.query(
+    if (
+      !/^\d{4,6}$/.test(
+        String(pin)
+      )
+    ) {
+      return res.status(400).json({
+        message:
+          "El PIN debe contener entre 4 y 6 dígitos"
+      });
+    }
+
+    const result = await pool.query(
       `
         SELECT
           u.id,
@@ -161,65 +298,80 @@ const loginPin = async (req, res) => {
           ub.tipo AS ubicacion_tipo,
           u.activo
         FROM usuarios u
-        LEFT JOIN ubicaciones ub
+        INNER JOIN ubicaciones ub
           ON ub.id = u.ubicacion_id
-        WHERE u.id = ?
+        WHERE
+          u.id = $1
+          AND u.ubicacion_id = $2
+          AND u.rol = 'sucursal'
+          AND ub.tipo = 'sucursal'
         LIMIT 1
       `,
-      [usuario_id]
+      [
+        usuarioId,
+        ubicacionId
+      ]
     );
 
-    if (usuarios.length === 0) {
+    if (
+      result.rows.length === 0
+    ) {
       return res.status(401).json({
-        message: "Usuario no encontrado"
+        message:
+          "El usuario no pertenece a esta sucursal"
       });
     }
 
-    const usuario = usuarios[0];
+    const usuario =
+      result.rows[0];
 
     if (!usuario.activo) {
       return res.status(403).json({
-        message: "El usuario está desactivado"
-      });
-    }
-
-    if (usuario.rol !== "sucursal") {
-      return res.status(403).json({
-        message: "El acceso por PIN es exclusivo para sucursales"
+        message:
+          "El usuario está desactivado"
       });
     }
 
     if (!usuario.pin_hash) {
       return res.status(401).json({
-        message: "El usuario no tiene un PIN configurado"
+        message:
+          "El usuario no tiene un PIN configurado"
       });
     }
 
-    const pinValido = await bcrypt.compare(
-      String(pin),
-      usuario.pin_hash
-    );
+    const pinValido =
+      await bcrypt.compare(
+        String(pin),
+        usuario.pin_hash
+      );
 
     if (!pinValido) {
       return res.status(401).json({
-        message: "PIN incorrecto"
+        message:
+          "PIN incorrecto"
       });
     }
 
-    const token = generarToken(usuario);
+    const token =
+      generarToken(usuario);
 
     delete usuario.pin_hash;
 
     return res.json({
-      message: "Acceso autorizado",
+      message:
+        "Acceso autorizado",
       token,
       usuario
     });
   } catch (error) {
-    console.error("Error login PIN:", error);
+    console.error(
+      "Error login PIN:",
+      error
+    );
 
     return res.status(500).json({
-      message: "Error al validar el PIN"
+      message:
+        "Error al validar el PIN"
     });
   }
 };
@@ -227,5 +379,6 @@ const loginPin = async (req, res) => {
 module.exports = {
   login,
   loginPin,
-  getUsuariosSucursal
+  getUsuariosSucursal,
+  getSucursales
 };

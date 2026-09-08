@@ -1,35 +1,175 @@
-import { useEffect, useState } from "react";
 import {
+  useEffect,
+  useMemo,
+  useState
+} from "react";
+
+import {
+  Pencil,
   Plus,
   RefreshCw,
-  UserX,
-  Users as UsersIcon
+  UserX
 } from "lucide-react";
+
 import api from "../services/api";
 
+const FORM_INICIAL = {
+  nombre: "",
+  email: "",
+  password: "",
+  pin: "",
+  rol: "",
+  ubicacion_id: "",
+  nivel_permiso: ""
+};
+
 const Usuarios = () => {
-  const [usuarios, setUsuarios] = useState([]);
-  const [ubicaciones, setUbicaciones] = useState([]);
+  const [
+    usuarios,
+    setUsuarios
+  ] = useState([]);
 
-  const [mostrarModal, setMostrarModal] =
-    useState(false);
+  const [
+    ubicaciones,
+    setUbicaciones
+  ] = useState([]);
 
-  const [form, setForm] = useState({
-    nombre: "",
-    email: "",
-    password: "",
-    pin: "",
-    rol: "equipo_interno",
-    ubicacion_id: "",
-    nivel_permiso: ""
-  });
+  const [
+    mostrarModal,
+    setMostrarModal
+  ] = useState(false);
 
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [
+    modoEdicion,
+    setModoEdicion
+  ] = useState(false);
+
+  const [
+    usuarioEditando,
+    setUsuarioEditando
+  ] = useState(null);
+
+  const [
+    form,
+    setForm
+  ] = useState(FORM_INICIAL);
+
+  const [
+    loading,
+    setLoading
+  ] = useState(true);
+
+  const [
+    guardando,
+    setGuardando
+  ] = useState(false);
+
+  const [
+    error,
+    setError
+  ] = useState("");
+
+  const [
+    mensaje,
+    setMensaje
+  ] = useState("");
 
   useEffect(() => {
     cargarDatos();
   }, []);
+
+  const ubicacionSeleccionada =
+    useMemo(() => {
+      return ubicaciones.find(
+        (item) =>
+          Number(item.id) ===
+          Number(
+            form.ubicacion_id
+          )
+      );
+    }, [
+      ubicaciones,
+      form.ubicacion_id
+    ]);
+
+  const tipoUbicacion =
+    ubicacionSeleccionada?.tipo ||
+    "";
+
+  const esCentral =
+    tipoUbicacion === "central";
+
+  const esSucursal =
+    tipoUbicacion === "sucursal";
+
+  const esEquipoInterno =
+    tipoUbicacion ===
+    "equipo_interno";
+
+  const obtenerRolPorTipo = (
+    tipo
+  ) => {
+    if (tipo === "central") {
+      return "principal";
+    }
+
+    if (tipo === "sucursal") {
+      return "sucursal";
+    }
+
+    if (
+      tipo === "equipo_interno"
+    ) {
+      return "equipo_interno";
+    }
+
+    return "";
+  };
+
+  const obtenerNombreRol = (
+    rol
+  ) => {
+    if (rol === "principal") {
+      return "Principal";
+    }
+
+    if (rol === "sucursal") {
+      return "Sucursal";
+    }
+
+    if (
+      rol === "equipo_interno"
+    ) {
+      return "Equipo Interno";
+    }
+
+    return "-";
+  };
+
+  const obtenerNombrePermiso = (
+    permiso
+  ) => {
+    if (
+      permiso === "consulta"
+    ) {
+      return "Consulta";
+    }
+
+    if (
+      permiso === "operador"
+    ) {
+      return "Operador";
+    }
+
+    if (
+      permiso ===
+      "aprobador_admin"
+    ) {
+      return "Aprobador / Administrador";
+    }
+
+    return "-";
+  };
 
   const cargarDatos = async () => {
     try {
@@ -44,13 +184,18 @@ const Usuarios = () => {
         api.get("/ubicaciones")
       ]);
 
-      setUsuarios(usuariosRes.data || []);
+      setUsuarios(
+        usuariosRes.data || []
+      );
+
       setUbicaciones(
-        ubicacionesRes.data || []
+        ubicacionesRes.data ||
+          []
       );
     } catch (error) {
       setError(
-        error.response?.data?.message ||
+        error.response?.data
+          ?.message ||
           "No fue posible cargar usuarios"
       );
     } finally {
@@ -58,74 +203,358 @@ const Usuarios = () => {
     }
   };
 
-  const crearUsuario = async (event) => {
-    event.preventDefault();
+  const limpiarFormulario =
+    () => {
+      setForm(
+        FORM_INICIAL
+      );
 
-    try {
+      setUsuarioEditando(
+        null
+      );
+
+      setModoEdicion(false);
+    };
+
+  const cerrarModal = () => {
+    if (guardando) {
+      return;
+    }
+
+    setMostrarModal(false);
+    limpiarFormulario();
+  };
+
+  const abrirNuevoUsuario =
+    () => {
+      setError("");
+      setMensaje("");
+      limpiarFormulario();
+
+      setMostrarModal(true);
+    };
+
+  const abrirEditarUsuario = (
+    usuario
+  ) => {
+    setError("");
+    setMensaje("");
+
+    setModoEdicion(true);
+
+    setUsuarioEditando(
+      usuario
+    );
+
+    setForm({
+      nombre:
+        usuario.nombre || "",
+
+      email:
+        usuario.email || "",
+
+      password: "",
+      pin: "",
+
+      rol:
+        usuario.rol || "",
+
+      ubicacion_id:
+        String(
+          usuario.ubicacion_id ||
+            ""
+        ),
+
+      nivel_permiso:
+        usuario.nivel_permiso ||
+        ""
+    });
+
+    setMostrarModal(true);
+  };
+
+  const cambiarUbicacion = (
+    event
+  ) => {
+    const nuevaUbicacionId =
+      event.target.value;
+
+    const ubicacion =
+      ubicaciones.find(
+        (item) =>
+          Number(item.id) ===
+          Number(
+            nuevaUbicacionId
+          )
+      );
+
+    const nuevoRol =
+      obtenerRolPorTipo(
+        ubicacion?.tipo
+      );
+
+    setForm((actual) => ({
+      ...actual,
+
+      ubicacion_id:
+        nuevaUbicacionId,
+
+      rol: nuevoRol,
+
+      nivel_permiso:
+        ubicacion?.tipo ===
+        "central"
+          ? actual
+              .nivel_permiso
+          : "",
+
+      pin:
+        ubicacion?.tipo ===
+        "sucursal"
+          ? actual.pin
+          : "",
+
+      email:
+        ubicacion?.tipo ===
+        "sucursal"
+          ? ""
+          : actual.email,
+
+      password:
+        ubicacion?.tipo ===
+        "sucursal"
+          ? ""
+          : actual.password
+    }));
+  };
+
+  const construirPayload =
+    () => {
       const payload = {
-        nombre: form.nombre,
-        rol: form.rol,
-        ubicacion_id: Number(
-          form.ubicacion_id
-        )
+        nombre:
+          form.nombre.trim(),
+
+        ubicacion_id:
+          Number(
+            form.ubicacion_id
+          ),
+
+        rol:
+          form.rol
       };
 
-      if (form.rol === "sucursal") {
-        payload.pin = form.pin;
+      if (esSucursal) {
+        if (form.pin) {
+          payload.pin =
+            form.pin;
+        }
       } else {
-        payload.email = form.email;
-        payload.password =
-          form.password;
+        payload.email =
+          form.email.trim();
+
+        if (form.password) {
+          payload.password =
+            form.password;
+        }
       }
 
-      if (form.rol === "principal") {
+      if (esCentral) {
         payload.nivel_permiso =
           form.nivel_permiso;
       }
 
-      await api.post("/usuarios", payload);
+      return payload;
+    };
 
-      setMostrarModal(false);
+  const validarFormulario =
+    () => {
+      if (
+        !form.nombre.trim()
+      ) {
+        setError(
+          "El nombre es obligatorio"
+        );
 
-      setForm({
-        nombre: "",
-        email: "",
-        password: "",
-        pin: "",
-        rol: "equipo_interno",
-        ubicacion_id: "",
-        nivel_permiso: ""
-      });
+        return false;
+      }
 
-      await cargarDatos();
-    } catch (error) {
-      setError(
-        error.response?.data?.message ||
-          "No fue posible crear el usuario"
-      );
-    }
-  };
+      if (
+        !form.ubicacion_id
+      ) {
+        setError(
+          "Selecciona una ubicación"
+        );
 
-  const desactivarUsuario = async (id) => {
-    const confirmar = window.confirm(
-      "¿Deseas desactivar este usuario?"
-    );
+        return false;
+      }
 
-    if (!confirmar) return;
+      if (!form.rol) {
+        setError(
+          "No fue posible determinar el rol de la ubicación"
+        );
 
-    try {
-      await api.patch(
-        `/usuarios/${id}/desactivar`
-      );
+        return false;
+      }
 
-      await cargarDatos();
-    } catch (error) {
-      setError(
-        error.response?.data?.message ||
-          "No fue posible desactivar el usuario"
-      );
-    }
-  };
+      if (esCentral) {
+        if (
+          !form.nivel_permiso
+        ) {
+          setError(
+            "Selecciona el nivel de permiso"
+          );
+
+          return false;
+        }
+      }
+
+      if (esSucursal) {
+        if (
+          !modoEdicion &&
+          !/^\d{4,6}$/.test(
+            form.pin
+          )
+        ) {
+          setError(
+            "El PIN debe contener entre 4 y 6 dígitos"
+          );
+
+          return false;
+        }
+
+        if (
+          modoEdicion &&
+          form.pin &&
+          !/^\d{4,6}$/.test(
+            form.pin
+          )
+        ) {
+          setError(
+            "El nuevo PIN debe contener entre 4 y 6 dígitos"
+          );
+
+          return false;
+        }
+      }
+
+      if (
+        esCentral ||
+        esEquipoInterno
+      ) {
+        if (
+          !form.email.trim()
+        ) {
+          setError(
+            "El correo es obligatorio"
+          );
+
+          return false;
+        }
+
+        if (
+          !modoEdicion &&
+          !form.password
+        ) {
+          setError(
+            "La contraseña es obligatoria"
+          );
+
+          return false;
+        }
+      }
+
+      return true;
+    };
+
+  const guardarUsuario =
+    async (event) => {
+      event.preventDefault();
+
+      setError("");
+      setMensaje("");
+
+      if (
+        !validarFormulario()
+      ) {
+        return;
+      }
+
+      try {
+        setGuardando(true);
+
+        const payload =
+          construirPayload();
+
+        if (
+          modoEdicion &&
+          usuarioEditando
+        ) {
+          await api.patch(
+            `/usuarios/${usuarioEditando.id}`,
+            payload
+          );
+
+          setMensaje(
+            "Usuario actualizado correctamente"
+          );
+        } else {
+          await api.post(
+            "/usuarios",
+            payload
+          );
+
+          setMensaje(
+            "Usuario creado correctamente"
+          );
+        }
+
+        setMostrarModal(false);
+        limpiarFormulario();
+
+        await cargarDatos();
+      } catch (error) {
+        setError(
+          error.response?.data
+            ?.message ||
+            "No fue posible guardar el usuario"
+        );
+      } finally {
+        setGuardando(false);
+      }
+    };
+
+  const desactivarUsuario =
+    async (id) => {
+      const confirmar =
+        window.confirm(
+          "¿Deseas desactivar este usuario?"
+        );
+
+      if (!confirmar) {
+        return;
+      }
+
+      try {
+        setError("");
+        setMensaje("");
+
+        await api.patch(
+          `/usuarios/${id}/desactivar`
+        );
+
+        setMensaje(
+          "Usuario desactivado correctamente"
+        );
+
+        await cargarDatos();
+      } catch (error) {
+        setError(
+          error.response?.data
+            ?.message ||
+            "No fue posible desactivar el usuario"
+        );
+      }
+    };
 
   if (loading) {
     return (
@@ -139,116 +568,207 @@ const Usuarios = () => {
     <div>
       <header className="page-header">
         <div>
-          <h1>Usuarios</h1>
+          <h1>
+            Usuarios
+          </h1>
+
           <p>
-            Administración de usuarios,
-            ubicaciones y permisos.
+            Administración de
+            usuarios, ubicaciones y
+            permisos.
           </p>
         </div>
 
         <div className="header-actions">
           <button
             className="secondary-button"
-            onClick={cargarDatos}
+            type="button"
+            onClick={
+              cargarDatos
+            }
           >
-            <RefreshCw size={18} />
+            <RefreshCw
+              size={18}
+            />
+
             Actualizar
           </button>
 
           <button
             className="primary-button icon-button"
-            onClick={() =>
-              setMostrarModal(true)
+            type="button"
+            onClick={
+              abrirNuevoUsuario
             }
           >
-            <Plus size={18} />
+            <Plus
+              size={18}
+            />
+
             Nuevo usuario
           </button>
         </div>
       </header>
 
-      {error && (
-        <div className="error-message page-error">
-          {error}
+      {mensaje && (
+        <div className="success-message page-error">
+          {mensaje}
         </div>
       )}
+
+      {error &&
+        !mostrarModal && (
+          <div className="error-message page-error">
+            {error}
+          </div>
+        )}
 
       <section className="content-card">
         {usuarios.length === 0 ? (
           <div className="empty-state">
-            No hay usuarios registrados.
+            No hay usuarios
+            registrados.
           </div>
         ) : (
           <div className="table-container">
             <table>
               <thead>
                 <tr>
-                  <th>Usuario</th>
-                  <th>Rol</th>
-                  <th>Ubicación</th>
-                  <th>Permiso</th>
-                  <th>Estado</th>
-                  <th>Acción</th>
+                  <th>
+                    Usuario
+                  </th>
+
+                  <th>
+                    Rol
+                  </th>
+
+                  <th>
+                    Ubicación
+                  </th>
+
+                  <th>
+                    Permiso
+                  </th>
+
+                  <th>
+                    Estado
+                  </th>
+
+                  <th>
+                    Acción
+                  </th>
                 </tr>
               </thead>
 
               <tbody>
-                {usuarios.map((usuario) => (
-                  <tr key={usuario.id}>
-                    <td>
-                      <strong>
-                        {usuario.nombre}
-                      </strong>
+                {usuarios.map(
+                  (usuario) => (
+                    <tr
+                      key={
+                        usuario.id
+                      }
+                    >
+                      <td>
+                        <strong>
+                          {
+                            usuario.nombre
+                          }
+                        </strong>
 
-                      <small className="table-secondary">
-                        {usuario.email || "Acceso PIN"}
-                      </small>
-                    </td>
+                        <small className="table-secondary">
+                          {usuario.email ||
+                            "Acceso PIN"}
+                        </small>
+                      </td>
 
-                    <td>{usuario.rol}</td>
+                      <td>
+                        {obtenerNombreRol(
+                          usuario.rol
+                        )}
+                      </td>
 
-                    <td>
-                      {usuario.ubicacion_nombre}
-                    </td>
-
-                    <td>
-                      {usuario.nivel_permiso ||
-                        "-"}
-                    </td>
-
-                    <td>
-                      <span
-                        className={
-                          usuario.activo
-                            ? "status success"
-                            : "status danger"
+                      <td>
+                        {
+                          usuario.ubicacion_nombre
                         }
-                      >
-                        {usuario.activo
-                          ? "Activo"
-                          : "Inactivo"}
-                      </span>
-                    </td>
+                      </td>
 
-                    <td>
-                      {usuario.activo ? (
-                        <button
-                          className="table-action danger-text"
-                          onClick={() =>
-                            desactivarUsuario(
-                              usuario.id
-                            )
+                      <td>
+                        {obtenerNombrePermiso(
+                          usuario.nivel_permiso
+                        )}
+                      </td>
+
+                      <td>
+                        <span
+                          className={
+                            usuario.activo
+                              ? "status success"
+                              : "status danger"
                           }
                         >
-                          <UserX size={17} />
-                          Desactivar
-                        </button>
-                      ) : (
-                        "-"
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                          {usuario.activo
+                            ? "Activo"
+                            : "Inactivo"}
+                        </span>
+                      </td>
+
+                      <td>
+                        <div
+                          style={{
+                            display:
+                              "flex",
+                            gap: "12px",
+                            alignItems:
+                              "center",
+                            flexWrap:
+                              "wrap"
+                          }}
+                        >
+                          <button
+                            type="button"
+                            className="table-action"
+                            onClick={() =>
+                              abrirEditarUsuario(
+                                usuario
+                              )
+                            }
+                          >
+                            <Pencil
+                              size={
+                                17
+                              }
+                            />
+
+                            Editar
+                          </button>
+
+                          {usuario.activo ? (
+                            <button
+                              type="button"
+                              className="table-action danger-text"
+                              onClick={() =>
+                                desactivarUsuario(
+                                  usuario.id
+                                )
+                              }
+                            >
+                              <UserX
+                                size={
+                                  17
+                                }
+                              />
+
+                              Desactivar
+                            </button>
+                          ) : (
+                            "-"
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                )}
               </tbody>
             </table>
           </div>
@@ -260,16 +780,24 @@ const Usuarios = () => {
           <div className="modal-card">
             <div className="modal-header">
               <div>
-                <h2>Nuevo usuario</h2>
+                <h2>
+                  {modoEdicion
+                    ? "Editar usuario"
+                    : "Nuevo usuario"}
+                </h2>
+
                 <p>
-                  Define rol, ubicación y acceso.
+                  {modoEdicion
+                    ? "Actualiza ubicación, permisos o credenciales."
+                    : "Define ubicación y acceso."}
                 </p>
               </div>
 
               <button
+                type="button"
                 className="modal-close"
-                onClick={() =>
-                  setMostrarModal(false)
+                onClick={
+                  cerrarModal
                 }
               >
                 ×
@@ -278,18 +806,29 @@ const Usuarios = () => {
 
             <form
               className="modal-form"
-              onSubmit={crearUsuario}
+              onSubmit={
+                guardarUsuario
+              }
             >
               <div className="form-group">
-                <label>Nombre</label>
+                <label>
+                  Nombre
+                </label>
 
                 <input
                   className="form-control"
-                  value={form.nombre}
-                  onChange={(e) =>
+                  value={
+                    form.nombre
+                  }
+                  onChange={(
+                    event
+                  ) =>
                     setForm({
                       ...form,
-                      nombre: e.target.value
+                      nombre:
+                        event
+                          .target
+                          .value
                     })
                   }
                   required
@@ -297,44 +836,17 @@ const Usuarios = () => {
               </div>
 
               <div className="form-group">
-                <label>Rol</label>
+                <label>
+                  Ubicación
+                </label>
 
                 <select
                   className="form-control"
-                  value={form.rol}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      rol: e.target.value
-                    })
+                  value={
+                    form.ubicacion_id
                   }
-                >
-                  <option value="principal">
-                    Principal
-                  </option>
-
-                  <option value="sucursal">
-                    Sucursal
-                  </option>
-
-                  <option value="equipo_interno">
-                    Equipo Interno
-                  </option>
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label>Ubicación</label>
-
-                <select
-                  className="form-control"
-                  value={form.ubicacion_id}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      ubicacion_id:
-                        e.target.value
-                    })
+                  onChange={
+                    cambiarUbicacion
                   }
                   required
                 >
@@ -342,76 +854,48 @@ const Usuarios = () => {
                     Seleccionar...
                   </option>
 
-                  {ubicaciones.map((item) => (
-                    <option
-                      key={item.id}
-                      value={item.id}
-                    >
-                      {item.nombre}
-                    </option>
-                  ))}
+                  {ubicaciones
+                    .filter(
+                      (item) =>
+                        item.activo !==
+                        false
+                    )
+                    .map(
+                      (item) => (
+                        <option
+                          key={
+                            item.id
+                          }
+                          value={
+                            item.id
+                          }
+                        >
+                          {
+                            item.nombre
+                          }
+                        </option>
+                      )
+                    )}
                 </select>
               </div>
 
-              {form.rol === "sucursal" ? (
+              {ubicacionSeleccionada && (
                 <div className="form-group">
-                  <label>PIN (4–6 dígitos)</label>
+                  <label>
+                    Rol
+                  </label>
 
                   <input
                     className="form-control"
-                    type="password"
-                    inputMode="numeric"
-                    maxLength="6"
-                    value={form.pin}
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        pin: e.target.value
-                      })
-                    }
-                    required
+                    value={obtenerNombreRol(
+                      form.rol
+                    )}
+                    readOnly
                   />
                 </div>
-              ) : (
-                <>
-                  <div className="form-group">
-                    <label>Email</label>
-
-                    <input
-                      className="form-control"
-                      type="email"
-                      value={form.email}
-                      onChange={(e) =>
-                        setForm({
-                          ...form,
-                          email: e.target.value
-                        })
-                      }
-                      required
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label>Contraseña</label>
-
-                    <input
-                      className="form-control"
-                      type="password"
-                      value={form.password}
-                      onChange={(e) =>
-                        setForm({
-                          ...form,
-                          password:
-                            e.target.value
-                        })
-                      }
-                      required
-                    />
-                  </div>
-                </>
               )}
 
-              {form.rol === "principal" && (
+              {esCentral && (
                 <div className="form-group">
                   <label>
                     Nivel de permiso
@@ -422,11 +906,15 @@ const Usuarios = () => {
                     value={
                       form.nivel_permiso
                     }
-                    onChange={(e) =>
+                    onChange={(
+                      event
+                    ) =>
                       setForm({
                         ...form,
                         nivel_permiso:
-                          e.target.value
+                          event
+                            .target
+                            .value
                       })
                     }
                     required
@@ -440,7 +928,8 @@ const Usuarios = () => {
                     </option>
 
                     <option value="operador">
-                      Operador
+                      Operador de
+                      solicitudes
                     </option>
 
                     <option value="aprobador_admin">
@@ -451,19 +940,167 @@ const Usuarios = () => {
                 </div>
               )}
 
+              {esSucursal && (
+                <div className="form-group">
+                  <label>
+                    {modoEdicion
+                      ? "Nuevo PIN (opcional)"
+                      : "PIN (4–6 dígitos)"}
+                  </label>
+
+                  <input
+                    className="form-control"
+                    type="password"
+                    inputMode="numeric"
+                    minLength={
+                      modoEdicion
+                        ? undefined
+                        : 4
+                    }
+                    maxLength="6"
+                    value={
+                      form.pin
+                    }
+                    onChange={(
+                      event
+                    ) => {
+                      const valor =
+                        event.target.value.replace(
+                          /\D/g,
+                          ""
+                        );
+
+                      setForm({
+                        ...form,
+                        pin: valor
+                      });
+                    }}
+                    placeholder={
+                      modoEdicion
+                        ? "Dejar vacío para conservar el PIN"
+                        : "4 a 6 dígitos"
+                    }
+                    required={
+                      !modoEdicion
+                    }
+                  />
+                </div>
+              )}
+
+              {(esCentral ||
+                esEquipoInterno) && (
+                <>
+                  <div className="form-group">
+                    <label>
+                      Email
+                    </label>
+
+                    <input
+                      className="form-control"
+                      type="email"
+                      value={
+                        form.email
+                      }
+                      onChange={(
+                        event
+                      ) =>
+                        setForm({
+                          ...form,
+                          email:
+                            event
+                              .target
+                              .value
+                        })
+                      }
+                      required
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>
+                      {modoEdicion
+                        ? "Nueva contraseña (opcional)"
+                        : "Contraseña"}
+                    </label>
+
+                    <input
+                      className="form-control"
+                      type="password"
+                      value={
+                        form.password
+                      }
+                      onChange={(
+                        event
+                      ) =>
+                        setForm({
+                          ...form,
+                          password:
+                            event
+                              .target
+                              .value
+                        })
+                      }
+                      placeholder={
+                        modoEdicion
+                          ? "Dejar vacío para conservarla"
+                          : ""
+                      }
+                      required={
+                        !modoEdicion
+                      }
+                    />
+                  </div>
+                </>
+              )}
+
+              {!form.ubicacion_id && (
+                <p
+                  style={{
+                    fontSize:
+                      "13px",
+                    opacity: 0.7
+                  }}
+                >
+                  Selecciona primero
+                  una ubicación. El
+                  formulario adaptará
+                  automáticamente el
+                  rol, permisos y tipo
+                  de credencial.
+                </p>
+              )}
+
+              {error && (
+                <div className="error-message">
+                  {error}
+                </div>
+              )}
+
               <div className="modal-actions">
                 <button
                   type="button"
                   className="secondary-button"
-                  onClick={() =>
-                    setMostrarModal(false)
+                  onClick={
+                    cerrarModal
+                  }
+                  disabled={
+                    guardando
                   }
                 >
                   Cancelar
                 </button>
 
-                <button className="primary-button">
-                  Crear usuario
+                <button
+                  className="primary-button"
+                  disabled={
+                    guardando
+                  }
+                >
+                  {guardando
+                    ? "Guardando..."
+                    : modoEdicion
+                    ? "Guardar cambios"
+                    : "Crear usuario"}
                 </button>
               </div>
             </form>
