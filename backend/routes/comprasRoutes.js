@@ -4,6 +4,7 @@ const {
   getOrdenes,
   getOrdenById,
   createOrden,
+  editarOrden,
   enviarOrden,
   recibirCompra
 } = require("../controllers/comprasController");
@@ -30,6 +31,12 @@ router.post(
   "/",
   verifyToken,
   createOrden
+);
+
+router.put(
+  "/:id",
+  verifyToken,
+  editarOrden
 );
 
 router.patch(

@@ -84,8 +84,8 @@ const validarCategoriaParaUsuario = async (
   // Central puede administrar únicamente productos
   // pertenecientes a categorías globales.
   //
-  // Las categorías privadas son visibles para Central,
-  // pero son de solo lectura.
+  // Las categorías privadas de Equipos Internos no forman
+  // parte del catálogo general de Central.
   // -------------------------------------------------------
 
   if (esPrincipal(usuario)) {
@@ -94,7 +94,7 @@ const validarCategoriaParaUsuario = async (
         permitido: false,
         status: 403,
         message:
-          "Central solo puede consultar productos de categorías privadas"
+          "Central no puede administrar productos de categorías privadas de Equipos Internos"
       };
     }
 
@@ -171,10 +171,6 @@ const puedeVerProducto = (
   producto,
   usuario
 ) => {
-  if (esPrincipal(usuario)) {
-    return true;
-  }
-
   if (
     !producto.categoria_tipo ||
     producto.categoria_tipo === "global"
@@ -246,11 +242,17 @@ const getProductos = async (req, res) => {
     // -----------------------------------------------------
     // CENTRAL
     // -----------------------------------------------------
-    // Ve todos los productos.
+    // Ve únicamente catálogo global.
+    // Los productos privados de Equipos Internos no forman
+    // parte del catálogo general de Central.
     // -----------------------------------------------------
 
     if (esPrincipal(usuario)) {
       query += `
+        WHERE
+          c.id IS NULL
+          OR c.tipo = 'global'
+
         ORDER BY p.nombre
       `;
     }
@@ -318,11 +320,7 @@ const getProductos = async (req, res) => {
       result.rows.map(
         (producto) => ({
           ...producto,
-
-          solo_lectura:
-            producto.categoria_tipo ===
-              "privada" &&
-            esPrincipal(usuario)
+          solo_lectura: false
         })
       );
 
@@ -424,10 +422,7 @@ const getProductoById = async (
       });
     }
 
-    producto.solo_lectura =
-      producto.categoria_tipo ===
-        "privada" &&
-      esPrincipal(usuario);
+    producto.solo_lectura = false;
 
     res.json(producto);
   } catch (error) {
@@ -704,7 +699,7 @@ const updateProducto = async (
     ) {
       return res.status(403).json({
         message:
-          "Central solo puede consultar productos de categorías privadas"
+          "Central no puede administrar productos de categorías privadas de Equipos Internos"
       });
     }
 
@@ -963,7 +958,7 @@ const deactivateProducto = async (
     ) {
       return res.status(403).json({
         message:
-          "Central solo puede consultar productos de categorías privadas"
+          "Central no puede administrar productos de categorías privadas de Equipos Internos"
       });
     }
 

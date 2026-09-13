@@ -14,46 +14,34 @@ import {
   Eye,
   PackageCheck,
   Truck,
-  ShoppingCart
+  ShoppingCart,
+  PackagePlus
 } from "lucide-react";
 
 import api from "../services/api";
 
 const Solicitudes = () => {
   const usuario = JSON.parse(
-    localStorage.getItem("usuario") ||
-      "{}"
+    localStorage.getItem("usuario") || "{}"
   );
 
-  const [
-    solicitudes,
-    setSolicitudes
-  ] = useState([]);
+  const [solicitudes, setSolicitudes] =
+    useState([]);
 
-  const [
-    productos,
-    setProductos
-  ] = useState([]);
+  const [productos, setProductos] =
+    useState([]);
 
-  const [
-    categorias,
-    setCategorias
-  ] = useState([]);
+  const [categorias, setCategorias] =
+    useState([]);
 
-  const [
-    ubicaciones,
-    setUbicaciones
-  ] = useState([]);
+  const [ubicaciones, setUbicaciones] =
+    useState([]);
 
-  const [
-    busqueda,
-    setBusqueda
-  ] = useState("");
+  const [busqueda, setBusqueda] =
+    useState("");
 
-  const [
-    estadoFiltro,
-    setEstadoFiltro
-  ] = useState("");
+  const [estadoFiltro, setEstadoFiltro] =
+    useState("");
 
   const [
     categoriaCatalogo,
@@ -76,6 +64,16 @@ const Solicitudes = () => {
   ] = useState({});
 
   const [
+    lineasDisponiblesEnvio,
+    setLineasDisponiblesEnvio
+  ] = useState([]);
+
+  const [
+    preparandoEnvio,
+    setPreparandoEnvio
+  ] = useState(false);
+
+  const [
     mostrarAprobacion,
     setMostrarAprobacion
   ] = useState(false);
@@ -93,6 +91,11 @@ const Solicitudes = () => {
   const [
     cargandoAprobacion,
     setCargandoAprobacion
+  ] = useState(false);
+
+  const [
+    registrandoInventario,
+    setRegistrandoInventario
   ] = useState(false);
 
   const [
@@ -156,6 +159,10 @@ const Solicitudes = () => {
     cargarDatos();
   }, []);
 
+  // =========================================================
+  // CARGA GENERAL
+  // =========================================================
+
   const cargarDatos = async () => {
     try {
       setLoading(true);
@@ -163,13 +170,11 @@ const Solicitudes = () => {
 
       const [
         solicitudesRes,
-        productosRes,
-        categoriasRes,
+        catalogoRes,
         ubicacionesRes
       ] = await Promise.all([
         api.get("/solicitudes"),
-        api.get("/productos"),
-        api.get("/categorias"),
+        api.get("/solicitudes/catalogo"),
         api.get("/ubicaciones")
       ]);
 
@@ -178,11 +183,11 @@ const Solicitudes = () => {
       );
 
       setProductos(
-        productosRes.data || []
+        catalogoRes.data?.productos || []
       );
 
       setCategorias(
-        categoriasRes.data || []
+        catalogoRes.data?.categorias || []
       );
 
       setUbicaciones(
@@ -198,6 +203,10 @@ const Solicitudes = () => {
     }
   };
 
+  // =========================================================
+  // FILTROS
+  // =========================================================
+
   const solicitudesFiltradas =
     useMemo(() => {
       return solicitudes.filter(
@@ -211,12 +220,10 @@ const Solicitudes = () => {
             String(item.id).includes(
               texto
             ) ||
-            item
-              .destino_ubicacion_nombre
+            item.destino_ubicacion_nombre
               ?.toLowerCase()
               .includes(texto) ||
-            item
-              .creado_por_usuario_nombre
+            item.creado_por_usuario_nombre
               ?.toLowerCase()
               .includes(texto);
 
@@ -239,11 +246,17 @@ const Solicitudes = () => {
 
   const productosCatalogo =
     useMemo(() => {
+      const activos =
+        productos.filter(
+          (producto) =>
+            producto.activo !== false
+        );
+
       if (!categoriaCatalogo) {
-        return productos;
+        return activos;
       }
 
-      return productos.filter(
+      return activos.filter(
         (producto) =>
           Number(
             producto.categoria_id
@@ -256,6 +269,20 @@ const Solicitudes = () => {
       productos,
       categoriaCatalogo
     ]);
+
+  const categoriasCatalogo =
+    useMemo(
+      () =>
+        categorias.filter(
+          (categoria) =>
+            categoria.activo !== false
+        ),
+      [categorias]
+    );
+
+  // =========================================================
+  // TIPO DE SOLICITUD
+  // =========================================================
 
   const esDestinoEquipoInterno =
     detalle?.solicitud
@@ -286,6 +313,155 @@ const Solicitudes = () => {
     usuario.rol ===
       "equipo_interno";
 
+  const esSolicitudPropiaEquipoInterno =
+    usuario.rol ===
+      "equipo_interno" &&
+    detalle?.solicitud &&
+    Number(
+      detalle.solicitud
+        .destino_ubicacion_id
+    ) ===
+      Number(
+        usuario.ubicacion_id
+      ) &&
+    Number(
+      detalle.solicitud
+        .solicitante_ubicacion_id
+    ) ===
+      Number(
+        usuario.ubicacion_id
+      );
+
+  // =========================================================
+  // ETIQUETAS
+  // =========================================================
+
+  const etiquetaEstadoSolicitud = (
+    solicitud
+  ) => {
+    if (
+      solicitud?.destino_ubicacion_tipo ===
+        "equipo_interno" &&
+      solicitud?.estado ===
+        "recibida"
+    ) {
+      return "Recibida por Central";
+    }
+
+    const etiquetas = {
+      solicitada:
+        "Solicitada",
+
+      en_revision:
+        "En revisión",
+
+      aprobada:
+        "Aprobada",
+
+      en_transito:
+        "En tránsito",
+
+      recibida:
+        "Recibida",
+
+      cerrada:
+        "Cerrada",
+
+      rechazada:
+        "Rechazada"
+    };
+
+    return (
+      etiquetas[
+        solicitud?.estado
+      ] ||
+      solicitud?.estado ||
+      "—"
+    );
+  };
+
+  // =========================================================
+  // CANTIDAD PENDIENTE DE REGISTRAR EN INVENTARIO PERSONAL
+  // =========================================================
+
+  const obtenerDisponibleRegistro = (
+    linea
+  ) => {
+    if (
+      linea
+        ?.cantidad_disponible_registro !==
+        undefined &&
+      linea
+        ?.cantidad_disponible_registro !==
+        null
+    ) {
+      return Math.max(
+        Number(
+          linea
+            .cantidad_disponible_registro
+        ) || 0,
+        0
+      );
+    }
+
+    const recibida =
+      Number(
+        linea
+          ?.cantidad_recibida_acumulada ||
+          0
+      );
+
+    const registrada =
+      Number(
+        linea
+          ?.cantidad_registrada_inventario ||
+          0
+      );
+
+    return Math.max(
+      recibida - registrada,
+      0
+    );
+  };
+
+  const unidadesDisponiblesRegistro =
+    useMemo(() => {
+      if (!detalle) {
+        return 0;
+      }
+
+      const existentes =
+        (
+          detalle.lineas || []
+        ).reduce(
+          (total, linea) =>
+            total +
+            obtenerDisponibleRegistro(
+              linea
+            ),
+          0
+        );
+
+      const nuevos =
+        (
+          detalle.productos_nuevos ||
+          []
+        ).reduce(
+          (total, producto) =>
+            total +
+            obtenerDisponibleRegistro(
+              producto
+            ),
+          0
+        );
+
+      return existentes + nuevos;
+    }, [detalle]);
+
+  // =========================================================
+  // LÍNEAS DE SOLICITUD
+  // =========================================================
+
   const agregarLinea = () => {
     setLineas([
       ...lineas,
@@ -301,7 +477,8 @@ const Solicitudes = () => {
   ) => {
     setLineas(
       lineas.filter(
-        (_, i) => i !== index
+        (_, i) =>
+          i !== index
       )
     );
   };
@@ -320,8 +497,14 @@ const Solicitudes = () => {
       [campo]: valor
     };
 
-    setLineas(nuevas);
+    setLineas(
+      nuevas
+    );
   };
+
+  // =========================================================
+  // PRODUCTOS NUEVOS
+  // =========================================================
 
   const agregarProductoNuevo =
     () => {
@@ -344,7 +527,8 @@ const Solicitudes = () => {
   ) => {
     setProductosNuevos(
       productosNuevos.filter(
-        (_, i) => i !== index
+        (_, i) =>
+          i !== index
       )
     );
   };
@@ -368,10 +552,15 @@ const Solicitudes = () => {
     );
   };
 
+  // =========================================================
+  // LIMPIAR SOLICITUD
+  // =========================================================
+
   const limpiarNuevaSolicitud =
     () => {
       setDestino(
-        usuario.ubicacion_id || ""
+        usuario.ubicacion_id ||
+          ""
       );
 
       setUsarFranquiciaNueva(
@@ -382,7 +571,9 @@ const Solicitudes = () => {
         ""
       );
 
-      setCategoriaCatalogo("");
+      setCategoriaCatalogo(
+        ""
+      );
 
       setLineas([
         {
@@ -391,8 +582,14 @@ const Solicitudes = () => {
         }
       ]);
 
-      setProductosNuevos([]);
+      setProductosNuevos(
+        []
+      );
     };
+
+  // =========================================================
+  // CREAR SOLICITUD
+  // =========================================================
 
   const crearSolicitud = async (
     event
@@ -439,7 +636,8 @@ const Solicitudes = () => {
 
             categoria_id:
               Number(
-                producto.categoria_id
+                producto
+                  .categoria_id
               ),
 
             cantidad_solicitada:
@@ -555,7 +753,9 @@ const Solicitudes = () => {
         payloadSolicitud
       );
 
-      setMostrarNueva(false);
+      setMostrarNueva(
+        false
+      );
 
       limpiarNuevaSolicitud();
 
@@ -571,6 +771,10 @@ const Solicitudes = () => {
     }
   };
 
+  // =========================================================
+  // DETALLE
+  // =========================================================
+
   const verDetalle = async (
     id
   ) => {
@@ -582,7 +786,9 @@ const Solicitudes = () => {
           `/solicitudes/${id}`
         );
 
-      setSeleccionada(id);
+      setSeleccionada(
+        id
+      );
 
       setDetalle(
         response.data
@@ -596,6 +802,10 @@ const Solicitudes = () => {
     }
   };
 
+  // =========================================================
+  // REVISIÓN
+  // =========================================================
+
   const iniciarRevision = async (
     id
   ) => {
@@ -608,7 +818,9 @@ const Solicitudes = () => {
 
       await cargarDatos();
 
-      await verDetalle(id);
+      await verDetalle(
+        id
+      );
     } catch (error) {
       setError(
         error.response?.data
@@ -618,9 +830,15 @@ const Solicitudes = () => {
     }
   };
 
+  // =========================================================
+  // APROBACIÓN
+  // =========================================================
+
   const abrirAprobacion =
     async () => {
-      if (!detalle) return;
+      if (!detalle) {
+        return;
+      }
 
       try {
         setCargandoAprobacion(
@@ -632,16 +850,9 @@ const Solicitudes = () => {
         const cantidadesIniciales =
           {};
 
-        /*
-         * ISSUE 7
-         *
-         * Equipo Interno:
-         * no depende del stock Central.
-         *
-         * Sucursal:
-         * sí se aprueba contra stock
-         * disponible de Central.
-         */
+        // Equipo Interno:
+        // no utilizamos ni mostramos stock
+        // de Central.
         if (
           esDestinoEquipoInterno
         ) {
@@ -649,15 +860,18 @@ const Solicitudes = () => {
             (linea) => {
               cantidadesIniciales[
                 linea.id
-              ] = Number(
-                linea
-                  .cantidad_solicitada ||
-                  0
-              );
+              ] =
+                Number(
+                  linea
+                    .cantidad_solicitada ||
+                    0
+                );
             }
           );
 
-          setStockCentral({});
+          setStockCentral(
+            {}
+          );
 
           setCantidadesAprobacion(
             cantidadesIniciales
@@ -670,12 +884,18 @@ const Solicitudes = () => {
           return;
         }
 
+        // Sucursal:
+        // solamente Central consulta su
+        // propio stock durante aprobación.
         const response =
           await api.get(
             "/reportes/inventario",
             {
               params: {
-                ubicacion_id: 1
+                ubicacion_id:
+                  Number(
+                    usuario.ubicacion_id
+                  )
               }
             }
           );
@@ -684,15 +904,19 @@ const Solicitudes = () => {
 
         (
           response.data || []
-        ).forEach((item) => {
-          mapaStock[
-            Number(
-              item.producto_id
-            )
-          ] = Number(
-            item.cantidad || 0
-          );
-        });
+        ).forEach(
+          (item) => {
+            mapaStock[
+              Number(
+                item.producto_id
+              )
+            ] =
+              Number(
+                item.cantidad ||
+                  0
+              );
+          }
+        );
 
         detalle.lineas.forEach(
           (linea) => {
@@ -707,18 +931,18 @@ const Solicitudes = () => {
               Number(
                 mapaStock[
                   Number(
-                    linea
-                      .producto_id
+                    linea.producto_id
                   )
                 ] || 0
               );
 
             cantidadesIniciales[
               linea.id
-            ] = Math.min(
-              solicitada,
-              disponible
-            );
+            ] =
+              Math.min(
+                solicitada,
+                disponible
+              );
           }
         );
 
@@ -754,8 +978,7 @@ const Solicitudes = () => {
       setCantidadesAprobacion(
         (actual) => ({
           ...actual,
-          [lineaId]:
-            valor
+          [lineaId]: valor
         })
       );
     };
@@ -764,7 +987,9 @@ const Solicitudes = () => {
     async (event) => {
       event.preventDefault();
 
-      if (!detalle) return;
+      if (!detalle) {
+        return;
+      }
 
       const lineasAprobadas =
         detalle.lineas.map(
@@ -781,8 +1006,7 @@ const Solicitudes = () => {
                 ? Number(
                     stockCentral[
                       Number(
-                        linea
-                          .producto_id
+                        linea.producto_id
                       )
                     ] || 0
                   )
@@ -803,7 +1027,6 @@ const Solicitudes = () => {
                 cantidad,
 
               solicitada,
-
               disponible
             };
           }
@@ -855,7 +1078,11 @@ const Solicitudes = () => {
         );
 
       const tieneProductosNuevos =
-        (detalle.productos_nuevos || []).length > 0;
+        (
+          detalle
+            .productos_nuevos ||
+          []
+        ).length > 0;
 
       if (
         totalAprobado <= 0 &&
@@ -870,7 +1097,6 @@ const Solicitudes = () => {
 
       try {
         setGuardando(true);
-
         setError("");
 
         await api.patch(
@@ -897,7 +1123,9 @@ const Solicitudes = () => {
           {}
         );
 
-        setStockCentral({});
+        setStockCentral(
+          {}
+        );
 
         await cargarDatos();
 
@@ -915,6 +1143,10 @@ const Solicitudes = () => {
       }
     };
 
+  // =========================================================
+  // RECHAZAR
+  // =========================================================
+
   const rechazarSolicitud =
     async () => {
       const motivo =
@@ -922,11 +1154,12 @@ const Solicitudes = () => {
           "Escribe el motivo del rechazo:"
         );
 
-      if (!motivo) return;
+      if (!motivo) {
+        return;
+      }
 
       try {
         setGuardando(true);
-
         setError("");
 
         await api.patch(
@@ -952,6 +1185,10 @@ const Solicitudes = () => {
       }
     };
 
+  // =========================================================
+  // CERRAR
+  // =========================================================
+
   const cerrarSolicitud =
     async () => {
       const motivo =
@@ -961,7 +1198,6 @@ const Solicitudes = () => {
 
       try {
         setGuardando(true);
-
         setError("");
 
         await api.patch(
@@ -988,8 +1224,50 @@ const Solicitudes = () => {
       }
     };
 
+  // =========================================================
+  // COMPRAS VINCULADAS
+  // =========================================================
+
+  const cargarComprasVinculadas =
+    async () => {
+      const ordenesResponse =
+        await api.get(
+          "/compras"
+        );
+
+      const ordenes =
+        ordenesResponse.data ||
+        [];
+
+      const detalles =
+        await Promise.all(
+          ordenes.map(
+            async (orden) => {
+              try {
+                const response =
+                  await api.get(
+                    `/compras/${orden.id}`
+                  );
+
+                return response.data;
+              } catch {
+                return null;
+              }
+            }
+          )
+        );
+
+      return detalles.filter(
+        Boolean
+      );
+    };
+
+  // =========================================================
+  // PREPARAR ENVÍO
+  // =========================================================
+
   const abrirCrearEnvio =
-    () => {
+    async () => {
       if (!detalle) {
         return;
       }
@@ -1005,97 +1283,55 @@ const Solicitudes = () => {
         return;
       }
 
-      const cantidadesIniciales =
-        {};
-
-      detalle.lineas.forEach(
-        (linea) => {
-          const aprobada =
-            Number(
-              linea
-                .cantidad_aprobada ||
-                0
-            );
-
-          const enviada =
-            Number(
-              linea
-                .cantidad_enviada_acumulada ||
-                0
-            );
-
-          const pendiente =
-            Math.max(
-              aprobada -
-                enviada,
-              0
-            );
-
-          if (
-            pendiente > 0
-          ) {
-            cantidadesIniciales[
-              linea.id
-            ] = "";
-          }
-        }
-      );
-
       if (
-        Object.keys(
-          cantidadesIniciales
-        ).length === 0
+        esDestinoEquipoInterno &&
+        detalle.solicitud.estado !==
+          "recibida"
       ) {
         setError(
-          "Esta solicitud no tiene productos pendientes de envío"
+          "La compra debe estar recibida por Central antes de crear el envío al Equipo Interno."
         );
 
         return;
       }
 
-      setCantidadesEnvio(
-        cantidadesIniciales
-      );
-
-      setError("");
-
-      setMostrarEnvio(true);
-    };
-
-  const actualizarCantidadEnvio =
-    (
-      lineaId,
-      valor
-    ) => {
-      setCantidadesEnvio(
-        (actual) => ({
-          ...actual,
-          [lineaId]:
-            valor
-        })
-      );
-    };
-
-  const crearEnvio =
-    async (event) => {
-      event.preventDefault();
-
-      if (!detalle) return;
-
       if (
-        !esDestinoSucursal &&
-        !esDestinoEquipoInterno
+        esDestinoSucursal &&
+        ![
+          "aprobada",
+          "en_transito"
+        ].includes(
+          detalle.solicitud.estado
+        )
       ) {
         setError(
-          "El destino de esta solicitud no admite envíos."
+          "La solicitud de Sucursal debe estar aprobada o en tránsito para crear el envío."
         );
 
         return;
       }
 
-      const lineasEnvio =
-        detalle.lineas
-          .map(
+      try {
+        setPreparandoEnvio(
+          true
+        );
+
+        setError("");
+
+        const disponibles = [];
+
+        // =====================================================
+        // SUCURSAL
+        // Se envía desde stock Central.
+        // =====================================================
+
+        if (
+          esDestinoSucursal
+        ) {
+          (
+            detalle.lineas ||
+            []
+          ).forEach(
             (linea) => {
               const aprobada =
                 Number(
@@ -1118,69 +1354,504 @@ const Solicitudes = () => {
                   0
                 );
 
-              const cantidad =
-                Number(
-                  cantidadesEnvio[
-                    linea.id
-                  ] || 0
+              if (
+                pendiente > 0
+              ) {
+                disponibles.push({
+                  key:
+                    `existente-${linea.id}`,
+
+                  tipo:
+                    "existente",
+
+                  solicitud_linea_id:
+                    linea.id,
+
+                  solicitud_producto_nuevo_id:
+                    null,
+
+                  producto_id:
+                    linea.producto_id,
+
+                  producto_nombre:
+                    linea.producto_nombre,
+
+                  cantidad_base:
+                    aprobada,
+
+                  cantidad_enviada:
+                    enviada,
+
+                  cantidad_disponible:
+                    pendiente
+                });
+              }
+            }
+          );
+        }
+
+        // =====================================================
+        // EQUIPO INTERNO
+        // Lo disponible depende de lo recibido del proveedor,
+        // no del stock de Central.
+        // =====================================================
+
+        if (
+          esDestinoEquipoInterno
+        ) {
+          const compras =
+            await cargarComprasVinculadas();
+
+          const lineasCompra =
+            compras.flatMap(
+              (compra) =>
+                (
+                  compra?.lineas ||
+                  []
+                ).map(
+                  (linea) => ({
+                    ...linea,
+
+                    orden_id:
+                      compra?.orden?.id
+                  })
+                )
+            );
+
+          // ---------------------------------------------------
+          // Productos existentes
+          // ---------------------------------------------------
+
+          (
+            detalle.lineas ||
+            []
+          ).forEach(
+            (linea) => {
+              const compradas =
+                lineasCompra.filter(
+                  (compra) =>
+                    Number(
+                      compra
+                        .solicitud_linea_id
+                    ) ===
+                    Number(
+                      linea.id
+                    )
                 );
 
-              return {
+              const recibidoProveedor =
+                compradas.reduce(
+                  (
+                    total,
+                    compra
+                  ) =>
+                    total +
+                    Number(
+                      compra
+                        .cantidad_recibida ||
+                        0
+                    ),
+                  0
+                );
+
+              const aprobada =
+                Number(
+                  linea
+                    .cantidad_aprobada ||
+                    linea
+                      .cantidad_solicitada ||
+                    0
+                );
+
+              const enviada =
+                Number(
+                  linea
+                    .cantidad_enviada_acumulada ||
+                    0
+                );
+
+              const disponible =
+                Math.max(
+                  Math.min(
+                    aprobadoSeguro(
+                      aprobada
+                    ),
+                    recibidoProveedor
+                  ) -
+                    enviada,
+                  0
+                );
+
+              if (
+                disponible > 0
+              ) {
+                disponibles.push({
+                  key:
+                    `existente-${linea.id}`,
+
+                  tipo:
+                    "existente",
+
+                  solicitud_linea_id:
+                    linea.id,
+
+                  solicitud_producto_nuevo_id:
+                    null,
+
+                  producto_id:
+                    linea.producto_id,
+
+                  producto_nombre:
+                    linea.producto_nombre,
+
+                  cantidad_base:
+                    recibidoProveedor,
+
+                  cantidad_enviada:
+                    enviada,
+
+                  cantidad_disponible:
+                    disponible
+                });
+              }
+            }
+          );
+
+          // ---------------------------------------------------
+          // Productos nuevos
+          // ---------------------------------------------------
+
+          for (
+            const productoNuevo of
+              detalle
+                .productos_nuevos ||
+              []
+          ) {
+            const compradas =
+              lineasCompra.filter(
+                (compra) =>
+                  Number(
+                    compra
+                      .solicitud_producto_nuevo_id
+                  ) ===
+                  Number(
+                    productoNuevo.id
+                  ) &&
+                  Number(
+                    compra
+                      .cantidad_recibida ||
+                      0
+                  ) > 0
+              );
+
+            const porProducto =
+              new Map();
+
+            compradas.forEach(
+              (compra) => {
+                const productoId =
+                  Number(
+                    compra.producto_id
+                  );
+
+                if (!productoId) {
+                  return;
+                }
+
+                const actual =
+                  porProducto.get(
+                    productoId
+                  ) || {
+                    producto_id:
+                      productoId,
+
+                    producto_nombre:
+                      compra
+                        .producto_nombre ||
+                      productoNuevo.nombre,
+
+                    cantidad_recibida:
+                      0
+                  };
+
+                actual.cantidad_recibida +=
+                  Number(
+                    compra
+                      .cantidad_recibida ||
+                      0
+                  );
+
+                porProducto.set(
+                  productoId,
+                  actual
+                );
+              }
+            );
+
+            const productosComprados =
+              Array.from(
+                porProducto.values()
+              );
+
+            if (
+              productosComprados.length >
+              1
+            ) {
+              throw new Error(
+                `El producto nuevo "${productoNuevo.nombre}" está vinculado a más de un producto real. Revisa la orden de compra antes de crear el envío.`
+              );
+            }
+
+            if (
+              productosComprados.length ===
+              0
+            ) {
+              continue;
+            }
+
+            const compra =
+              productosComprados[0];
+
+            const enviada =
+              Number(
+                productoNuevo
+                  .cantidad_enviada_acumulada ||
+                  0
+              );
+
+            const disponible =
+              Math.max(
+                Number(
+                  compra
+                    .cantidad_recibida ||
+                    0
+                ) -
+                  enviada,
+                0
+              );
+
+            if (
+              disponible > 0
+            ) {
+              disponibles.push({
+                key:
+                  `nuevo-${productoNuevo.id}`,
+
+                tipo:
+                  "nuevo",
+
                 solicitud_linea_id:
-                  linea.id,
+                  null,
+
+                solicitud_producto_nuevo_id:
+                  productoNuevo.id,
+
+                producto_id:
+                  compra.producto_id,
+
+                producto_nombre:
+                  compra
+                    .producto_nombre ||
+                  productoNuevo.nombre,
+
+                cantidad_base:
+                  Number(
+                    compra
+                      .cantidad_recibida ||
+                      0
+                  ),
 
                 cantidad_enviada:
-                  cantidad,
+                  enviada,
 
-                pendiente
-              };
+                cantidad_disponible:
+                  disponible
+              });
             }
+          }
+        }
+
+        if (
+          disponibles.length ===
+          0
+        ) {
+          setError(
+            esDestinoEquipoInterno
+              ? "No hay artículos recibidos por Central pendientes de enviar al Equipo Interno."
+              : "Esta solicitud no tiene productos pendientes de envío."
+          );
+
+          return;
+        }
+
+        const cantidades = {};
+
+        disponibles.forEach(
+          (linea) => {
+            cantidades[
+              linea.key
+            ] = "";
+          }
+        );
+
+        setLineasDisponiblesEnvio(
+          disponibles
+        );
+
+        setCantidadesEnvio(
+          cantidades
+        );
+
+        setMostrarEnvio(
+          true
+        );
+      } catch (error) {
+        setError(
+          error.response?.data
+            ?.message ||
+            error.message ||
+            "No fue posible preparar el envío"
+        );
+      } finally {
+        setPreparandoEnvio(
+          false
+        );
+      }
+    };
+
+  const aprobadoSeguro = (
+    cantidad
+  ) => {
+    const numero =
+      Number(cantidad);
+
+    return Number.isFinite(
+      numero
+    )
+      ? Math.max(
+          numero,
+          0
+        )
+      : 0;
+  };
+
+  const actualizarCantidadEnvio =
+    (
+      key,
+      valor
+    ) => {
+      setCantidadesEnvio(
+        (actual) => ({
+          ...actual,
+          [key]: valor
+        })
+      );
+    };
+
+  // =========================================================
+  // CREAR ENVÍO
+  // =========================================================
+
+  const crearEnvio =
+    async (event) => {
+      event.preventDefault();
+
+      if (!detalle) {
+        return;
+      }
+
+      const seleccionadas =
+        lineasDisponiblesEnvio
+          .map(
+            (linea) => ({
+              ...linea,
+
+              cantidad:
+                Number(
+                  cantidadesEnvio[
+                    linea.key
+                  ] || 0
+                )
+            })
           )
           .filter(
             (linea) =>
-              linea
-                .cantidad_enviada >
-              0
+              linea.cantidad > 0
           );
 
       if (
-        lineasEnvio.length === 0
+        seleccionadas.length ===
+        0
       ) {
         setError(
-          "Captura al menos una cantidad mayor a cero para crear el envío"
+          "Captura al menos una cantidad mayor a cero para crear el envío."
         );
 
         return;
       }
 
-      const cantidadInvalida =
-        lineasEnvio.find(
+      const invalida =
+        seleccionadas.find(
           (linea) =>
             !Number.isFinite(
-              linea
-                .cantidad_enviada
+              linea.cantidad
             ) ||
-            linea
-              .cantidad_enviada <=
-              0 ||
-            linea
-              .cantidad_enviada >
-              linea.pendiente
+            linea.cantidad <= 0 ||
+            linea.cantidad >
+              Number(
+                linea
+                  .cantidad_disponible ||
+                  0
+              )
         );
 
-      if (
-        cantidadInvalida
-      ) {
+      if (invalida) {
         setError(
-          "La cantidad a enviar debe ser mayor a cero y no puede superar el pendiente aprobado"
+          "La cantidad a enviar debe ser mayor a cero y no puede superar la cantidad disponible."
         );
 
         return;
       }
+
+      const payloadLineas =
+        seleccionadas.map(
+          (linea) => {
+            if (
+              linea.tipo ===
+              "nuevo"
+            ) {
+              return {
+                solicitud_producto_nuevo_id:
+                  Number(
+                    linea
+                      .solicitud_producto_nuevo_id
+                  ),
+
+                producto_id:
+                  Number(
+                    linea.producto_id
+                  ),
+
+                cantidad_enviada:
+                  linea.cantidad
+              };
+            }
+
+            return {
+              solicitud_linea_id:
+                Number(
+                  linea
+                    .solicitud_linea_id
+                ),
+
+              cantidad_enviada:
+                linea.cantidad
+            };
+          }
+        );
 
       try {
         setGuardando(true);
-
         setError("");
 
         const response =
@@ -1194,15 +1865,7 @@ const Solicitudes = () => {
                 ),
 
               lineas:
-                lineasEnvio.map(
-                  ({
-                    solicitud_linea_id,
-                    cantidad_enviada
-                  }) => ({
-                    solicitud_linea_id,
-                    cantidad_enviada
-                  })
-                )
+                payloadLineas
             }
           );
 
@@ -1212,6 +1875,10 @@ const Solicitudes = () => {
 
         setCantidadesEnvio(
           {}
+        );
+
+        setLineasDisponiblesEnvio(
+          []
         );
 
         await cargarDatos();
@@ -1234,6 +1901,78 @@ const Solicitudes = () => {
       }
     };
 
+  // =========================================================
+  // REGISTRAR EN INVENTARIO PERSONAL
+  // =========================================================
+
+  const registrarPedidoEnInventario =
+    async () => {
+      if (
+        !detalle ||
+        !esSolicitudPropiaEquipoInterno
+      ) {
+        return;
+      }
+
+      if (
+        unidadesDisponiblesRegistro <=
+        0
+      ) {
+        setError(
+          "No hay artículos recibidos pendientes de registrar en tu inventario."
+        );
+
+        return;
+      }
+
+      const confirmar =
+        window.confirm(
+          `Se registrarán ${unidadesDisponiblesRegistro} unidad(es) recibidas en tu inventario. ¿Deseas continuar?`
+        );
+
+      if (!confirmar) {
+        return;
+      }
+
+      try {
+        setRegistrandoInventario(
+          true
+        );
+
+        setError("");
+
+        const response =
+          await api.post(
+            `/solicitudes/${detalle.solicitud.id}/registrar-inventario`
+          );
+
+        await cargarDatos();
+
+        await verDetalle(
+          detalle.solicitud.id
+        );
+
+        window.alert(
+          response.data?.message ||
+            "Artículos registrados en tu inventario correctamente."
+        );
+      } catch (error) {
+        setError(
+          error.response?.data
+            ?.message ||
+            "No fue posible registrar los artículos en tu inventario"
+        );
+      } finally {
+        setRegistrandoInventario(
+          false
+        );
+      }
+    };
+
+  // =========================================================
+  // LOADING
+  // =========================================================
+
   if (loading) {
     return (
       <div className="page-loading">
@@ -1241,6 +1980,10 @@ const Solicitudes = () => {
       </div>
     );
   }
+
+  // =========================================================
+  // RENDER
+  // =========================================================
 
   return (
     <div>
@@ -1251,22 +1994,17 @@ const Solicitudes = () => {
           </h1>
 
           <p>
-            Solicitudes de
-            Sucursales y Equipos
-            Internos.
+            Solicitudes de Sucursales y
+            Equipos Internos.
           </p>
         </div>
 
         <div className="header-actions">
           <button
             className="secondary-button"
-            onClick={
-              cargarDatos
-            }
+            onClick={cargarDatos}
           >
-            <RefreshCw
-              size={18}
-            />
+            <RefreshCw size={18} />
 
             Actualizar
           </button>
@@ -1307,9 +2045,7 @@ const Solicitudes = () => {
             <input
               type="text"
               placeholder="Buscar solicitud..."
-              value={
-                busqueda
-              }
+              value={busqueda}
               onChange={(
                 event
               ) =>
@@ -1321,9 +2057,7 @@ const Solicitudes = () => {
           </div>
 
           <select
-            value={
-              estadoFiltro
-            }
+            value={estadoFiltro}
             onChange={(
               event
             ) =>
@@ -1353,7 +2087,8 @@ const Solicitudes = () => {
             </option>
 
             <option value="recibida">
-              Recibida
+              Recibida / Recibida por
+              Central
             </option>
 
             <option value="cerrada">
@@ -1366,11 +2101,10 @@ const Solicitudes = () => {
           </select>
         </div>
 
-        {solicitudesFiltradas
-          .length === 0 ? (
+        {solicitudesFiltradas.length ===
+        0 ? (
           <div className="empty-state">
-            No hay solicitudes
-            disponibles.
+            No hay solicitudes disponibles.
           </div>
         ) : (
           <div className="table-container">
@@ -1378,21 +2112,27 @@ const Solicitudes = () => {
               <thead>
                 <tr>
                   <th>ID</th>
+
                   <th>
                     Destino
                   </th>
+
                   <th>
                     Flujo
                   </th>
+
                   <th>
                     Creada por
                   </th>
+
                   <th>
                     Estado
                   </th>
+
                   <th>
                     Fecha
                   </th>
+
                   <th>
                     Acción
                   </th>
@@ -1422,8 +2162,8 @@ const Solicitudes = () => {
                         {item
                           .destino_ubicacion_tipo ===
                         "equipo_interno"
-                          ? "Compra"
-                          : "Central"}
+                          ? "Compra → Envío"
+                          : "Central → Envío"}
                       </td>
 
                       <td>
@@ -1436,7 +2176,9 @@ const Solicitudes = () => {
                       <td>
                         <span className="status neutral">
                           {
-                            item.estado
+                            etiquetaEstadoSolicitud(
+                              item
+                            )
                           }
                         </span>
                       </td>
@@ -1474,6 +2216,10 @@ const Solicitudes = () => {
         )}
       </section>
 
+      {/* ===================================================
+          NUEVA SOLICITUD
+      =================================================== */}
+
       {mostrarNueva && (
         <div className="modal-backdrop">
           <div className="modal-card large-modal">
@@ -1484,9 +2230,12 @@ const Solicitudes = () => {
                 </h2>
 
                 <p>
-                  Agrega productos del
-                  catálogo o productos
-                  nuevos.
+                  Aquí puedes consultar los
+                  artículos y categorías
+                  disponibles para realizar
+                  una solicitud. Las
+                  cantidades de stock de
+                  Central no son visibles.
                 </p>
               </div>
 
@@ -1527,9 +2276,13 @@ const Solicitudes = () => {
                     style={{
                       display:
                         "flex",
+
                       alignItems:
                         "center",
-                      gap: "8px",
+
+                      gap:
+                        "8px",
+
                       marginBottom:
                         "12px"
                     }}
@@ -1570,8 +2323,8 @@ const Solicitudes = () => {
                       }}
                     />
 
-                    Franquicia nueva,
-                    aún no dada de alta
+                    Franquicia nueva, aún
+                    no dada de alta
                   </label>
                 )}
 
@@ -1601,22 +2354,22 @@ const Solicitudes = () => {
                       style={{
                         display:
                           "block",
+
                         marginTop:
                           "7px",
-                        opacity: 0.7
+
+                        opacity:
+                          0.7
                       }}
                     >
-                      La ubicación se
-                      creará con estado
-                      Pendiente.
+                      La ubicación se creará
+                      con estado Pendiente.
                     </small>
                   </>
                 ) : (
                   <select
                     className="form-control"
-                    value={
-                      destino
-                    }
+                    value={destino}
                     onChange={(
                       event
                     ) =>
@@ -1701,6 +2454,18 @@ const Solicitudes = () => {
                 <h3>
                   Productos existentes
                 </h3>
+
+                <p
+                  style={{
+                    opacity:
+                      0.75
+                  }}
+                >
+                  El catálogo no muestra
+                  existencias ni cantidades
+                  disponibles del almacén
+                  Central.
+                </p>
               </div>
 
               <div className="form-group">
@@ -1726,7 +2491,7 @@ const Solicitudes = () => {
                     Todas las categorías
                   </option>
 
-                  {categorias.map(
+                  {categoriasCatalogo.map(
                     (
                       categoria
                     ) => (
@@ -1847,8 +2612,7 @@ const Solicitudes = () => {
                   agregarLinea
                 }
               >
-                + Agregar producto
-                existente
+                + Agregar producto existente
               </button>
 
               <div
@@ -1863,12 +2627,13 @@ const Solicitudes = () => {
 
                 <p
                   style={{
-                    opacity: 0.75
+                    opacity:
+                      0.75
                   }}
                 >
-                  Usa esta sección
-                  cuando el artículo no
-                  existe en el catálogo.
+                  Usa esta sección cuando
+                  el artículo no existe en
+                  el catálogo.
                 </p>
               </div>
 
@@ -1882,10 +2647,13 @@ const Solicitudes = () => {
                     style={{
                       border:
                         "1px solid rgba(128,128,128,.25)",
+
                       borderRadius:
                         "10px",
+
                       padding:
                         "16px",
+
                       marginBottom:
                         "16px"
                     }}
@@ -1894,6 +2662,7 @@ const Solicitudes = () => {
                       style={{
                         display:
                           "flex",
+
                         justifyContent:
                           "space-between"
                       }}
@@ -1992,7 +2761,7 @@ const Solicitudes = () => {
                           Seleccionar...
                         </option>
 
-                        {categorias.map(
+                        {categoriasCatalogo.map(
                           (
                             categoria
                           ) => (
@@ -2058,8 +2827,7 @@ const Solicitudes = () => {
 
                         <div className="form-group">
                           <label>
-                            Proveedor
-                            sugerido
+                            Proveedor sugerido
                           </label>
 
                           <input
@@ -2074,8 +2842,7 @@ const Solicitudes = () => {
                               actualizarProductoNuevo(
                                 index,
                                 "proveedor_sugerido",
-                                event
-                                  .target
+                                event.target
                                   .value
                               )
                             }
@@ -2101,8 +2868,7 @@ const Solicitudes = () => {
                               actualizarProductoNuevo(
                                 index,
                                 "proveedor_link",
-                                event
-                                  .target
+                                event.target
                                   .value
                               )
                             }
@@ -2127,8 +2893,7 @@ const Solicitudes = () => {
                               actualizarProductoNuevo(
                                 index,
                                 "sku_sugerido",
-                                event
-                                  .target
+                                event.target
                                   .value
                               )
                             }
@@ -2183,291 +2948,102 @@ const Solicitudes = () => {
         </div>
       )}
 
+      {/* ===================================================
+          APROBACIÓN
+      =================================================== */}
+
       {mostrarAprobacion &&
         detalle && (
-        <div className="modal-backdrop">
-          <div className="modal-card large-modal">
-            <div className="modal-header">
-              <div>
-                <h2>
-                  Aprobar solicitud #
-                  {
-                    detalle
-                      .solicitud.id
-                  }
-                </h2>
+          <div className="modal-backdrop">
+            <div className="modal-card large-modal">
+              <div className="modal-header">
+                <div>
+                  <h2>
+                    Aprobar solicitud #
+                    {
+                      detalle
+                        .solicitud.id
+                    }
+                  </h2>
 
-                <p>
-                  {esDestinoEquipoInterno
-                    ? "Equipo Interno: la aprobación no depende del stock de Central. Los productos aprobados pasan al flujo de Compras."
-                    : "Sucursal: la cantidad aprobada está limitada por el stock disponible en Central."}
-                </p>
-              </div>
+                  <p>
+                    {esDestinoEquipoInterno
+                      ? "Equipo Interno: la aprobación no depende del stock de Central. Los productos aprobados pasan al flujo de Compras."
+                      : "Sucursal: la cantidad aprobada está limitada por el stock disponible en Central."}
+                  </p>
+                </div>
 
-              <button
-                type="button"
-                className="modal-close"
-                onClick={() => {
-                  setMostrarAprobacion(
-                    false
-                  );
-
-                  setCantidadesAprobacion(
-                    {}
-                  );
-
-                  setStockCentral(
-                    {}
-                  );
-                }}
-              >
-                ×
-              </button>
-            </div>
-
-            <form
-              onSubmit={
-                aprobarSolicitud
-              }
-            >
-              <div className="table-container">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>
-                        Producto
-                      </th>
-
-                      <th>
-                        Solicitada
-                      </th>
-
-                      {esDestinoSucursal && (
-                        <th>
-                          Stock Central
-                        </th>
-                      )}
-
-                      <th>
-                        Aprobar
-                      </th>
-                    </tr>
-                  </thead>
-
-                  <tbody>
-                    {detalle.lineas.map(
-                      (
-                        linea
-                      ) => {
-                        const solicitada =
-                          Number(
-                            linea
-                              .cantidad_solicitada ||
-                              0
-                          );
-
-                        const disponible =
-                          Number(
-                            stockCentral[
-                              Number(
-                                linea
-                                  .producto_id
-                              )
-                            ] || 0
-                          );
-
-                        return (
-                          <tr
-                            key={
-                              linea.id
-                            }
-                          >
-                            <td>
-                              {
-                                linea
-                                  .producto_nombre
-                              }
-                            </td>
-
-                            <td>
-                              {
-                                solicitada
-                              }
-                            </td>
-
-                            {esDestinoSucursal && (
-                              <td>
-                                {
-                                  disponible
-                                }
-                              </td>
-                            )}
-
-                            <td>
-                              <input
-                                className="form-control quantity-input"
-                                type="number"
-                                min="0"
-                                max={
-                                  esDestinoSucursal
-                                    ? Math.min(
-                                        solicitada,
-                                        disponible
-                                      )
-                                    : solicitada
-                                }
-                                step="0.01"
-                                value={
-                                  cantidadesAprobacion[
-                                    linea.id
-                                  ] ??
-                                  ""
-                                }
-                                onChange={(
-                                  event
-                                ) =>
-                                  actualizarCantidadAprobacion(
-                                    linea.id,
-                                    event
-                                      .target
-                                      .value
-                                  )
-                                }
-                              />
-                            </td>
-                          </tr>
-                        );
-                      }
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="modal-actions">
                 <button
                   type="button"
-                  className="secondary-button"
-                  onClick={() =>
+                  className="modal-close"
+                  onClick={() => {
                     setMostrarAprobacion(
                       false
-                    )
-                  }
-                >
-                  Cancelar
-                </button>
+                    );
 
-                <button
-                  type="submit"
-                  className="primary-button icon-button"
-                  disabled={
-                    guardando
-                  }
-                >
-                  <CheckCircle2
-                    size={17}
-                  />
+                    setCantidadesAprobacion(
+                      {}
+                    );
 
-                  Confirmar aprobación
+                    setStockCentral(
+                      {}
+                    );
+                  }}
+                >
+                  ×
                 </button>
               </div>
-            </form>
-          </div>
-        </div>
-      )}
 
-      {mostrarEnvio &&
-        detalle && (
-        <div className="modal-backdrop">
-          <div className="modal-card large-modal">
-            <div className="modal-header">
-              <div>
-                <h2>
-                  Crear envío parcial
-                </h2>
-
-                <p>
-                  Solicitud #
-                  {
-                    detalle
-                      .solicitud.id
-                  }
-                </p>
-              </div>
-
-              <button
-                className="modal-close"
-                type="button"
-                onClick={() =>
-                  setMostrarEnvio(
-                    false
-                  )
+              <form
+                onSubmit={
+                  aprobarSolicitud
                 }
               >
-                ×
-              </button>
-            </div>
+                <div className="table-container">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>
+                          Producto
+                        </th>
 
-            <form
-              onSubmit={
-                crearEnvio
-              }
-            >
-              <div className="table-container">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>
-                        Producto
-                      </th>
-                      <th>
-                        Aprobada
-                      </th>
-                      <th>
-                        Enviada
-                      </th>
-                      <th>
-                        Pendiente
-                      </th>
-                      <th>
-                        Enviar
-                      </th>
-                    </tr>
-                  </thead>
+                        <th>
+                          Solicitada
+                        </th>
 
-                  <tbody>
-                    {detalle.lineas
-                      .filter(
-                        (
-                          linea
-                        ) =>
-                          Number(
-                            linea
-                              .cantidad_aprobada
-                          ) >
-                          Number(
-                            linea
-                              .cantidad_enviada_acumulada
-                          )
-                      )
-                      .map(
+                        {esDestinoSucursal && (
+                          <th>
+                            Stock Central
+                          </th>
+                        )}
+
+                        <th>
+                          Aprobar
+                        </th>
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      {detalle.lineas.map(
                         (
                           linea
                         ) => {
-                          const aprobada =
+                          const solicitada =
                             Number(
                               linea
-                                .cantidad_aprobada
+                                .cantidad_solicitada ||
+                                0
                             );
 
-                          const enviada =
+                          const disponible =
                             Number(
-                              linea
-                                .cantidad_enviada_acumulada
+                              stockCentral[
+                                Number(
+                                  linea
+                                    .producto_id
+                                )
+                              ] || 0
                             );
-
-                          const pendiente =
-                            aprobada -
-                            enviada;
 
                           return (
                             <tr
@@ -2484,21 +3060,17 @@ const Solicitudes = () => {
 
                               <td>
                                 {
-                                  aprobada
+                                  solicitada
                                 }
                               </td>
 
-                              <td>
-                                {
-                                  enviada
-                                }
-                              </td>
-
-                              <td>
-                                {
-                                  pendiente
-                                }
-                              </td>
+                              {esDestinoSucursal && (
+                                <td>
+                                  {
+                                    disponible
+                                  }
+                                </td>
+                              )}
 
                               <td>
                                 <input
@@ -2506,11 +3078,16 @@ const Solicitudes = () => {
                                   type="number"
                                   min="0"
                                   max={
-                                    pendiente
+                                    esDestinoSucursal
+                                      ? Math.min(
+                                          solicitada,
+                                          disponible
+                                        )
+                                      : solicitada
                                   }
                                   step="0.01"
                                   value={
-                                    cantidadesEnvio[
+                                    cantidadesAprobacion[
                                       linea.id
                                     ] ??
                                     ""
@@ -2518,10 +3095,9 @@ const Solicitudes = () => {
                                   onChange={(
                                     event
                                   ) =>
-                                    actualizarCantidadEnvio(
+                                    actualizarCantidadAprobacion(
                                       linea.id,
-                                      event
-                                        .target
+                                      event.target
                                         .value
                                     )
                                   }
@@ -2531,516 +3107,871 @@ const Solicitudes = () => {
                           );
                         }
                       )}
-                  </tbody>
-                </table>
-              </div>
+                    </tbody>
+                  </table>
+                </div>
 
-              <div className="modal-actions">
-                <button
-                  type="button"
-                  className="secondary-button"
-                  onClick={() =>
-                    setMostrarEnvio(
-                      false
-                    )
-                  }
-                >
-                  Cancelar
-                </button>
+                <div className="modal-actions">
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={() =>
+                      setMostrarAprobacion(
+                        false
+                      )
+                    }
+                  >
+                    Cancelar
+                  </button>
 
-                <button
-                  type="submit"
-                  className="primary-button icon-button"
-                  disabled={
-                    guardando
-                  }
-                >
-                  <Truck
-                    size={17}
-                  />
+                  <button
+                    type="submit"
+                    className="primary-button icon-button"
+                    disabled={
+                      guardando
+                    }
+                  >
+                    <CheckCircle2
+                      size={17}
+                    />
 
-                  Crear envío
-                </button>
-              </div>
-            </form>
+                    Confirmar aprobación
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {detalle &&
-        !mostrarEnvio &&
-        !mostrarAprobacion && (
-        <div className="modal-backdrop">
-          <div className="modal-card large-modal">
-            <div className="modal-header">
-              <div>
-                <h2>
-                  Solicitud #
-                  {
-                    detalle
-                      .solicitud.id
-                  }
-                </h2>
+      {/* ===================================================
+          CREAR ENVÍO
+      =================================================== */}
 
-                <p>
-                  Estado:{" "}
-                  <strong>
+      {mostrarEnvio &&
+        detalle && (
+          <div className="modal-backdrop">
+            <div className="modal-card large-modal">
+              <div className="modal-header">
+                <div>
+                  <h2>
+                    Crear envío parcial
+                  </h2>
+
+                  <p>
+                    Solicitud #
                     {
                       detalle
-                        .solicitud
-                        .estado
+                        .solicitud.id
                     }
-                  </strong>
-                </p>
+                  </p>
+                </div>
+
+                <button
+                  className="modal-close"
+                  type="button"
+                  onClick={() => {
+                    setMostrarEnvio(
+                      false
+                    );
+
+                    setLineasDisponiblesEnvio(
+                      []
+                    );
+
+                    setCantidadesEnvio(
+                      {}
+                    );
+                  }}
+                >
+                  ×
+                </button>
               </div>
 
-              <button
-                type="button"
-                className="modal-close"
-                onClick={() => {
-                  setDetalle(
-                    null
-                  );
-
-                  setSeleccionada(
-                    null
-                  );
-
-                  setError("");
-                }}
+              <form
+                onSubmit={
+                  crearEnvio
+                }
               >
-                ×
-              </button>
-            </div>
+                <div className="table-container">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>
+                          Producto
+                        </th>
 
-            <div
-              style={{
-                padding:
-                  "12px",
-                marginBottom:
-                  "18px",
-                border:
-                  "1px solid rgba(128,128,128,.25)",
-                borderRadius:
-                  "8px"
-              }}
-            >
-              <strong>
-                Flujo de
-                abastecimiento:{" "}
-              </strong>
+                        <th>
+                          Origen
+                        </th>
 
-              {esDestinoEquipoInterno ? (
-                <span>
-                  Compra a proveedor
-                  <ShoppingCart
-                    size={16}
-                    style={{
-                      marginLeft:
-                        "7px",
-                      verticalAlign:
-                        "middle"
-                    }}
-                  />
-                </span>
-              ) : (
-                <span>
-                  Stock de Central →
-                  Envío a Sucursal
-                </span>
-              )}
-            </div>
+                        <th>
+                          Disponible
+                        </th>
 
-            <h3>
-              Productos existentes
-            </h3>
+                        <th>
+                          Enviar
+                        </th>
+                      </tr>
+                    </thead>
 
-            {detalle.lineas
-              ?.length > 0 ? (
-              <div className="table-container">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>
-                        Producto
-                      </th>
-                      <th>
-                        Solicitada
-                      </th>
-                      <th>
-                        Aprobada
-                      </th>
-                      <th>
-                        Enviada
-                      </th>
-                      <th>
-                        Recibida
-                      </th>
-                    </tr>
-                  </thead>
-
-                  <tbody>
-                    {detalle.lineas.map(
-                      (
-                        linea
-                      ) => (
-                        <tr
-                          key={
-                            linea.id
-                          }
-                        >
-                          <td>
-                            {
-                              linea
-                                .producto_nombre
-                            }
-                          </td>
-
-                          <td>
-                            {
-                              linea
-                                .cantidad_solicitada
-                            }
-                          </td>
-
-                          <td>
-                            {
-                              linea
-                                .cantidad_aprobada
-                            }
-                          </td>
-
-                          <td>
-                            {
-                              linea
-                                .cantidad_enviada_acumulada
-                            }
-                          </td>
-
-                          <td>
-                            {
-                              linea
-                                .cantidad_recibida_acumulada
-                            }
-                          </td>
-                        </tr>
-                      )
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="empty-state">
-                No hay productos
-                existentes.
-              </div>
-            )}
-
-            <div
-              style={{
-                marginTop:
-                  "28px"
-              }}
-            >
-              <h3>
-                Productos nuevos
-              </h3>
-            </div>
-
-            {detalle
-              .productos_nuevos
-              ?.length > 0 ? (
-              <div className="table-container">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>
-                        Nombre
-                      </th>
-                      <th>
-                        Descripción
-                      </th>
-                      <th>
-                        Categoría
-                      </th>
-                      <th>
-                        Cantidad
-                      </th>
-
-                      {puedeVerDatosProveedor && (
-                        <>
-                          <th>
-                            Proveedor
-                          </th>
-                          <th>
-                            SKU
-                          </th>
-                          <th>
-                            Link
-                          </th>
-                        </>
-                      )}
-                    </tr>
-                  </thead>
-
-                  <tbody>
-                    {detalle
-                      .productos_nuevos
-                      .map(
+                    <tbody>
+                      {lineasDisponiblesEnvio.map(
                         (
-                          producto
+                          linea
                         ) => (
                           <tr
                             key={
-                              producto.id
+                              linea.key
                             }
                           >
                             <td>
                               {
-                                producto.nombre
+                                linea.producto_nombre
                               }
                             </td>
 
                             <td>
-                              {
-                                producto.descripcion
-                              }
+                              {linea.tipo ===
+                              "nuevo"
+                                ? "Compra / producto nuevo"
+                                : esDestinoEquipoInterno
+                                  ? "Compra a proveedor"
+                                  : "Stock Central"}
                             </td>
 
                             <td>
                               {
-                                producto.categoria_nombre
+                                linea
+                                  .cantidad_disponible
                               }
                             </td>
 
                             <td>
-                              {
-                                producto.cantidad_solicitada
-                              }
+                              <input
+                                className="form-control quantity-input"
+                                type="number"
+                                min="0"
+                                max={
+                                  linea
+                                    .cantidad_disponible
+                                }
+                                step="0.01"
+                                value={
+                                  cantidadesEnvio[
+                                    linea.key
+                                  ] ??
+                                  ""
+                                }
+                                onChange={(
+                                  event
+                                ) =>
+                                  actualizarCantidadEnvio(
+                                    linea.key,
+                                    event.target
+                                      .value
+                                  )
+                                }
+                              />
                             </td>
-
-                            {puedeVerDatosProveedor && (
-                              <>
-                                <td>
-                                  {producto
-                                    .proveedor_sugerido ||
-                                    "—"}
-                                </td>
-
-                                <td>
-                                  {producto
-                                    .sku_sugerido ||
-                                    "—"}
-                                </td>
-
-                                <td>
-                                  {producto
-                                    .proveedor_link ? (
-                                    <a
-                                      href={
-                                        producto
-                                          .proveedor_link
-                                      }
-                                      target="_blank"
-                                      rel="noreferrer"
-                                    >
-                                      Abrir
-                                    </a>
-                                  ) : (
-                                    "—"
-                                  )}
-                                </td>
-                              </>
-                            )}
                           </tr>
                         )
                       )}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="empty-state">
-                No hay productos
-                nuevos.
-              </div>
-            )}
+                    </tbody>
+                  </table>
+                </div>
 
-            <div className="modal-actions">
-              {puedeRevisar &&
-                detalle
-                  .solicitud
-                  .estado ===
-                  "solicitada" && (
+                <div className="modal-actions">
                   <button
+                    type="button"
                     className="secondary-button"
-                    onClick={() =>
-                      iniciarRevision(
-                        detalle
-                          .solicitud
-                          .id
-                      )
-                    }
+                    onClick={() => {
+                      setMostrarEnvio(
+                        false
+                      );
+
+                      setLineasDisponiblesEnvio(
+                        []
+                      );
+
+                      setCantidadesEnvio(
+                        {}
+                      );
+                    }}
                   >
-                    <ClipboardList
-                      size={17}
-                    />
-
-                    Iniciar revisión
+                    Cancelar
                   </button>
-                )}
 
-              {puedeAprobar &&
-                detalle
-                  .solicitud
-                  .estado ===
-                  "en_revision" && (
-                  <>
-                    <button
-                      className="danger-button"
-                      onClick={
-                        rechazarSolicitud
-                      }
-                      disabled={
-                        guardando
-                      }
-                    >
-                      <XCircle
-                        size={17}
-                      />
-
-                      Rechazar
-                    </button>
-
-                    <button
-                      className="primary-button icon-button"
-                      onClick={
-                        abrirAprobacion
-                      }
-                      disabled={
-                        guardando ||
-                        cargandoAprobacion ||
-                        (
-                          detalle.lineas.length === 0 &&
-                          (detalle.productos_nuevos || []).length === 0
-                        )
-                      }
-                    >
-                      <CheckCircle2
-                        size={17}
-                      />
-
-                      {cargandoAprobacion
-                        ? "Preparando..."
-                        : "Revisar aprobación"}
-                    </button>
-                  </>
-                )}
-
-              {puedeRevisar &&
-                (esDestinoSucursal ||
-                  esDestinoEquipoInterno) &&
-                [
-                  "aprobada",
-                  "en_transito"
-                ].includes(
-                  detalle
-                    .solicitud
-                    .estado
-                ) &&
-                detalle.lineas.some(
-                  (
-                    linea
-                  ) =>
-                    Number(
-                      linea
-                        .cantidad_aprobada
-                    ) >
-                    Number(
-                      linea
-                        .cantidad_enviada_acumulada
-                    )
-                ) && (
                   <button
+                    type="submit"
                     className="primary-button icon-button"
-                    onClick={
-                      abrirCrearEnvio
+                    disabled={
+                      guardando
                     }
                   >
                     <Truck
                       size={17}
                     />
 
-                    Crear envío
+                    {guardando
+                      ? "Creando..."
+                      : "Crear envío"}
                   </button>
-                )}
-
-              {puedeRevisar &&
-                esDestinoEquipoInterno &&
-                detalle.solicitud.estado ===
-                  "aprobada" &&
-                !detalle.lineas.some(
-                  (linea) =>
-                    Number(
-                      linea.cantidad_enviada_acumulada ||
-                        0
-                    ) > 0
-                ) && (
-                  <div
-                    style={{
-                      padding:
-                        "10px 14px",
-                      borderRadius:
-                        "8px",
-                      border:
-                        "1px solid rgba(128,128,128,.3)"
-                    }}
-                  >
-                    <ShoppingCart
-                      size={17}
-                      style={{
-                        verticalAlign:
-                          "middle",
-                        marginRight:
-                          "7px"
-                      }}
-                    />
-
-                    Pendiente de
-                    gestionar en
-                    Compras
-                  </div>
-                )}
-
-              {puedeAprobar &&
-                [
-                  "aprobada",
-                  "en_transito",
-                  "recibida"
-                ].includes(
-                  detalle
-                    .solicitud
-                    .estado
-                ) && (
-                  <button
-                    className="secondary-button"
-                    onClick={
-                      cerrarSolicitud
-                    }
-                    disabled={
-                      guardando
-                    }
-                  >
-                    <PackageCheck
-                      size={17}
-                    />
-
-                    Cerrar solicitud
-                  </button>
-                )}
+                </div>
+              </form>
             </div>
           </div>
-        </div>
-      )}
+        )}
+
+      {/* ===================================================
+          DETALLE
+      =================================================== */}
+
+      {detalle &&
+        !mostrarEnvio &&
+        !mostrarAprobacion && (
+          <div className="modal-backdrop">
+            <div className="modal-card large-modal">
+              <div className="modal-header">
+                <div>
+                  <h2>
+                    Solicitud #
+                    {
+                      detalle
+                        .solicitud.id
+                    }
+                  </h2>
+
+                  <p>
+                    Estado:{" "}
+                    <strong>
+                      {
+                        etiquetaEstadoSolicitud(
+                          detalle
+                            .solicitud
+                        )
+                      }
+                    </strong>
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  className="modal-close"
+                  onClick={() => {
+                    setDetalle(
+                      null
+                    );
+
+                    setSeleccionada(
+                      null
+                    );
+
+                    setError("");
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+
+              <div
+                style={{
+                  padding:
+                    "12px",
+
+                  marginBottom:
+                    "18px",
+
+                  border:
+                    "1px solid rgba(128,128,128,.25)",
+
+                  borderRadius:
+                    "8px"
+                }}
+              >
+                <strong>
+                  Flujo de abastecimiento:{" "}
+                </strong>
+
+                {esDestinoEquipoInterno ? (
+                  <span>
+                    Compra a proveedor →
+                    Recibida por Central →
+                    Envío → Registro manual
+                    en inventario
+
+                    <ShoppingCart
+                      size={16}
+                      style={{
+                        marginLeft:
+                          "7px",
+
+                        verticalAlign:
+                          "middle"
+                      }}
+                    />
+                  </span>
+                ) : (
+                  <span>
+                    Stock de Central →
+                    Envío a Sucursal →
+                    Inventario de Sucursal
+                  </span>
+                )}
+              </div>
+
+              <h3>
+                Productos existentes
+              </h3>
+
+              {detalle.lineas
+                ?.length > 0 ? (
+                <div className="table-container">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>
+                          Producto
+                        </th>
+
+                        <th>
+                          Solicitada
+                        </th>
+
+                        <th>
+                          Aprobada
+                        </th>
+
+                        <th>
+                          Enviada
+                        </th>
+
+                        <th>
+                          Recibida
+                        </th>
+
+                        {esDestinoEquipoInterno && (
+                          <th>
+                            Registrada
+                          </th>
+                        )}
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      {detalle.lineas.map(
+                        (
+                          linea
+                        ) => (
+                          <tr
+                            key={
+                              linea.id
+                            }
+                          >
+                            <td>
+                              {
+                                linea
+                                  .producto_nombre
+                              }
+                            </td>
+
+                            <td>
+                              {
+                                linea
+                                  .cantidad_solicitada
+                              }
+                            </td>
+
+                            <td>
+                              {
+                                linea
+                                  .cantidad_aprobada
+                              }
+                            </td>
+
+                            <td>
+                              {
+                                linea
+                                  .cantidad_enviada_acumulada
+                              }
+                            </td>
+
+                            <td>
+                              {
+                                linea
+                                  .cantidad_recibida_acumulada
+                              }
+                            </td>
+
+                            {esDestinoEquipoInterno && (
+                              <td>
+                                {Number(
+                                  linea
+                                    .cantidad_registrada_inventario ||
+                                    0
+                                )}
+                              </td>
+                            )}
+                          </tr>
+                        )
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="empty-state">
+                  No hay productos existentes.
+                </div>
+              )}
+
+              <div
+                style={{
+                  marginTop:
+                    "28px"
+                }}
+              >
+                <h3>
+                  Productos nuevos
+                </h3>
+              </div>
+
+              {detalle
+                .productos_nuevos
+                ?.length > 0 ? (
+                <div className="table-container">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>
+                          Nombre
+                        </th>
+
+                        <th>
+                          Descripción
+                        </th>
+
+                        <th>
+                          Categoría
+                        </th>
+
+                        <th>
+                          Cantidad
+                        </th>
+
+                        <th>
+                          Enviada
+                        </th>
+
+                        <th>
+                          Recibida
+                        </th>
+
+                        {esDestinoEquipoInterno && (
+                          <th>
+                            Registrada
+                          </th>
+                        )}
+
+                        {puedeVerDatosProveedor && (
+                          <>
+                            <th>
+                              Proveedor
+                            </th>
+
+                            <th>
+                              SKU
+                            </th>
+
+                            <th>
+                              Link
+                            </th>
+                          </>
+                        )}
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      {detalle
+                        .productos_nuevos
+                        .map(
+                          (
+                            producto
+                          ) => (
+                            <tr
+                              key={
+                                producto.id
+                              }
+                            >
+                              <td>
+                                {
+                                  producto.nombre
+                                }
+                              </td>
+
+                              <td>
+                                {
+                                  producto.descripcion ||
+                                  "—"
+                                }
+                              </td>
+
+                              <td>
+                                {
+                                  producto.categoria_nombre ||
+                                  "—"
+                                }
+                              </td>
+
+                              <td>
+                                {
+                                  producto
+                                    .cantidad_solicitada
+                                }
+                              </td>
+
+                              <td>
+                                {Number(
+                                  producto
+                                    .cantidad_enviada_acumulada ||
+                                    0
+                                )}
+                              </td>
+
+                              <td>
+                                {Number(
+                                  producto
+                                    .cantidad_recibida_acumulada ||
+                                    0
+                                )}
+                              </td>
+
+                              {esDestinoEquipoInterno && (
+                                <td>
+                                  {Number(
+                                    producto
+                                      .cantidad_registrada_inventario ||
+                                      0
+                                  )}
+                                </td>
+                              )}
+
+                              {puedeVerDatosProveedor && (
+                                <>
+                                  <td>
+                                    {producto
+                                      .proveedor_sugerido ||
+                                      "—"}
+                                  </td>
+
+                                  <td>
+                                    {producto
+                                      .sku_sugerido ||
+                                      "—"}
+                                  </td>
+
+                                  <td>
+                                    {producto
+                                      .proveedor_link ? (
+                                      <a
+                                        href={
+                                          producto
+                                            .proveedor_link
+                                        }
+                                        target="_blank"
+                                        rel="noreferrer"
+                                      >
+                                        Abrir
+                                      </a>
+                                    ) : (
+                                      "—"
+                                    )}
+                                  </td>
+                                </>
+                              )}
+                            </tr>
+                          )
+                        )}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="empty-state">
+                  No hay productos nuevos.
+                </div>
+              )}
+
+              {/* =================================================
+                  ACCIONES
+              ================================================= */}
+
+              <div className="modal-actions">
+                {puedeRevisar &&
+                  detalle
+                    .solicitud
+                    .estado ===
+                    "solicitada" && (
+                    <button
+                      className="secondary-button"
+                      onClick={() =>
+                        iniciarRevision(
+                          detalle
+                            .solicitud
+                            .id
+                        )
+                      }
+                    >
+                      <ClipboardList
+                        size={17}
+                      />
+
+                      Iniciar revisión
+                    </button>
+                  )}
+
+                {puedeAprobar &&
+                  detalle
+                    .solicitud
+                    .estado ===
+                    "en_revision" && (
+                    <>
+                      <button
+                        className="danger-button"
+                        onClick={
+                          rechazarSolicitud
+                        }
+                        disabled={
+                          guardando
+                        }
+                      >
+                        <XCircle
+                          size={17}
+                        />
+
+                        Rechazar
+                      </button>
+
+                      <button
+                        className="primary-button icon-button"
+                        onClick={
+                          abrirAprobacion
+                        }
+                        disabled={
+                          guardando ||
+                          cargandoAprobacion ||
+                          (
+                            detalle
+                              .lineas
+                              .length ===
+                              0 &&
+                            (
+                              detalle
+                                .productos_nuevos ||
+                              []
+                            ).length ===
+                              0
+                          )
+                        }
+                      >
+                        <CheckCircle2
+                          size={17}
+                        />
+
+                        {cargandoAprobacion
+                          ? "Preparando..."
+                          : "Revisar aprobación"}
+                      </button>
+                    </>
+                  )}
+
+                {puedeRevisar &&
+                  (
+                    (
+                      esDestinoSucursal &&
+                      [
+                        "aprobada",
+                        "en_transito"
+                      ].includes(
+                        detalle
+                          .solicitud
+                          .estado
+                      )
+                    ) ||
+                    (
+                      esDestinoEquipoInterno &&
+                      detalle
+                        .solicitud
+                        .estado ===
+                        "recibida"
+                    )
+                  ) &&
+                  (
+                    (
+                      detalle.lineas ||
+                      []
+                    ).length >
+                      0 ||
+                    (
+                      detalle
+                        .productos_nuevos ||
+                      []
+                    ).length >
+                      0
+                  ) && (
+                    <button
+                      className="primary-button icon-button"
+                      onClick={
+                        abrirCrearEnvio
+                      }
+                      disabled={
+                        preparandoEnvio
+                      }
+                    >
+                      <Truck
+                        size={17}
+                      />
+
+                      {preparandoEnvio
+                        ? "Preparando..."
+                        : esDestinoEquipoInterno
+                          ? "Crear envío al solicitante"
+                          : "Crear envío"}
+                    </button>
+                  )}
+
+                {puedeRevisar &&
+                  esDestinoEquipoInterno &&
+                  detalle
+                    .solicitud
+                    .estado ===
+                    "aprobada" && (
+                    <div
+                      style={{
+                        padding:
+                          "10px 14px",
+
+                        borderRadius:
+                          "8px",
+
+                        border:
+                          "1px solid rgba(128,128,128,.3)"
+                      }}
+                    >
+                      <ShoppingCart
+                        size={17}
+                        style={{
+                          verticalAlign:
+                            "middle",
+
+                          marginRight:
+                            "7px"
+                        }}
+                      />
+
+                      Pendiente de recepción
+                      por Central en Compras
+                    </div>
+                  )}
+
+                {esSolicitudPropiaEquipoInterno &&
+                  unidadesDisponiblesRegistro >
+                    0 && (
+                    <button
+                      className="primary-button icon-button"
+                      onClick={
+                        registrarPedidoEnInventario
+                      }
+                      disabled={
+                        registrandoInventario
+                      }
+                    >
+                      <PackagePlus
+                        size={17}
+                      />
+
+                      {registrandoInventario
+                        ? "Registrando..."
+                        : `Registrar en mi inventario (${unidadesDisponiblesRegistro})`}
+                    </button>
+                  )}
+
+                {esSolicitudPropiaEquipoInterno &&
+                  unidadesDisponiblesRegistro ===
+                    0 &&
+                  (
+                    detalle.lineas || []
+                  ).some(
+                    (linea) =>
+                      Number(
+                        linea
+                          .cantidad_recibida_acumulada ||
+                          0
+                      ) > 0
+                  ) && (
+                    <div
+                      style={{
+                        padding:
+                          "10px 14px",
+
+                        borderRadius:
+                          "8px",
+
+                        border:
+                          "1px solid rgba(128,128,128,.3)"
+                      }}
+                    >
+                      <PackageCheck
+                        size={17}
+                        style={{
+                          verticalAlign:
+                            "middle",
+
+                          marginRight:
+                            "7px"
+                        }}
+                      />
+
+                      Todo lo recibido ya fue
+                      registrado en tu
+                      inventario
+                    </div>
+                  )}
+
+                {puedeAprobar &&
+                  [
+                    "aprobada",
+                    "en_transito",
+                    "recibida"
+                  ].includes(
+                    detalle
+                      .solicitud
+                      .estado
+                  ) &&
+                  !(
+                    esDestinoEquipoInterno &&
+                    detalle
+                      .solicitud
+                      .estado ===
+                      "recibida"
+                  ) && (
+                    <button
+                      className="secondary-button"
+                      onClick={
+                        cerrarSolicitud
+                      }
+                      disabled={
+                        guardando
+                      }
+                    >
+                      <PackageCheck
+                        size={17}
+                      />
+
+                      Cerrar solicitud
+                    </button>
+                  )}
+              </div>
+            </div>
+          </div>
+        )}
     </div>
   );
 };

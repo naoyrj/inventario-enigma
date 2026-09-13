@@ -1,4 +1,6 @@
 const pool = require("../config/db");
+const csv = require("csv-parser");
+const { Readable } = require("stream");
 
 const CENTRAL_ID = 1;
 
@@ -50,27 +52,6 @@ const obtenerUbicacionUsuario = async (client, req) => {
   return result.rows[0] || null;
 };
 
-const obtenerNivelPermisoUsuario = async (
-  client,
-  req
-) => {
-  if (!req.usuario?.id) {
-    return null;
-  }
-
-  const result = await client.query(
-    `
-      SELECT nivel_permiso
-      FROM usuarios
-      WHERE id = $1
-        AND activo = TRUE
-    `,
-    [req.usuario.id]
-  );
-
-  return result.rows[0]?.nivel_permiso || null;
-};
-
 const puedeVerCategoria = (categoria, req) => {
   if (!categoria) {
     return true;
@@ -92,8 +73,7 @@ const puedeVerCategoria = (categoria, req) => {
       esEquipoInterno(req) &&
       Number(
         categoria.ubicacion_propietaria_id
-      ) ===
-        Number(req.usuario.ubicacion_id)
+      ) === Number(req.usuario.ubicacion_id)
     );
   }
 
@@ -105,7 +85,7 @@ const puedeUsarCategoriaParaAlta = (
   req
 ) => {
   if (!categoria) {
-    return esPrincipal(req);
+    return true;
   }
 
   if (
@@ -120,8 +100,7 @@ const puedeUsarCategoriaParaAlta = (
       esEquipoInterno(req) &&
       Number(
         categoria.ubicacion_propietaria_id
-      ) ===
-        Number(req.usuario.ubicacion_id)
+      ) === Number(req.usuario.ubicacion_id)
     );
   }
 
@@ -140,6 +119,7 @@ const generarSku = () => {
 
 // =========================================================
 // INVENTARIO GENERAL
+// CADA USUARIO SOLO VE SU PROPIO INVENTARIO
 // =========================================================
 
 const getInventario = async (req, res) => {
@@ -150,66 +130,59 @@ const getInventario = async (req, res) => {
       });
     }
 
-    let query = `
-      SELECT
-        i.id,
-        i.ubicacion_id,
-        u.nombre AS ubicacion_nombre,
-        u.tipo AS ubicacion_tipo,
+    const ubicacionUsuario = Number(
+      req.usuario.ubicacion_id
+    );
 
-        i.producto_id,
-        p.nombre AS producto_nombre,
-        p.descripcion,
-        p.sku,
-        p.unidad_medida,
-        p.punto_reorden,
-
-        p.categoria_id,
-        c.nombre AS categoria_nombre,
-        c.tipo AS categoria_tipo,
-        c.ubicacion_propietaria_id,
-
-        i.cantidad,
-        i.updated_at
-
-      FROM inventario i
-
-      INNER JOIN ubicaciones u
-        ON i.ubicacion_id = u.id
-
-      INNER JOIN productos p
-        ON i.producto_id = p.id
-
-      LEFT JOIN categorias c
-        ON p.categoria_id = c.id
-
-      WHERE
-        u.activo = TRUE
-        AND p.activo = TRUE
-    `;
-
-    const params = [];
-
-    if (!esPrincipal(req)) {
-      params.push(
-        CENTRAL_ID,
-        Number(req.usuario.ubicacion_id)
-      );
-
-      query += `
-        AND i.ubicacion_id IN ($1, $2)
-      `;
+    if (!Number.isFinite(ubicacionUsuario)) {
+      return res.status(400).json({
+        message:
+          "El usuario no tiene una ubicación válida"
+      });
     }
 
-    query += `
-      ORDER BY
-        u.nombre,
-        p.nombre
-    `;
-
     const result = await pool.query(
-      query,
-      params
+      `
+        SELECT
+          i.id,
+          i.ubicacion_id,
+          u.nombre AS ubicacion_nombre,
+          u.tipo AS ubicacion_tipo,
+
+          i.producto_id,
+          p.nombre AS producto_nombre,
+          p.descripcion,
+          p.sku,
+          p.unidad_medida,
+          p.punto_reorden,
+
+          p.categoria_id,
+          c.nombre AS categoria_nombre,
+          c.tipo AS categoria_tipo,
+          c.ubicacion_propietaria_id,
+
+          i.cantidad,
+          i.updated_at
+
+        FROM inventario i
+
+        INNER JOIN ubicaciones u
+          ON i.ubicacion_id = u.id
+
+        INNER JOIN productos p
+          ON i.producto_id = p.id
+
+        LEFT JOIN categorias c
+          ON p.categoria_id = c.id
+
+        WHERE
+          i.ubicacion_id = $1
+          AND u.activo = TRUE
+          AND p.activo = TRUE
+
+        ORDER BY p.nombre
+      `,
+      [ubicacionUsuario]
     );
 
     const inventarioVisible =
@@ -224,11 +197,10 @@ const getInventario = async (req, res) => {
         )
       );
 
-    res.json(inventarioVisible);
+    return res.json(inventarioVisible);
   } catch (error) {
-    res.status(500).json({
-      message:
-        "Error al obtener inventario",
+    return res.status(500).json({
+      message: "Error al obtener inventario",
       error: error.message
     });
   }
@@ -253,26 +225,41 @@ const getInventarioByUbicacion = async (
       req.params.ubicacionId
     );
 
+    const ubicacionUsuario = Number(
+      req.usuario.ubicacion_id
+    );
+
     if (!Number.isFinite(ubicacionId)) {
       return res.status(400).json({
         message: "Ubicación inválida"
       });
     }
 
-    if (!esPrincipal(req)) {
-      const ubicacionUsuario = Number(
-        req.usuario.ubicacion_id
-      );
+    if (!Number.isFinite(ubicacionUsuario)) {
+      return res.status(400).json({
+        message:
+          "El usuario no tiene una ubicación válida"
+      });
+    }
 
-      if (
-        ubicacionId !== CENTRAL_ID &&
-        ubicacionId !== ubicacionUsuario
-      ) {
-        return res.status(403).json({
-          message:
-            "No tienes permiso para consultar el inventario de esta ubicación"
-        });
-      }
+    if (
+      !esPrincipal(req) &&
+      ubicacionId !== ubicacionUsuario
+    ) {
+      return res.status(403).json({
+        message:
+          "Solo puedes consultar el inventario de tu propia ubicación"
+      });
+    }
+
+    if (
+      esPrincipal(req) &&
+      ubicacionId !== CENTRAL_ID
+    ) {
+      return res.status(403).json({
+        message:
+          "Central solo puede consultar su propio inventario"
+      });
     }
 
     const result = await pool.query(
@@ -331,9 +318,9 @@ const getInventarioByUbicacion = async (
         )
       );
 
-    res.json(inventarioVisible);
+    return res.json(inventarioVisible);
   } catch (error) {
-    res.status(500).json({
+    return res.status(500).json({
       message:
         "Error al obtener inventario de la ubicación",
       error: error.message
@@ -377,6 +364,19 @@ const setStockInicial = async (req, res) => {
       });
     }
 
+    const ubicacionObjetivo =
+      Number(ubicacion_id);
+
+    if (
+      !Number.isFinite(ubicacionObjetivo) ||
+      ubicacionObjetivo !== CENTRAL_ID
+    ) {
+      return res.status(403).json({
+        message:
+          "Central solo puede establecer stock inicial en su propio inventario"
+      });
+    }
+
     const result = await pool.query(
       `
         INSERT INTO inventario (
@@ -399,19 +399,19 @@ const setStockInicial = async (req, res) => {
         RETURNING *
       `,
       [
-        Number(ubicacion_id),
+        CENTRAL_ID,
         Number(producto_id),
         Number(cantidad)
       ]
     );
 
-    res.json({
+    return res.json({
       message:
         "Stock inicial actualizado correctamente",
       inventario: result.rows[0]
     });
   } catch (error) {
-    res.status(500).json({
+    return res.status(500).json({
       message:
         "Error al establecer stock inicial",
       error: error.message
@@ -420,7 +420,6 @@ const setStockInicial = async (req, res) => {
 };
 
 // =========================================================
-// ISSUE 10
 // AGREGAR PRODUCTO EXISTENTE AL PROPIO STOCK
 // =========================================================
 
@@ -501,11 +500,13 @@ const agregarProductoExistentePropio =
       const producto =
         productoResult.rows[0];
 
-      const categoria = {
-        tipo: producto.categoria_tipo,
-        ubicacion_propietaria_id:
-          producto.ubicacion_propietaria_id
-      };
+      const categoria = producto.categoria_id
+        ? {
+            tipo: producto.categoria_tipo,
+            ubicacion_propietaria_id:
+              producto.ubicacion_propietaria_id
+          }
+        : null;
 
       if (
         !puedeUsarCategoriaParaAlta(
@@ -560,7 +561,7 @@ const agregarProductoExistentePropio =
 
       await client.query("COMMIT");
 
-      res.json({
+      return res.json({
         message:
           "Producto agregado al stock correctamente",
         producto,
@@ -572,7 +573,7 @@ const agregarProductoExistentePropio =
         await client.query("ROLLBACK");
       } catch {}
 
-      res.status(500).json({
+      return res.status(500).json({
         message:
           "Error al agregar el producto al stock",
         error: error.message
@@ -583,8 +584,8 @@ const agregarProductoExistentePropio =
   };
 
 // =========================================================
-// ISSUE 10
 // CREAR PRODUCTO NUEVO + STOCK
+// DESCRIPCIÓN Y CATEGORÍA SON OPCIONALES
 // =========================================================
 
 const agregarProductoNuevoPropio =
@@ -612,13 +613,6 @@ const agregarProductoNuevoPropio =
         return res.status(400).json({
           message:
             "El nombre del producto es obligatorio"
-        });
-      }
-
-      if (!categoria_id) {
-        return res.status(400).json({
-          message:
-            "La categoría es obligatoria"
         });
       }
 
@@ -662,42 +656,66 @@ const agregarProductoNuevoPropio =
         });
       }
 
-      const categoriaResult =
-        await client.query(
-          `
-            SELECT
-              id,
-              nombre,
-              tipo,
-              ubicacion_propietaria_id,
-              activo
-            FROM categorias
-            WHERE id = $1
-              AND activo = TRUE
-          `,
-          [categoria_id]
-        );
-
-      if (!categoriaResult.rows.length) {
-        return res.status(404).json({
-          message:
-            "La categoría no existe o está inactiva"
-        });
-      }
-
-      const categoria =
-        categoriaResult.rows[0];
+      let categoria = null;
+      let categoriaIdFinal = null;
 
       if (
-        !puedeUsarCategoriaParaAlta(
-          categoria,
-          req
-        )
+        categoria_id !== undefined &&
+        categoria_id !== null &&
+        categoria_id !== ""
       ) {
-        return res.status(403).json({
-          message:
-            "No tienes permiso para utilizar esta categoría"
-        });
+        categoriaIdFinal =
+          Number(categoria_id);
+
+        if (
+          !Number.isInteger(
+            categoriaIdFinal
+          ) ||
+          categoriaIdFinal <= 0
+        ) {
+          return res.status(400).json({
+            message:
+              "La categoría seleccionada no es válida"
+          });
+        }
+
+        const categoriaResult =
+          await client.query(
+            `
+              SELECT
+                id,
+                nombre,
+                tipo,
+                ubicacion_propietaria_id,
+                activo
+              FROM categorias
+              WHERE id = $1
+                AND activo = TRUE
+            `,
+            [categoriaIdFinal]
+          );
+
+        if (!categoriaResult.rows.length) {
+          return res.status(404).json({
+            message:
+              "La categoría no existe o está inactiva"
+          });
+        }
+
+        categoria =
+          categoriaResult.rows[0];
+
+        if (
+          !puedeUsarCategoriaParaAlta(
+            categoria,
+            req
+          )
+        ) {
+          return res.status(403).json({
+            message:
+              "No tienes permiso para utilizar esta categoría"
+          });
+        }
       }
 
       const skuFinal =
@@ -732,7 +750,7 @@ const agregarProductoNuevoPropio =
             nombre.trim(),
             descripcion?.trim() || null,
             skuFinal,
-            Number(categoria_id),
+            categoriaIdFinal,
             unidad_medida.trim(),
             puntoReorden
           ]
@@ -767,7 +785,7 @@ const agregarProductoNuevoPropio =
 
       await client.query("COMMIT");
 
-      res.status(201).json({
+      return res.status(201).json({
         message:
           "Producto creado y agregado a tu stock correctamente",
         producto,
@@ -786,7 +804,7 @@ const agregarProductoNuevoPropio =
         });
       }
 
-      res.status(500).json({
+      return res.status(500).json({
         message:
           "Error al crear el producto y agregarlo al stock",
         error: error.message
@@ -797,8 +815,508 @@ const agregarProductoNuevoPropio =
   };
 
 // =========================================================
-// ISSUE 11
+// IMPORTAR INVENTARIO DESDE CSV
+//
+// COLUMNAS:
+// nombre
+// descripcion (opcional)
+// sku
+// categoria_id (opcional)
+// unidad_medida
+// punto_reorden
+// cantidad
+//
+// REGLAS:
+// - Siempre importa al inventario del usuario autenticado.
+// - Nunca acepta ubicacion_id desde el CSV.
+// - Descripción y categoría pueden estar vacías.
+// - Si el SKU ya existe, utiliza ese producto.
+// - Si el SKU no existe, crea el producto.
+// - Si ya existe en el inventario, suma la cantidad.
+// - Una fila incorrecta no cancela las demás.
+// =========================================================
+
+const importarInventarioCsv = async (
+  req,
+  res
+) => {
+  if (!req.usuario) {
+    return res.status(401).json({
+      message: "Usuario no autenticado"
+    });
+  }
+
+  if (!req.file) {
+    return res.status(400).json({
+      message:
+        "Debes seleccionar un archivo CSV"
+    });
+  }
+
+  const filas = [];
+
+  try {
+    await new Promise((resolve, reject) => {
+      Readable.from([req.file.buffer])
+        .pipe(
+          csv({
+            mapHeaders: ({ header }) =>
+              header
+                .replace(/^\uFEFF/, "")
+                .trim()
+                .toLowerCase()
+          })
+        )
+        .on("data", (fila) => {
+          filas.push(fila);
+        })
+        .on("end", resolve)
+        .on("error", reject);
+    });
+  } catch (error) {
+    return res.status(400).json({
+      message:
+        "No se pudo leer el archivo CSV",
+      error: error.message
+    });
+  }
+
+  if (!filas.length) {
+    return res.status(400).json({
+      message:
+        "El archivo CSV está vacío"
+    });
+  }
+
+  const columnasObligatorias = [
+    "nombre",
+    "sku",
+    "unidad_medida",
+    "cantidad"
+  ];
+
+  const columnasArchivo =
+    Object.keys(filas[0]);
+
+  const columnasFaltantes =
+    columnasObligatorias.filter(
+      (columna) =>
+        !columnasArchivo.includes(columna)
+    );
+
+  if (columnasFaltantes.length) {
+    return res.status(400).json({
+      message:
+        "El archivo CSV no contiene todas las columnas obligatorias",
+      columnas_faltantes:
+        columnasFaltantes
+    });
+  }
+
+  const client = await pool.connect();
+
+  const resultados = {
+    total: filas.length,
+    agregados: 0,
+    productos_creados: 0,
+    productos_existentes: 0,
+    errores: []
+  };
+
+  try {
+    const ubicacion =
+      await obtenerUbicacionUsuario(
+        client,
+        req
+      );
+
+    if (!ubicacion) {
+      return res.status(404).json({
+        message:
+          "La ubicación del usuario no existe o está inactiva"
+      });
+    }
+
+    for (
+      let indice = 0;
+      indice < filas.length;
+      indice++
+    ) {
+      const fila = filas[indice];
+
+      const numeroFila = indice + 2;
+
+      const nombre =
+        fila.nombre?.trim();
+
+      const descripcion =
+        fila.descripcion?.trim() || null;
+
+      const sku =
+        fila.sku?.trim();
+
+      const categoriaId =
+        fila.categoria_id === undefined ||
+        fila.categoria_id === ""
+          ? null
+          : Number(fila.categoria_id);
+
+      const unidadMedida =
+        fila.unidad_medida?.trim();
+
+      const puntoReorden =
+        fila.punto_reorden === undefined ||
+        fila.punto_reorden === ""
+          ? 0
+          : Number(fila.punto_reorden);
+
+      const cantidad =
+        Number(fila.cantidad);
+
+      if (!nombre) {
+        resultados.errores.push({
+          fila: numeroFila,
+          sku: sku || null,
+          error:
+            "El nombre es obligatorio"
+        });
+
+        continue;
+      }
+
+      if (!sku) {
+        resultados.errores.push({
+          fila: numeroFila,
+          sku: null,
+          error:
+            "El SKU es obligatorio"
+        });
+
+        continue;
+      }
+
+      if (
+        categoriaId !== null &&
+        (
+          !Number.isInteger(categoriaId) ||
+          categoriaId <= 0
+        )
+      ) {
+        resultados.errores.push({
+          fila: numeroFila,
+          sku,
+          error:
+            "categoria_id debe ser un número válido o estar vacío"
+        });
+
+        continue;
+      }
+
+      if (!unidadMedida) {
+        resultados.errores.push({
+          fila: numeroFila,
+          sku,
+          error:
+            "La unidad de medida es obligatoria"
+        });
+
+        continue;
+      }
+
+      if (
+        !Number.isFinite(puntoReorden) ||
+        puntoReorden < 0
+      ) {
+        resultados.errores.push({
+          fila: numeroFila,
+          sku,
+          error:
+            "El punto de reorden debe ser mayor o igual a 0"
+        });
+
+        continue;
+      }
+
+      if (
+        !Number.isFinite(cantidad) ||
+        cantidad <= 0
+      ) {
+        resultados.errores.push({
+          fila: numeroFila,
+          sku,
+          error:
+            "La cantidad debe ser mayor a 0"
+        });
+
+        continue;
+      }
+
+      try {
+        await client.query("BEGIN");
+
+        if (categoriaId !== null) {
+          const categoriaResult =
+            await client.query(
+              `
+                SELECT
+                  id,
+                  nombre,
+                  tipo,
+                  ubicacion_propietaria_id,
+                  activo
+                FROM categorias
+                WHERE id = $1
+                  AND activo = TRUE
+              `,
+              [categoriaId]
+            );
+
+          if (!categoriaResult.rows.length) {
+            await client.query("ROLLBACK");
+
+            resultados.errores.push({
+              fila: numeroFila,
+              sku,
+              error:
+                "La categoría no existe o está inactiva"
+            });
+
+            continue;
+          }
+
+          const categoria =
+            categoriaResult.rows[0];
+
+          if (
+            !puedeUsarCategoriaParaAlta(
+              categoria,
+              req
+            )
+          ) {
+            await client.query("ROLLBACK");
+
+            resultados.errores.push({
+              fila: numeroFila,
+              sku,
+              error:
+                "No tienes permiso para utilizar esta categoría"
+            });
+
+            continue;
+          }
+        }
+
+        const productoExistente =
+          await client.query(
+            `
+              SELECT
+                p.id,
+                p.nombre,
+                p.sku,
+                p.categoria_id,
+                p.activo,
+
+                c.tipo AS categoria_tipo,
+                c.ubicacion_propietaria_id
+
+              FROM productos p
+
+              LEFT JOIN categorias c
+                ON p.categoria_id = c.id
+
+              WHERE LOWER(p.sku) =
+                    LOWER($1)
+              LIMIT 1
+            `,
+            [sku]
+          );
+
+        let productoId;
+
+        if (productoExistente.rows.length) {
+          const producto =
+            productoExistente.rows[0];
+
+          if (!producto.activo) {
+            await client.query("ROLLBACK");
+
+            resultados.errores.push({
+              fila: numeroFila,
+              sku,
+              error:
+                "El SKU corresponde a un producto inactivo"
+            });
+
+            continue;
+          }
+
+          const categoriaProducto =
+            producto.categoria_id
+              ? {
+                  tipo:
+                    producto.categoria_tipo,
+                  ubicacion_propietaria_id:
+                    producto.ubicacion_propietaria_id
+                }
+              : null;
+
+          if (
+            !puedeUsarCategoriaParaAlta(
+              categoriaProducto,
+              req
+            )
+          ) {
+            await client.query("ROLLBACK");
+
+            resultados.errores.push({
+              fila: numeroFila,
+              sku,
+              error:
+                "No tienes permiso para agregar este producto"
+            });
+
+            continue;
+          }
+
+          productoId =
+            Number(producto.id);
+
+          resultados.productos_existentes++;
+        } else {
+          const productoCreado =
+            await client.query(
+              `
+                INSERT INTO productos (
+                  nombre,
+                  descripcion,
+                  sku,
+                  categoria_id,
+                  unidad_medida,
+                  punto_reorden,
+                  activo
+                )
+                VALUES (
+                  $1,
+                  $2,
+                  $3,
+                  $4,
+                  $5,
+                  $6,
+                  TRUE
+                )
+                RETURNING id
+              `,
+              [
+                nombre,
+                descripcion,
+                sku,
+                categoriaId,
+                unidadMedida,
+                puntoReorden
+              ]
+            );
+
+          productoId =
+            Number(
+              productoCreado.rows[0].id
+            );
+
+          resultados.productos_creados++;
+        }
+
+        await client.query(
+          `
+            INSERT INTO inventario (
+              ubicacion_id,
+              producto_id,
+              cantidad,
+              updated_at
+            )
+            VALUES (
+              $1,
+              $2,
+              $3,
+              CURRENT_TIMESTAMP
+            )
+
+            ON CONFLICT (
+              ubicacion_id,
+              producto_id
+            )
+
+            DO UPDATE SET
+              cantidad =
+                inventario.cantidad +
+                EXCLUDED.cantidad,
+              updated_at =
+                CURRENT_TIMESTAMP
+          `,
+          [
+            Number(ubicacion.id),
+            productoId,
+            cantidad
+          ]
+        );
+
+        await client.query("COMMIT");
+
+        resultados.agregados++;
+      } catch (error) {
+        try {
+          await client.query("ROLLBACK");
+        } catch {}
+
+        resultados.errores.push({
+          fila: numeroFila,
+          sku,
+          error:
+            error.code === "23505"
+              ? "El SKU ya existe y no pudo ser procesado"
+              : error.message
+        });
+      }
+    }
+
+    return res.status(200).json({
+      message:
+        "Importación CSV procesada",
+      ubicacion: {
+        id: ubicacion.id,
+        nombre: ubicacion.nombre
+      },
+      resumen: {
+        total_filas:
+          resultados.total,
+
+        agregados:
+          resultados.agregados,
+
+        productos_creados:
+          resultados.productos_creados,
+
+        productos_existentes:
+          resultados.productos_existentes,
+
+        filas_con_error:
+          resultados.errores.length
+      },
+      errores:
+        resultados.errores
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message:
+        "Error al importar el inventario desde CSV",
+      error: error.message
+    });
+  } finally {
+    client.release();
+  }
+};
+
+// =========================================================
 // AJUSTE DESCENTRALIZADO DE STOCK
+// CADA USUARIO MODIFICA SU PROPIO INVENTARIO
 // =========================================================
 
 const ajustarStock = async (req, res) => {
@@ -813,7 +1331,6 @@ const ajustarStock = async (req, res) => {
 
     const {
       producto_id,
-      ubicacion_id,
       cantidad_nueva,
       motivo
     } = req.body;
@@ -843,71 +1360,29 @@ const ajustarStock = async (req, res) => {
       });
     }
 
-    const ubicacionPropia = Number(
+    const ubicacionObjetivo = Number(
       req.usuario.ubicacion_id
     );
 
-    let ubicacionObjetivo =
-      ubicacionPropia;
+    if (!Number.isFinite(ubicacionObjetivo)) {
+      return res.status(400).json({
+        message:
+          "El usuario no tiene una ubicación válida"
+      });
+    }
 
-    // Usuarios normales:
-    // SIEMPRE su propia ubicación.
-    if (!esPrincipal(req)) {
-      ubicacionObjetivo =
-        ubicacionPropia;
-    } else {
-      const ubicacionSolicitada =
-        ubicacion_id
-          ? Number(ubicacion_id)
-          : ubicacionPropia;
-
-      if (
-        !Number.isFinite(
-          ubicacionSolicitada
-        )
-      ) {
-        return res.status(400).json({
-          message:
-            "La ubicación indicada no es válida"
-        });
-      }
-
-      // Central puede ajustar su propio stock
-      // normalmente.
-      if (
-        ubicacionSolicitada ===
-        ubicacionPropia
-      ) {
-        ubicacionObjetivo =
-          ubicacionPropia;
-      } else {
-        // Para intervenir otra ubicación,
-        // debe ser Aprobador/Administrador.
-        const nivelPermiso =
-          await obtenerNivelPermisoUsuario(
-            client,
-            req
-          );
-
-        if (
-          nivelPermiso !==
-          "aprobador_admin"
-        ) {
-          return res.status(403).json({
-            message:
-              "La anulación excepcional sobre otra ubicación requiere nivel Aprobador/Administrador"
-          });
-        }
-
-        ubicacionObjetivo =
-          ubicacionSolicitada;
-      }
+    if (
+      esPrincipal(req) &&
+      ubicacionObjetivo !== CENTRAL_ID
+    ) {
+      return res.status(403).json({
+        message:
+          "Central solo puede modificar el inventario de Central"
+      });
     }
 
     await client.query("BEGIN");
 
-    // FOR UPDATE evita que dos ajustes
-    // modifiquen simultáneamente la misma fila.
     const inventarioResult =
       await client.query(
         `
@@ -944,8 +1419,6 @@ const ajustarStock = async (req, res) => {
         ]
       );
 
-    // MUY IMPORTANTE:
-    // Issue 11 no da de alta artículos.
     if (!inventarioResult.rows.length) {
       await client.query("ROLLBACK");
 
@@ -1048,20 +1521,23 @@ const ajustarStock = async (req, res) => {
 
     await client.query("COMMIT");
 
-    res.json({
+    return res.json({
       message:
         "Stock ajustado correctamente",
 
       ajuste: {
         ubicacion_id:
           ubicacionObjetivo,
+
         ubicacion_nombre:
           registro.ubicacion_nombre,
 
         producto_id:
           registro.producto_id,
+
         producto_nombre:
           registro.producto_nombre,
+
         sku:
           registro.sku,
 
@@ -1088,7 +1564,7 @@ const ajustarStock = async (req, res) => {
       await client.query("ROLLBACK");
     } catch {}
 
-    res.status(500).json({
+    return res.status(500).json({
       message:
         "Error al realizar el ajuste de stock",
       error: error.message
@@ -1108,5 +1584,6 @@ module.exports = {
   setStockInicial,
   agregarProductoExistentePropio,
   agregarProductoNuevoPropio,
+  importarInventarioCsv,
   ajustarStock
 };

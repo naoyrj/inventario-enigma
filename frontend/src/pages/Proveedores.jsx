@@ -2,21 +2,29 @@ import { useEffect, useState } from "react";
 import {
   Building2,
   Plus,
-  RefreshCw
+  RefreshCw,
+  ExternalLink,
+  Pencil
 } from "lucide-react";
 import api from "../services/api";
 
 const Proveedores = () => {
   const [proveedores, setProveedores] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
-  const [mostrarModal, setMostrarModal] = useState(false);
+  const [mostrarModal, setMostrarModal] =
+    useState(false);
+
+  const [proveedorEditandoId, setProveedorEditandoId] =
+    useState(null);
 
   const [form, setForm] = useState({
     nombre: "",
     contacto: "",
     telefono: "",
-    email: ""
+    email: "",
+    url: ""
   });
 
   useEffect(() => {
@@ -28,40 +36,133 @@ const Proveedores = () => {
       setLoading(true);
       setError("");
 
-      const response = await api.get("/proveedores");
+      const response = await api.get(
+        "/proveedores"
+      );
 
-      setProveedores(response.data || []);
+      setProveedores(
+        response.data || []
+      );
     } catch (error) {
       setError(
         error.response?.data?.message ||
-        "No fue posible cargar los proveedores"
+          "No fue posible cargar los proveedores"
       );
     } finally {
       setLoading(false);
     }
   };
 
-  const crearProveedor = async (event) => {
+  const limpiarFormulario = () => {
+    setForm({
+      nombre: "",
+      contacto: "",
+      telefono: "",
+      email: "",
+      url: ""
+    });
+
+    setProveedorEditandoId(null);
+  };
+
+  const abrirNuevoProveedor = () => {
+    setError("");
+    limpiarFormulario();
+    setMostrarModal(true);
+  };
+
+  const abrirEdicionProveedor = (
+    proveedor
+  ) => {
+    setError("");
+
+    setProveedorEditandoId(
+      Number(proveedor.id)
+    );
+
+    setForm({
+      nombre:
+        proveedor.nombre || "",
+      contacto:
+        proveedor.contacto || "",
+      telefono:
+        proveedor.telefono || "",
+      email:
+        proveedor.email || "",
+      url:
+        proveedor.url || ""
+    });
+
+    setMostrarModal(true);
+  };
+
+  const cerrarModal = () => {
+    if (guardando) {
+      return;
+    }
+
+    setMostrarModal(false);
+    setError("");
+    limpiarFormulario();
+  };
+
+  const guardarProveedor = async (
+    event
+  ) => {
     event.preventDefault();
 
     try {
-      await api.post("/proveedores", form);
+      setGuardando(true);
+      setError("");
 
-      setForm({
-        nombre: "",
-        contacto: "",
-        telefono: "",
-        email: ""
-      });
+      const payload = {
+        nombre:
+          form.nombre.trim(),
+
+        contacto:
+          form.contacto.trim() ||
+          null,
+
+        telefono:
+          form.telefono.trim() ||
+          null,
+
+        email:
+          form.email.trim() ||
+          null,
+
+        url:
+          form.url.trim() ||
+          null
+      };
+
+      if (proveedorEditandoId) {
+        await api.put(
+          `/proveedores/${proveedorEditandoId}`,
+          payload
+        );
+      } else {
+        await api.post(
+          "/proveedores",
+          payload
+        );
+      }
 
       setMostrarModal(false);
+      limpiarFormulario();
 
       await cargarProveedores();
     } catch (error) {
       setError(
         error.response?.data?.message ||
-        "No fue posible crear el proveedor"
+          (
+            proveedorEditandoId
+              ? "No fue posible actualizar el proveedor"
+              : "No fue posible crear el proveedor"
+          )
       );
+    } finally {
+      setGuardando(false);
     }
   };
 
@@ -77,26 +178,38 @@ const Proveedores = () => {
     <div>
       <header className="page-header">
         <div>
-          <h1>Proveedores</h1>
+          <h1>
+            Proveedores
+          </h1>
+
           <p>
-            Catálogo de proveedores del almacén Central.
+            Catálogo de proveedores del
+            almacén Central.
           </p>
         </div>
 
         <div className="header-actions">
           <button
+            type="button"
             className="secondary-button"
-            onClick={cargarProveedores}
+            onClick={
+              cargarProveedores
+            }
           >
             <RefreshCw size={18} />
+
             Actualizar
           </button>
 
           <button
+            type="button"
             className="primary-button icon-button"
-            onClick={() => setMostrarModal(true)}
+            onClick={
+              abrirNuevoProveedor
+            }
           >
             <Plus size={18} />
+
             Nuevo proveedor
           </button>
         </div>
@@ -115,44 +228,129 @@ const Proveedores = () => {
           </div>
         ) : (
           <div className="providers-grid">
-            {proveedores.map((proveedor) => (
-              <div
-                className="provider-card"
-                key={proveedor.id}
-              >
-                <div className="provider-icon">
-                  <Building2 size={24} />
-                </div>
-
-                <div>
-                  <h3>{proveedor.nombre}</h3>
-
-                  <p>
-                    {proveedor.contacto || "Sin contacto"}
-                  </p>
-
-                  <small>
-                    {proveedor.email || "Sin email"}
-                  </small>
-
-                  <small>
-                    {proveedor.telefono || "Sin teléfono"}
-                  </small>
-                </div>
-
-                <span
-                  className={
-                    proveedor.activo
-                      ? "status success"
-                      : "status danger"
-                  }
+            {proveedores.map(
+              (proveedor) => (
+                <div
+                  className="provider-card"
+                  key={proveedor.id}
                 >
-                  {proveedor.activo
-                    ? "Activo"
-                    : "Inactivo"}
-                </span>
-              </div>
-            ))}
+                  <div className="provider-icon">
+                    <Building2
+                      size={24}
+                    />
+                  </div>
+
+                  <div
+                    style={{
+                      flex: 1
+                    }}
+                  >
+                    <h3>
+                      {proveedor.nombre}
+                    </h3>
+
+                    <p>
+                      {proveedor.contacto ||
+                        "Sin contacto"}
+                    </p>
+
+                    <small
+                      style={{
+                        display: "block"
+                      }}
+                    >
+                      {proveedor.email ||
+                        "Sin email"}
+                    </small>
+
+                    <small
+                      style={{
+                        display: "block"
+                      }}
+                    >
+                      {proveedor.telefono ||
+                        "Sin teléfono"}
+                    </small>
+
+                    {proveedor.url ? (
+                      <a
+                        href={
+                          proveedor.url
+                        }
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          display: "flex",
+                          alignItems:
+                            "center",
+                          gap: "6px",
+                          marginTop:
+                            "8px",
+                          wordBreak:
+                            "break-word"
+                        }}
+                      >
+                        <ExternalLink
+                          size={14}
+                        />
+
+                        Visitar proveedor
+                      </a>
+                    ) : (
+                      <small
+                        style={{
+                          display:
+                            "block",
+                          marginTop:
+                            "8px"
+                        }}
+                      >
+                        Sin URL
+                      </small>
+                    )}
+                  </div>
+
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection:
+                        "column",
+                      alignItems:
+                        "flex-end",
+                      gap: "10px"
+                    }}
+                  >
+                    <span
+                      className={
+                        proveedor.activo
+                          ? "status success"
+                          : "status danger"
+                      }
+                    >
+                      {proveedor.activo
+                        ? "Activo"
+                        : "Inactivo"}
+                    </span>
+
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={() =>
+                        abrirEdicionProveedor(
+                          proveedor
+                        )
+                      }
+                    >
+                      <Pencil
+                        size={16}
+                      />
+
+                      Editar
+                    </button>
+                  </div>
+                </div>
+              )
+            )}
           </div>
         )}
       </section>
@@ -162,15 +360,28 @@ const Proveedores = () => {
           <div className="modal-card">
             <div className="modal-header">
               <div>
-                <h2>Nuevo proveedor</h2>
+                <h2>
+                  {proveedorEditandoId
+                    ? "Editar proveedor"
+                    : "Nuevo proveedor"}
+                </h2>
+
                 <p>
-                  Registra un proveedor para Central.
+                  {proveedorEditandoId
+                    ? "Modifica la información del proveedor."
+                    : "Registra un proveedor para Central."}
                 </p>
               </div>
 
               <button
+                type="button"
                 className="modal-close"
-                onClick={() => setMostrarModal(false)}
+                onClick={
+                  cerrarModal
+                }
+                disabled={
+                  guardando
+                }
               >
                 ×
               </button>
@@ -178,18 +389,35 @@ const Proveedores = () => {
 
             <form
               className="modal-form"
-              onSubmit={crearProveedor}
+              onSubmit={
+                guardarProveedor
+              }
             >
+              {error && (
+                <div className="error-message">
+                  {error}
+                </div>
+              )}
+
               <div className="form-group">
-                <label>Nombre</label>
+                <label>
+                  Nombre
+                </label>
 
                 <input
                   className="form-control"
-                  value={form.nombre}
-                  onChange={(e) =>
+                  type="text"
+                  value={
+                    form.nombre
+                  }
+                  onChange={(
+                    event
+                  ) =>
                     setForm({
                       ...form,
-                      nombre: e.target.value
+                      nombre:
+                        event.target
+                          .value
                     })
                   }
                   required
@@ -197,62 +425,144 @@ const Proveedores = () => {
               </div>
 
               <div className="form-group">
-                <label>Contacto</label>
+                <label>
+                  Contacto
+                </label>
 
                 <input
                   className="form-control"
-                  value={form.contacto}
-                  onChange={(e) =>
+                  type="text"
+                  value={
+                    form.contacto
+                  }
+                  onChange={(
+                    event
+                  ) =>
                     setForm({
                       ...form,
-                      contacto: e.target.value
+                      contacto:
+                        event.target
+                          .value
                     })
                   }
                 />
               </div>
 
               <div className="form-group">
-                <label>Teléfono</label>
+                <label>
+                  Teléfono
+                </label>
 
                 <input
                   className="form-control"
-                  value={form.telefono}
-                  onChange={(e) =>
+                  type="text"
+                  value={
+                    form.telefono
+                  }
+                  onChange={(
+                    event
+                  ) =>
                     setForm({
                       ...form,
-                      telefono: e.target.value
+                      telefono:
+                        event.target
+                          .value
                     })
                   }
                 />
               </div>
 
               <div className="form-group">
-                <label>Email</label>
+                <label>
+                  Email
+                </label>
 
                 <input
                   className="form-control"
                   type="email"
-                  value={form.email}
-                  onChange={(e) =>
+                  value={
+                    form.email
+                  }
+                  onChange={(
+                    event
+                  ) =>
                     setForm({
                       ...form,
-                      email: e.target.value
+                      email:
+                        event.target
+                          .value
                     })
                   }
                 />
+              </div>
+
+              <div className="form-group">
+                <label>
+                  URL
+                </label>
+
+                <input
+                  className="form-control"
+                  type="url"
+                  value={
+                    form.url
+                  }
+                  onChange={(
+                    event
+                  ) =>
+                    setForm({
+                      ...form,
+                      url:
+                        event.target
+                          .value
+                    })
+                  }
+                  placeholder="https://www.proveedor.com"
+                />
+
+                <small
+                  style={{
+                    opacity: 0.7,
+                    marginTop:
+                      "5px",
+                    display:
+                      "block"
+                  }}
+                >
+                  Campo opcional.
+                  Debe comenzar con
+                  http:// o https://
+                </small>
               </div>
 
               <div className="modal-actions">
                 <button
                   type="button"
                   className="secondary-button"
-                  onClick={() => setMostrarModal(false)}
+                  onClick={
+                    cerrarModal
+                  }
+                  disabled={
+                    guardando
+                  }
                 >
                   Cancelar
                 </button>
 
-                <button className="primary-button">
-                  Guardar proveedor
+                <button
+                  type="submit"
+                  className="primary-button"
+                  disabled={
+                    guardando
+                  }
+                >
+                  {guardando
+                    ? proveedorEditandoId
+                      ? "Actualizando..."
+                      : "Guardando..."
+                    : proveedorEditandoId
+                      ? "Guardar cambios"
+                      : "Guardar proveedor"}
                 </button>
               </div>
             </form>

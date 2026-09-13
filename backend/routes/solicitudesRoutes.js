@@ -2,11 +2,13 @@ const express = require("express");
 
 const {
   getSolicitudes,
+  getCatalogoSolicitud,
   getSolicitudById,
   createSolicitud,
   iniciarRevision,
   aprobarSolicitud,
   rechazarSolicitud,
+  registrarPedidoEnInventario,
   cerrarSolicitud
 } = require("../controllers/solicitudesController");
 
@@ -20,6 +22,12 @@ router.get(
   "/",
   verifyToken,
   getSolicitudes
+);
+
+router.get(
+  "/catalogo",
+  verifyToken,
+  getCatalogoSolicitud
 );
 
 router.get(
@@ -50,6 +58,12 @@ router.patch(
   "/:id/rechazar",
   verifyToken,
   rechazarSolicitud
+);
+
+router.post(
+  "/:id/registrar-inventario",
+  verifyToken,
+  registrarPedidoEnInventario
 );
 
 router.patch(

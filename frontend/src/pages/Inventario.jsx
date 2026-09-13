@@ -1,6 +1,7 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState
 } from "react";
 
@@ -13,7 +14,9 @@ import {
   X,
   Boxes,
   PackagePlus,
-  SlidersHorizontal
+  SlidersHorizontal,
+  Upload,
+  FileText
 } from "lucide-react";
 
 import api from "../services/api";
@@ -54,7 +57,10 @@ const Inventario = () => {
   const [mensaje, setMensaje] =
     useState("");
 
-  // ISSUE 10
+  // =======================================================
+  // ISSUE 10 - AGREGAR ARTÍCULO
+  // =======================================================
+
   const [
     mostrarModal,
     setMostrarModal
@@ -91,7 +97,10 @@ const Inventario = () => {
     cantidad: ""
   });
 
-  // ISSUE 11
+  // =======================================================
+  // ISSUE 11 - AJUSTE
+  // =======================================================
+
   const [
     mostrarAjuste,
     setMostrarAjuste
@@ -112,7 +121,31 @@ const Inventario = () => {
     setMotivoAjuste
   ] = useState("");
 
+  // =======================================================
+  // IMPORTACIÓN CSV
+  // =======================================================
+
+  const [
+    mostrarImportacion,
+    setMostrarImportacion
+  ] = useState(false);
+
+  const [
+    archivoCsv,
+    setArchivoCsv
+  ] = useState(null);
+
+  const [
+    resultadoImportacion,
+    setResultadoImportacion
+  ] = useState(null);
+
+  const inputArchivoRef = useRef(null);
+
   const [guardando, setGuardando] =
+    useState(false);
+
+  const [importando, setImportando] =
     useState(false);
 
   const usuario = JSON.parse(
@@ -123,6 +156,10 @@ const Inventario = () => {
   useEffect(() => {
     cargarDatos();
   }, []);
+
+  // =======================================================
+  // CARGAR DATOS
+  // =======================================================
 
   const cargarDatos = async () => {
     try {
@@ -182,6 +219,10 @@ const Inventario = () => {
     }
   };
 
+  // =======================================================
+  // FILTROS
+  // =======================================================
+
   const inventarioFiltrado =
     useMemo(() => {
       return inventario.filter(
@@ -204,15 +245,13 @@ const Inventario = () => {
             !categoria ||
             Number(
               item.categoria_id
-            ) ===
-              Number(categoria);
+            ) === Number(categoria);
 
           const coincideUbicacion =
             !ubicacion ||
             Number(
               item.ubicacion_id
-            ) ===
-              Number(ubicacion);
+            ) === Number(ubicacion);
 
           const coincideStock =
             !soloBajoStock ||
@@ -300,6 +339,10 @@ const Inventario = () => {
       productos,
       categoriaProductoExistente
     ]);
+
+  // =======================================================
+  // RESUMEN
+  // =======================================================
 
   const totalProductos =
     new Set(
@@ -474,10 +517,10 @@ const Inventario = () => {
         }
 
         if (
-          !nuevoProducto.categoria_id
+          !nuevoProducto.unidad_medida.trim()
         ) {
           setError(
-            "Selecciona una categoría."
+            "Escribe la unidad de medida."
           );
           return;
         }
@@ -506,6 +549,18 @@ const Inventario = () => {
                   .punto_reorden
               );
 
+        if (
+          !Number.isFinite(
+            puntoReorden
+          ) ||
+          puntoReorden < 0
+        ) {
+          setError(
+            "El punto de reorden debe ser mayor o igual a cero."
+          );
+          return;
+        }
+
         setGuardando(true);
 
         const response =
@@ -516,18 +571,25 @@ const Inventario = () => {
                 nuevoProducto.nombre.trim(),
 
               descripcion:
-                nuevoProducto.descripcion.trim(),
+                nuevoProducto.descripcion
+                  .trim() || null,
 
               sku:
-                nuevoProducto.sku.trim(),
+                nuevoProducto.sku
+                  .trim() || null,
 
               categoria_id:
-                Number(
-                  nuevoProducto.categoria_id
-                ),
+                nuevoProducto.categoria_id
+                  ? Number(
+                      nuevoProducto
+                        .categoria_id
+                    )
+                  : null,
 
               unidad_medida:
-                nuevoProducto.unidad_medida.trim(),
+                nuevoProducto
+                  .unidad_medida
+                  .trim(),
 
               punto_reorden:
                 puntoReorden,
@@ -559,23 +621,169 @@ const Inventario = () => {
     };
 
   // =======================================================
+  // IMPORTAR CSV
+  // =======================================================
+
+  const abrirImportacion = () => {
+    setError("");
+    setMensaje("");
+    setArchivoCsv(null);
+    setResultadoImportacion(null);
+
+    if (inputArchivoRef.current) {
+      inputArchivoRef.current.value =
+        "";
+    }
+
+    setMostrarImportacion(true);
+  };
+
+  const cerrarImportacion = () => {
+    if (importando) {
+      return;
+    }
+
+    setMostrarImportacion(false);
+    setArchivoCsv(null);
+    setResultadoImportacion(null);
+
+    if (inputArchivoRef.current) {
+      inputArchivoRef.current.value =
+        "";
+    }
+  };
+
+  const seleccionarArchivoCsv = (
+    event
+  ) => {
+    setError("");
+    setResultadoImportacion(null);
+
+    const archivo =
+      event.target.files?.[0];
+
+    if (!archivo) {
+      setArchivoCsv(null);
+      return;
+    }
+
+    if (
+      !archivo.name
+        .toLowerCase()
+        .endsWith(".csv")
+    ) {
+      setArchivoCsv(null);
+
+      event.target.value = "";
+
+      setError(
+        "Selecciona un archivo con extensión .csv."
+      );
+
+      return;
+    }
+
+    if (
+      archivo.size >
+      5 * 1024 * 1024
+    ) {
+      setArchivoCsv(null);
+
+      event.target.value = "";
+
+      setError(
+        "El archivo CSV no puede superar los 5 MB."
+      );
+
+      return;
+    }
+
+    setArchivoCsv(archivo);
+  };
+
+  const importarCsv = async (
+    event
+  ) => {
+    event.preventDefault();
+
+    if (!archivoCsv) {
+      setError(
+        "Selecciona un archivo CSV."
+      );
+      return;
+    }
+
+    try {
+      setImportando(true);
+      setError("");
+      setMensaje("");
+      setResultadoImportacion(null);
+
+      const formData =
+        new FormData();
+
+      formData.append(
+        "archivo",
+        archivoCsv
+      );
+
+      const response =
+        await api.post(
+          "/inventario/importar-csv",
+          formData
+        );
+
+      const datos =
+        response.data || {};
+
+      setResultadoImportacion(datos);
+
+      const resumen =
+        datos.resumen || {};
+
+      const agregados =
+        Number(
+          resumen.agregados || 0
+        );
+
+      const errores =
+        Number(
+          resumen.filas_con_error || 0
+        );
+
+      if (errores > 0) {
+        setMensaje(
+          `Importación procesada: ${agregados} fila(s) agregada(s) y ${errores} fila(s) con error.`
+        );
+      } else {
+        setMensaje(
+          datos.message ||
+            `Importación completada correctamente. ${agregados} fila(s) agregada(s).`
+        );
+      }
+
+      await cargarDatos();
+    } catch (error) {
+      console.error(error);
+
+      setError(
+        error.response?.data
+          ?.message ||
+          "No fue posible importar el archivo CSV."
+      );
+    } finally {
+      setImportando(false);
+    }
+  };
+
+  // =======================================================
   // ISSUE 11
   // =======================================================
 
   const puedeAjustar = (item) => {
-    const esPropio =
-      Number(item.ubicacion_id) ===
-      Number(usuario.ubicacion_id);
-
-    if (esPropio) {
-      return true;
-    }
-
     return (
-      usuario.rol ===
-        "principal" &&
-      usuario.nivel_permiso ===
-        "aprobador_admin"
+      Number(item.ubicacion_id) ===
+      Number(usuario.ubicacion_id)
     );
   };
 
@@ -646,11 +854,6 @@ const Inventario = () => {
                   articuloAjuste.producto_id
                 ),
 
-              ubicacion_id:
-                Number(
-                  articuloAjuste.ubicacion_id
-                ),
-
               cantidad_nueva:
                 nuevaCantidad,
 
@@ -680,6 +883,10 @@ const Inventario = () => {
       }
     };
 
+  // =======================================================
+  // LOADING
+  // =======================================================
+
   if (loading) {
     return (
       <div className="page-loading">
@@ -687,6 +894,10 @@ const Inventario = () => {
       </div>
     );
   }
+
+  // =======================================================
+  // RENDER
+  // =======================================================
 
   return (
     <div>
@@ -709,6 +920,7 @@ const Inventario = () => {
           }}
         >
           <button
+            type="button"
             className="secondary-button"
             onClick={cargarDatos}
           >
@@ -717,6 +929,16 @@ const Inventario = () => {
           </button>
 
           <button
+            type="button"
+            className="secondary-button"
+            onClick={abrirImportacion}
+          >
+            <Upload size={18} />
+            Importar CSV
+          </button>
+
+          <button
+            type="button"
             className="primary-button"
             onClick={abrirModal}
           >
@@ -728,7 +950,8 @@ const Inventario = () => {
 
       {error &&
         !mostrarModal &&
-        !mostrarAjuste && (
+        !mostrarAjuste &&
+        !mostrarImportacion && (
           <div className="error-message page-error">
             {error}
           </div>
@@ -736,7 +959,8 @@ const Inventario = () => {
 
       {mensaje &&
         !mostrarModal &&
-        !mostrarAjuste && (
+        !mostrarAjuste &&
+        !mostrarImportacion && (
           <div className="success-message page-error">
             {mensaje}
           </div>
@@ -748,6 +972,7 @@ const Inventario = () => {
 
           <div>
             <span>Productos</span>
+
             <strong>
               {totalProductos}
             </strong>
@@ -775,6 +1000,7 @@ const Inventario = () => {
 
           <div>
             <span>Alertas</span>
+
             <strong>
               {totalAlertas}
             </strong>
@@ -818,6 +1044,7 @@ const Inventario = () => {
                   value={item.id}
                 >
                   {item.nombre}
+
                   {item.tipo ===
                   "privada"
                     ? " (Privada)"
@@ -869,6 +1096,7 @@ const Inventario = () => {
           </label>
 
           <button
+            type="button"
             className="text-button"
             onClick={limpiarFiltros}
           >
@@ -901,9 +1129,11 @@ const Inventario = () => {
                   <th>Categoría</th>
                   <th>Ubicación</th>
                   <th>Existencia</th>
+
                   <th>
                     Punto reorden
                   </th>
+
                   <th>Estado</th>
                   <th>Acción</th>
                 </tr>
@@ -1014,6 +1244,377 @@ const Inventario = () => {
       </section>
 
       {/* ============================================= */}
+      {/* IMPORTAR CSV */}
+      {/* ============================================= */}
+
+      {mostrarImportacion && (
+        <div
+          className="modal-overlay"
+          onMouseDown={(event) => {
+            if (
+              event.target ===
+              event.currentTarget
+            ) {
+              cerrarImportacion();
+            }
+          }}
+        >
+          <div
+            className="modal-content"
+            style={{
+              maxWidth: "650px",
+              width:
+                "calc(100% - 32px)"
+            }}
+          >
+            <div className="modal-header">
+              <div>
+                <h2>
+                  Importar inventario CSV
+                </h2>
+
+                <p>
+                  Agrega varios productos
+                  directamente al inventario
+                  de tu ubicación.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                className="text-button"
+                onClick={
+                  cerrarImportacion
+                }
+                disabled={importando}
+              >
+                <X size={22} />
+              </button>
+            </div>
+
+            {error && (
+              <div className="error-message page-error">
+                {error}
+              </div>
+            )}
+
+            {mensaje && (
+              <div className="success-message page-error">
+                {mensaje}
+              </div>
+            )}
+
+            <div
+              style={{
+                padding: "16px",
+                border:
+                  "1px dashed #cbd5e1",
+                borderRadius: "10px",
+                marginBottom: "20px"
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                  marginBottom: "12px"
+                }}
+              >
+                <FileText size={24} />
+
+                <strong>
+                  Archivo CSV
+                </strong>
+              </div>
+
+              <input
+                ref={inputArchivoRef}
+                type="file"
+                accept=".csv,text/csv"
+                onChange={
+                  seleccionarArchivoCsv
+                }
+                disabled={importando}
+              />
+
+              {archivoCsv && (
+                <div
+                  className="table-secondary"
+                  style={{
+                    marginTop: "12px"
+                  }}
+                >
+                  Archivo seleccionado:{" "}
+                  <strong>
+                    {archivoCsv.name}
+                  </strong>
+                </div>
+              )}
+            </div>
+
+            <div
+              style={{
+                marginBottom: "20px"
+              }}
+            >
+              <strong>
+                Formato esperado
+              </strong>
+
+              <p
+                className="table-secondary"
+                style={{
+                  marginTop: "8px"
+                }}
+              >
+                Las columnas obligatorias son
+                nombre, sku, unidad_medida y
+                cantidad. Descripción,
+                categoria_id y punto_reorden
+                pueden estar vacíos.
+              </p>
+
+              <div
+                style={{
+                  overflowX: "auto",
+                  marginTop: "12px"
+                }}
+              >
+                <table>
+                  <thead>
+                    <tr>
+                      <th>nombre</th>
+                      <th>sku</th>
+                      <th>
+                        categoria_id
+                      </th>
+                      <th>
+                        unidad_medida
+                      </th>
+                      <th>cantidad</th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    <tr>
+                      <td>
+                        Mouse Logitech
+                      </td>
+
+                      <td>
+                        MOU-001
+                      </td>
+
+                      <td>
+                        Opcional
+                      </td>
+
+                      <td>
+                        pieza
+                      </td>
+
+                      <td>10</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {resultadoImportacion && (
+              <div
+                style={{
+                  marginTop: "20px",
+                  marginBottom: "20px"
+                }}
+              >
+                <h3>
+                  Resultado de la importación
+                </h3>
+
+                <div
+                  className="inventory-summary"
+                  style={{
+                    marginTop: "14px"
+                  }}
+                >
+                  <div className="mini-stat">
+                    <FileText
+                      size={20}
+                    />
+
+                    <div>
+                      <span>
+                        Filas
+                      </span>
+
+                      <strong>
+                        {resultadoImportacion
+                          .resumen
+                          ?.total_filas ||
+                          0}
+                      </strong>
+                    </div>
+                  </div>
+
+                  <div className="mini-stat">
+                    <PackagePlus
+                      size={20}
+                    />
+
+                    <div>
+                      <span>
+                        Agregadas
+                      </span>
+
+                      <strong>
+                        {resultadoImportacion
+                          .resumen
+                          ?.agregados ||
+                          0}
+                      </strong>
+                    </div>
+                  </div>
+
+                  <div className="mini-stat">
+                    <AlertTriangle
+                      size={20}
+                    />
+
+                    <div>
+                      <span>
+                        Errores
+                      </span>
+
+                      <strong>
+                        {resultadoImportacion
+                          .resumen
+                          ?.filas_con_error ||
+                          0}
+                      </strong>
+                    </div>
+                  </div>
+                </div>
+
+                {resultadoImportacion
+                  .errores?.length >
+                  0 && (
+                  <div
+                    style={{
+                      marginTop:
+                        "18px"
+                    }}
+                  >
+                    <strong>
+                      Filas con error
+                    </strong>
+
+                    <div
+                      className="table-container"
+                      style={{
+                        marginTop:
+                          "10px"
+                      }}
+                    >
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>
+                              Fila
+                            </th>
+
+                            <th>
+                              SKU
+                            </th>
+
+                            <th>
+                              Error
+                            </th>
+                          </tr>
+                        </thead>
+
+                        <tbody>
+                          {resultadoImportacion.errores.map(
+                            (
+                              item,
+                              index
+                            ) => (
+                              <tr
+                                key={`${item.fila}-${index}`}
+                              >
+                                <td>
+                                  {
+                                    item.fila
+                                  }
+                                </td>
+
+                                <td>
+                                  {item.sku ||
+                                    "-"}
+                                </td>
+
+                                <td>
+                                  {
+                                    item.error
+                                  }
+                                </td>
+                              </tr>
+                            )
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <form
+              onSubmit={importarCsv}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent:
+                    "flex-end",
+                  gap: "10px",
+                  marginTop: "24px"
+                }}
+              >
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={
+                    cerrarImportacion
+                  }
+                  disabled={importando}
+                >
+                  {resultadoImportacion
+                    ? "Cerrar"
+                    : "Cancelar"}
+                </button>
+
+                <button
+                  type="submit"
+                  className="primary-button"
+                  disabled={
+                    importando ||
+                    !archivoCsv
+                  }
+                >
+                  <Upload size={18} />
+
+                  {importando
+                    ? "Importando..."
+                    : "Importar CSV"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================= */}
       {/* ISSUE 10 - AGREGAR ARTÍCULO */}
       {/* ============================================= */}
 
@@ -1040,13 +1641,11 @@ const Inventario = () => {
             <div className="modal-header">
               <div>
                 <h2>
-                  Agregar artículo al
-                  stock
+                  Agregar artículo al stock
                 </h2>
 
                 <p>
-                  Se agregará
-                  directamente a tu
+                  Se agregará directamente a tu
                   ubicación.
                 </p>
               </div>
@@ -1142,8 +1741,7 @@ const Inventario = () => {
                     }}
                   >
                     <option value="">
-                      Todas las
-                      categorías
+                      Todas las categorías
                     </option>
 
                     {categoriasParaAlta.map(
@@ -1159,6 +1757,7 @@ const Inventario = () => {
                           {
                             item.nombre
                           }
+
                           {item.tipo ===
                           "privada"
                             ? " (Privada)"
@@ -1189,8 +1788,7 @@ const Inventario = () => {
                     required
                   >
                     <option value="">
-                      Selecciona un
-                      producto
+                      Selecciona un producto
                     </option>
 
                     {productosDisponibles.map(
@@ -1206,6 +1804,7 @@ const Inventario = () => {
                           {
                             producto.nombre
                           }
+
                           {producto.sku
                             ? ` — ${producto.sku}`
                             : ""}
@@ -1303,7 +1902,7 @@ const Inventario = () => {
 
                 <div className="form-group">
                   <label>
-                    Descripción
+                    Descripción (opcional)
                   </label>
 
                   <textarea
@@ -1315,11 +1914,14 @@ const Inventario = () => {
                       handleNuevoProducto
                     }
                     rows="3"
+                    placeholder="Opcional"
                   />
                 </div>
 
                 <div className="form-group">
-                  <label>SKU</label>
+                  <label>
+                    SKU
+                  </label>
 
                   <input
                     name="sku"
@@ -1335,7 +1937,7 @@ const Inventario = () => {
 
                 <div className="form-group">
                   <label>
-                    Categoría *
+                    Categoría (opcional)
                   </label>
 
                   <select
@@ -1346,11 +1948,9 @@ const Inventario = () => {
                     onChange={
                       handleNuevoProducto
                     }
-                    required
                   >
                     <option value="">
-                      Selecciona una
-                      categoría
+                      Sin categoría
                     </option>
 
                     {categoriasParaAlta.map(
@@ -1366,6 +1966,7 @@ const Inventario = () => {
                           {
                             item.nombre
                           }
+
                           {item.tipo ===
                           "privada"
                             ? " (Privada)"
@@ -1510,9 +2111,8 @@ const Inventario = () => {
                   </h2>
 
                   <p>
-                    Corrección por
-                    conteo físico o
-                    diferencia de
+                    Corrección por conteo
+                    físico o diferencia de
                     inventario.
                   </p>
                 </div>
@@ -1567,19 +2167,6 @@ const Inventario = () => {
                   }
                 </strong>
               </div>
-
-              {Number(
-                articuloAjuste.ubicacion_id
-              ) !==
-                Number(
-                  usuario.ubicacion_id
-                ) && (
-                <div className="error-message page-error">
-                  Anulación excepcional
-                  de Central sobre otra
-                  ubicación.
-                </div>
-              )}
 
               <form
                 onSubmit={

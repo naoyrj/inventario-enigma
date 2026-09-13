@@ -1,4 +1,4 @@
-const pool = require("../config/db");
+﻿const pool = require("../config/db");
 
 const CENTRAL_ID = 1;
 
@@ -102,7 +102,8 @@ const getOrdenes = async (req, res) => {
     res.json(ordenes);
   } catch (error) {
     res.status(500).json({
-      message: "Error al obtener órdenes de compra",
+      message:
+        "Error al obtener órdenes de compra",
       error: error.message
     });
   }
@@ -112,119 +113,141 @@ const getOrdenById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const ordenesResult = await pool.query(
-      `
-        SELECT
-          oc.id,
-          oc.proveedor_id,
-          p.nombre AS proveedor_nombre,
-          oc.creado_por_usuario_id,
-          u.nombre AS creado_por_usuario_nombre,
-          oc.estado,
-          oc.created_at
+    const ordenesResult =
+      await pool.query(
+        `
+          SELECT
+            oc.id,
+            oc.proveedor_id,
+            p.nombre AS proveedor_nombre,
+            oc.creado_por_usuario_id,
+            u.nombre AS creado_por_usuario_nombre,
+            oc.estado,
+            oc.created_at
 
-        FROM ordenes_compra oc
+          FROM ordenes_compra oc
 
-        INNER JOIN proveedores p
-          ON oc.proveedor_id = p.id
+          INNER JOIN proveedores p
+            ON oc.proveedor_id = p.id
 
-        INNER JOIN usuarios u
-          ON oc.creado_por_usuario_id = u.id
+          INNER JOIN usuarios u
+            ON oc.creado_por_usuario_id = u.id
 
-        WHERE oc.id = $1
-      `,
-      [id]
-    );
+          WHERE oc.id = $1
+        `,
+        [id]
+      );
 
-    if (ordenesResult.rows.length === 0) {
+    if (
+      ordenesResult.rows.length === 0
+    ) {
       return res.status(404).json({
-        message: "Orden de compra no encontrada"
+        message:
+          "Orden de compra no encontrada"
       });
     }
 
-    const lineasResult = await pool.query(
-      `
-        SELECT
-          ocl.id,
-          ocl.producto_id,
-          p.nombre AS producto_nombre,
-          p.sku,
-          p.unidad_medida,
-          ocl.cantidad_solicitada,
-          ocl.cantidad_recibida,
-          ocl.costo_unitario,
-          ocl.solicitud_linea_id,
-          ocl.solicitud_producto_nuevo_id,
+    const lineasResult =
+      await pool.query(
+        `
+          SELECT
+            ocl.id,
+            ocl.producto_id,
+            p.nombre AS producto_nombre,
+            p.sku,
+            p.unidad_medida,
+            ocl.cantidad_solicitada,
+            ocl.cantidad_recibida,
+            ocl.costo_unitario,
+            ocl.solicitud_linea_id,
+            ocl.solicitud_producto_nuevo_id,
 
-          COALESCE(
-            sl.solicitud_id,
-            spn.solicitud_id
-          ) AS solicitud_id,
+            COALESCE(
+              sl.solicitud_id,
+              spn.solicitud_id
+            ) AS solicitud_id,
 
-          s.destino_ubicacion_id,
-          destino.nombre AS destino_ubicacion_nombre,
-          destino.tipo AS destino_ubicacion_tipo,
-          solicitante.nombre AS solicitante_ubicacion_nombre,
-          solicitante.tipo AS solicitante_ubicacion_tipo,
+            s.destino_ubicacion_id,
+            destino.nombre AS destino_ubicacion_nombre,
+            destino.tipo AS destino_ubicacion_tipo,
+            solicitante.nombre AS solicitante_ubicacion_nombre,
+            solicitante.tipo AS solicitante_ubicacion_tipo,
 
-          spn.proveedor_sugerido,
-          spn.proveedor_link,
-          spn.sku_sugerido
+            spn.proveedor_sugerido,
+            spn.proveedor_link,
+            spn.sku_sugerido
 
-        FROM orden_compra_lineas ocl
+          FROM orden_compra_lineas ocl
 
-        INNER JOIN productos p
-          ON ocl.producto_id = p.id
+          INNER JOIN productos p
+            ON ocl.producto_id = p.id
 
-        LEFT JOIN solicitud_lineas sl
-          ON ocl.solicitud_linea_id = sl.id
+          LEFT JOIN solicitud_lineas sl
+            ON ocl.solicitud_linea_id = sl.id
 
-        LEFT JOIN solicitud_productos_nuevos spn
-          ON ocl.solicitud_producto_nuevo_id = spn.id
+          LEFT JOIN solicitud_productos_nuevos spn
+            ON ocl.solicitud_producto_nuevo_id = spn.id
 
-        LEFT JOIN solicitudes s
-          ON s.id = COALESCE(
-            sl.solicitud_id,
-            spn.solicitud_id
-          )
+          LEFT JOIN solicitudes s
+            ON s.id = COALESCE(
+              sl.solicitud_id,
+              spn.solicitud_id
+            )
 
-        LEFT JOIN ubicaciones destino
-          ON s.destino_ubicacion_id = destino.id
+          LEFT JOIN ubicaciones destino
+            ON s.destino_ubicacion_id = destino.id
 
-        LEFT JOIN ubicaciones solicitante
-          ON s.solicitante_ubicacion_id = solicitante.id
+          LEFT JOIN ubicaciones solicitante
+            ON s.solicitante_ubicacion_id = solicitante.id
 
-        WHERE ocl.orden_compra_id = $1
+          WHERE ocl.orden_compra_id = $1
 
-        ORDER BY ocl.id
-      `,
-      [id]
-    );
+          ORDER BY ocl.id
+        `,
+        [id]
+      );
 
     const solicitudesOrigen = [
       ...new Set(
         lineasResult.rows
-          .filter((linea) => linea.solicitud_id)
-          .map((linea) => Number(linea.solicitud_id))
+          .filter(
+            (linea) =>
+              linea.solicitud_id
+          )
+          .map(
+            (linea) =>
+              Number(
+                linea.solicitud_id
+              )
+          )
       )
     ];
 
     res.json({
       orden: {
         ...ordenesResult.rows[0],
-        solicitudes_origen: solicitudesOrigen,
+
+        solicitudes_origen:
+          solicitudesOrigen,
+
         origen:
           solicitudesOrigen.length > 0
             ? solicitudesOrigen
-                .map((solicitudId) => `Solicitud #${solicitudId}`)
+                .map(
+                  (solicitudId) =>
+                    `Solicitud #${solicitudId}`
+                )
                 .join(", ")
             : "Reorden Central"
       },
-      lineas: lineasResult.rows
+
+      lineas:
+        lineasResult.rows
     });
   } catch (error) {
     res.status(500).json({
-      message: "Error al obtener la orden",
+      message:
+        "Error al obtener la orden",
       error: error.message
     });
   }
@@ -235,13 +258,24 @@ const validarProductoExistente = async (
   proveedorId,
   linea
 ) => {
-  const productoId = Number(linea.producto_id);
-  const cantidad = Number(linea.cantidad_solicitada);
+  const productoId =
+    Number(
+      linea.producto_id
+    );
+
+  const cantidad =
+    Number(
+      linea.cantidad_solicitada
+    );
 
   if (
     !productoId ||
-    !Number.isFinite(productoId) ||
-    !Number.isFinite(cantidad) ||
+    !Number.isFinite(
+      productoId
+    ) ||
+    !Number.isFinite(
+      cantidad
+    ) ||
     cantidad <= 0
   ) {
     return {
@@ -256,52 +290,61 @@ const validarProductoExistente = async (
     linea.costo_unitario !== null &&
     linea.costo_unitario !== undefined &&
     linea.costo_unitario !== "" &&
-    !validarNumeroNoNegativo(linea.costo_unitario)
+    !validarNumeroNoNegativo(
+      linea.costo_unitario
+    )
   ) {
     return {
       valido: false,
       status: 400,
-      message: "El costo unitario no puede ser negativo"
+      message:
+        "El costo unitario no puede ser negativo"
     };
   }
 
-  const productoResult = await client.query(
-    `
-      SELECT
-        p.id,
-        p.nombre,
-        p.activo,
-        p.categoria_id,
-        c.tipo AS categoria_tipo,
-        c.activo AS categoria_activa,
-        c.ubicacion_propietaria_id
+  const productoResult =
+    await client.query(
+      `
+        SELECT
+          p.id,
+          p.nombre,
+          p.activo,
+          p.categoria_id,
+          c.tipo AS categoria_tipo,
+          c.activo AS categoria_activa,
+          c.ubicacion_propietaria_id
 
-      FROM productos p
+        FROM productos p
 
-      LEFT JOIN categorias c
-        ON p.categoria_id = c.id
+        LEFT JOIN categorias c
+          ON p.categoria_id = c.id
 
-      WHERE p.id = $1
-    `,
-    [productoId]
-  );
+        WHERE p.id = $1
+      `,
+      [productoId]
+    );
 
   if (
-    productoResult.rows.length === 0 ||
-    productoResult.rows[0].activo !== true
+    productoResult.rows.length ===
+      0 ||
+    productoResult.rows[0]
+      .activo !== true
   ) {
     return {
       valido: false,
       status: 400,
-      message: `El producto ${productoId} no existe o está inactivo`
+      message:
+        `El producto ${productoId} no existe o está inactivo`
     };
   }
 
-  const producto = productoResult.rows[0];
+  const producto =
+    productoResult.rows[0];
 
   if (
     producto.categoria_id &&
-    producto.categoria_activa !== true
+    producto.categoria_activa !==
+      true
   ) {
     return {
       valido: false,
@@ -311,53 +354,77 @@ const validarProductoExistente = async (
     };
   }
 
-  let solicitudLinea = null;
-  let vinculadaEquipoInterno = false;
+  let solicitudLinea =
+    null;
 
-  if (linea.solicitud_linea_id) {
-    const solicitudLineaResult = await client.query(
-      `
-        SELECT
-          sl.id,
-          sl.solicitud_id,
-          sl.producto_id,
-          sl.cantidad_solicitada,
-          sl.cantidad_aprobada,
-          s.estado,
-          s.solicitante_ubicacion_id,
-          s.destino_ubicacion_id,
-          solicitante.nombre AS solicitante_nombre,
-          solicitante.tipo AS solicitante_tipo,
-          destino.nombre AS destino_nombre,
-          destino.tipo AS destino_tipo
+  let vinculadaEquipoInterno =
+    false;
 
-        FROM solicitud_lineas sl
+  if (
+    linea.solicitud_linea_id
+  ) {
+    const solicitudLineaResult =
+      await client.query(
+        `
+          SELECT
+            sl.id,
+            sl.solicitud_id,
+            sl.producto_id,
+            sl.cantidad_solicitada,
+            sl.cantidad_aprobada,
+            s.estado,
+            s.solicitante_ubicacion_id,
+            s.destino_ubicacion_id,
+            solicitante.nombre AS solicitante_nombre,
+            solicitante.tipo AS solicitante_tipo,
+            destino.nombre AS destino_nombre,
+            destino.tipo AS destino_tipo
 
-        INNER JOIN solicitudes s
-          ON sl.solicitud_id = s.id
+          FROM solicitud_lineas sl
 
-        INNER JOIN ubicaciones solicitante
-          ON s.solicitante_ubicacion_id = solicitante.id
+          INNER JOIN solicitudes s
+            ON sl.solicitud_id = s.id
 
-        INNER JOIN ubicaciones destino
-          ON s.destino_ubicacion_id = destino.id
+          INNER JOIN ubicaciones solicitante
+            ON s.solicitante_ubicacion_id =
+               solicitante.id
 
-        WHERE sl.id = $1
-      `,
-      [Number(linea.solicitud_linea_id)]
-    );
+          INNER JOIN ubicaciones destino
+            ON s.destino_ubicacion_id =
+               destino.id
 
-    if (solicitudLineaResult.rows.length === 0) {
+          WHERE sl.id = $1
+        `,
+        [
+          Number(
+            linea
+              .solicitud_linea_id
+          )
+        ]
+      );
+
+    if (
+      solicitudLineaResult.rows
+        .length === 0
+    ) {
       return {
         valido: false,
         status: 400,
-        message: "La línea de solicitud seleccionada no existe"
+        message:
+          "La línea de solicitud seleccionada no existe"
       };
     }
 
-    solicitudLinea = solicitudLineaResult.rows[0];
+    solicitudLinea =
+      solicitudLineaResult.rows[0];
 
-    if (Number(solicitudLinea.producto_id) !== productoId) {
+    if (
+      Number(
+        solicitudLinea
+          .producto_id
+      ) !==
+      productoId
+    ) {
       return {
         valido: false,
         status: 400,
@@ -366,7 +433,11 @@ const validarProductoExistente = async (
       };
     }
 
-    if (solicitudLinea.destino_tipo !== "equipo_interno") {
+    if (
+      solicitudLinea
+        .destino_tipo !==
+      "equipo_interno"
+    ) {
       return {
         valido: false,
         status: 400,
@@ -375,7 +446,14 @@ const validarProductoExistente = async (
       };
     }
 
-    if (["rechazada", "cerrada"].includes(solicitudLinea.estado)) {
+    if (
+      [
+        "rechazada",
+        "cerrada"
+      ].includes(
+        solicitudLinea.estado
+      )
+    ) {
       return {
         valido: false,
         status: 400,
@@ -384,7 +462,10 @@ const validarProductoExistente = async (
       };
     }
 
-    if (solicitudLinea.estado !== "aprobada") {
+    if (
+      solicitudLinea.estado !==
+      "aprobada"
+    ) {
       return {
         valido: false,
         status: 400,
@@ -393,14 +474,20 @@ const validarProductoExistente = async (
       };
     }
 
-    const cantidadAutorizada = Number(
-      solicitudLinea.cantidad_aprobada ??
-        solicitudLinea.cantidad_solicitada
-    );
+    const cantidadAutorizada =
+      Number(
+        solicitudLinea
+          .cantidad_aprobada ??
+        solicitudLinea
+          .cantidad_solicitada
+      );
 
     if (
-      Number.isFinite(cantidadAutorizada) &&
-      cantidad > cantidadAutorizada
+      Number.isFinite(
+        cantidadAutorizada
+      ) &&
+      cantidad >
+        cantidadAutorizada
     ) {
       return {
         valido: false,
@@ -410,13 +497,22 @@ const validarProductoExistente = async (
       };
     }
 
-    vinculadaEquipoInterno = true;
+    vinculadaEquipoInterno =
+      true;
 
     if (
-      producto.categoria_tipo === "privada" &&
-      producto.ubicacion_propietaria_id &&
-      Number(producto.ubicacion_propietaria_id) !==
-        Number(solicitudLinea.destino_ubicacion_id)
+      producto.categoria_tipo ===
+        "privada" &&
+      producto
+        .ubicacion_propietaria_id &&
+      Number(
+        producto
+          .ubicacion_propietaria_id
+      ) !==
+        Number(
+          solicitudLinea
+            .destino_ubicacion_id
+        )
     ) {
       return {
         valido: false,
@@ -428,7 +524,8 @@ const validarProductoExistente = async (
   }
 
   if (
-    producto.categoria_tipo === "privada" &&
+    producto.categoria_tipo ===
+      "privada" &&
     !vinculadaEquipoInterno
   ) {
     return {
@@ -439,22 +536,27 @@ const validarProductoExistente = async (
     };
   }
 
-  const asociacionResult = await client.query(
-    `
-      SELECT
-        proveedor_id,
-        producto_id
+  const asociacionResult =
+    await client.query(
+      `
+        SELECT
+          proveedor_id,
+          producto_id
 
-      FROM proveedor_productos
+        FROM proveedor_productos
 
-      WHERE proveedor_id = $1
-        AND producto_id = $2
-    `,
-    [proveedorId, productoId]
-  );
+        WHERE proveedor_id = $1
+          AND producto_id = $2
+      `,
+      [
+        proveedorId,
+        productoId
+      ]
+    );
 
   if (
-    asociacionResult.rows.length === 0 &&
+    asociacionResult.rows.length ===
+      0 &&
     !vinculadaEquipoInterno
   ) {
     return {
@@ -469,9 +571,11 @@ const validarProductoExistente = async (
     valido: true,
     producto,
     solicitudLinea,
+
     crearAsociacionProveedor:
       vinculadaEquipoInterno &&
-      asociacionResult.rows.length === 0
+      asociacionResult.rows.length ===
+        0
   };
 };
 
@@ -480,49 +584,63 @@ const validarProductoNuevo = async (
   producto
 ) => {
   const solicitudProductoNuevoId =
-    producto.solicitud_producto_nuevo_id
-      ? Number(producto.solicitud_producto_nuevo_id)
+    producto
+      .solicitud_producto_nuevo_id
+      ? Number(
+          producto
+            .solicitud_producto_nuevo_id
+        )
       : null;
 
-  let origenSolicitud = null;
+  let origenSolicitud =
+    null;
 
-  if (solicitudProductoNuevoId) {
-    const origenResult = await client.query(
-      `
-        SELECT
-          spn.id,
-          spn.solicitud_id,
-          spn.nombre,
-          spn.descripcion,
-          spn.categoria_id,
-          spn.cantidad_solicitada,
-          spn.proveedor_sugerido,
-          spn.proveedor_link,
-          spn.sku_sugerido,
-          s.estado,
-          s.destino_ubicacion_id,
-          destino.tipo AS destino_tipo,
-          c.tipo AS categoria_tipo,
-          c.activo AS categoria_activa,
-          c.ubicacion_propietaria_id
+  if (
+    solicitudProductoNuevoId
+  ) {
+    const origenResult =
+      await client.query(
+        `
+          SELECT
+            spn.id,
+            spn.solicitud_id,
+            spn.nombre,
+            spn.descripcion,
+            spn.categoria_id,
+            spn.cantidad_solicitada,
+            spn.proveedor_sugerido,
+            spn.proveedor_link,
+            spn.sku_sugerido,
+            s.estado,
+            s.destino_ubicacion_id,
+            destino.tipo AS destino_tipo,
+            c.tipo AS categoria_tipo,
+            c.activo AS categoria_activa,
+            c.ubicacion_propietaria_id
 
-        FROM solicitud_productos_nuevos spn
+          FROM solicitud_productos_nuevos spn
 
-        INNER JOIN solicitudes s
-          ON spn.solicitud_id = s.id
+          INNER JOIN solicitudes s
+            ON spn.solicitud_id = s.id
 
-        INNER JOIN ubicaciones destino
-          ON s.destino_ubicacion_id = destino.id
+          INNER JOIN ubicaciones destino
+            ON s.destino_ubicacion_id =
+               destino.id
 
-        INNER JOIN categorias c
-          ON spn.categoria_id = c.id
+          INNER JOIN categorias c
+            ON spn.categoria_id = c.id
 
-        WHERE spn.id = $1
-      `,
-      [solicitudProductoNuevoId]
-    );
+          WHERE spn.id = $1
+        `,
+        [
+          solicitudProductoNuevoId
+        ]
+      );
 
-    if (origenResult.rows.length === 0) {
+    if (
+      origenResult.rows.length ===
+      0
+    ) {
       return {
         valido: false,
         status: 400,
@@ -531,11 +649,16 @@ const validarProductoNuevo = async (
       };
     }
 
-    origenSolicitud = origenResult.rows[0];
+    origenSolicitud =
+      origenResult.rows[0];
 
     if (
-      !["equipo_interno", "sucursal"].includes(
-        origenSolicitud.destino_tipo
+      ![
+        "equipo_interno",
+        "sucursal"
+      ].includes(
+        origenSolicitud
+          .destino_tipo
       )
     ) {
       return {
@@ -546,7 +669,10 @@ const validarProductoNuevo = async (
       };
     }
 
-    if (origenSolicitud.estado !== "aprobada") {
+    if (
+      origenSolicitud.estado !==
+      "aprobada"
+    ) {
       return {
         valido: false,
         status: 400,
@@ -555,7 +681,11 @@ const validarProductoNuevo = async (
       };
     }
 
-    if (origenSolicitud.categoria_activa !== true) {
+    if (
+      origenSolicitud
+        .categoria_activa !==
+      true
+    ) {
       return {
         valido: false,
         status: 400,
@@ -565,9 +695,17 @@ const validarProductoNuevo = async (
     }
 
     if (
-      origenSolicitud.categoria_tipo === "privada" &&
-      Number(origenSolicitud.ubicacion_propietaria_id) !==
-        Number(origenSolicitud.destino_ubicacion_id)
+      origenSolicitud
+        .categoria_tipo ===
+        "privada" &&
+      Number(
+        origenSolicitud
+          .ubicacion_propietaria_id
+      ) !==
+        Number(
+          origenSolicitud
+            .destino_ubicacion_id
+        )
     ) {
       return {
         valido: false,
@@ -579,33 +717,54 @@ const validarProductoNuevo = async (
   }
 
   const nombre =
-    origenSolicitud?.nombre || producto.nombre?.trim();
+    origenSolicitud?.nombre ||
+    producto.nombre?.trim();
 
   const descripcion =
-    origenSolicitud?.descripcion?.trim() ||
-    producto.descripcion?.trim() ||
+    origenSolicitud
+      ?.descripcion
+      ?.trim() ||
+    producto
+      .descripcion
+      ?.trim() ||
     "";
 
   const sku =
     producto.sku?.trim() ||
-    origenSolicitud?.sku_sugerido?.trim();
+    origenSolicitud
+      ?.sku_sugerido
+      ?.trim();
 
   const unidadMedida =
-    producto.unidad_medida?.trim() || "pieza";
+    producto
+      .unidad_medida
+      ?.trim() ||
+    "pieza";
 
-  const categoriaId = Number(
-    origenSolicitud?.categoria_id ?? producto.categoria_id
-  );
+  const categoriaId =
+    Number(
+      origenSolicitud
+        ?.categoria_id ??
+      producto.categoria_id
+    );
 
-  const cantidad = Number(producto.cantidad_solicitada);
+  const cantidad =
+    Number(
+      producto
+        .cantidad_solicitada
+    );
 
   if (
     !nombre ||
     !sku ||
     !unidadMedida ||
     !categoriaId ||
-    !Number.isFinite(categoriaId) ||
-    !Number.isFinite(cantidad) ||
+    !Number.isFinite(
+      categoriaId
+    ) ||
+    !Number.isFinite(
+      cantidad
+    ) ||
     cantidad <= 0
   ) {
     return {
@@ -618,7 +777,11 @@ const validarProductoNuevo = async (
 
   if (
     origenSolicitud &&
-    cantidad > Number(origenSolicitud.cantidad_solicitada)
+    cantidad >
+      Number(
+        origenSolicitud
+          .cantidad_solicitada
+      )
   ) {
     return {
       valido: false,
@@ -629,37 +792,48 @@ const validarProductoNuevo = async (
   }
 
   if (
-    producto.costo_unitario !== null &&
-    producto.costo_unitario !== undefined &&
-    producto.costo_unitario !== "" &&
-    !validarNumeroNoNegativo(producto.costo_unitario)
+    producto.costo_unitario !==
+      null &&
+    producto.costo_unitario !==
+      undefined &&
+    producto.costo_unitario !==
+      "" &&
+    !validarNumeroNoNegativo(
+      producto.costo_unitario
+    )
   ) {
     return {
       valido: false,
       status: 400,
-      message: "El costo unitario no puede ser negativo"
+      message:
+        "El costo unitario no puede ser negativo"
     };
   }
 
-  const categoriaResult = await client.query(
-    `
-      SELECT
-        id,
-        nombre,
-        tipo,
-        activo,
-        ubicacion_propietaria_id
+  const categoriaResult =
+    await client.query(
+      `
+        SELECT
+          id,
+          nombre,
+          tipo,
+          activo,
+          ubicacion_propietaria_id
 
-      FROM categorias
+        FROM categorias
 
-      WHERE id = $1
-    `,
-    [categoriaId]
-  );
+        WHERE id = $1
+      `,
+      [
+        categoriaId
+      ]
+    );
 
   if (
-    categoriaResult.rows.length === 0 ||
-    categoriaResult.rows[0].activo !== true
+    categoriaResult.rows.length ===
+      0 ||
+    categoriaResult.rows[0]
+      .activo !== true
   ) {
     return {
       valido: false,
@@ -670,7 +844,9 @@ const validarProductoNuevo = async (
   }
 
   if (
-    categoriaResult.rows[0].tipo === "privada" &&
+    categoriaResult.rows[0]
+      .tipo ===
+      "privada" &&
     !origenSolicitud
   ) {
     return {
@@ -681,46 +857,85 @@ const validarProductoNuevo = async (
     };
   }
 
-  const skuResult = await client.query(
-    `
-      SELECT id
-      FROM productos
-      WHERE LOWER(TRIM(sku)) = LOWER(TRIM($1))
-    `,
-    [sku]
-  );
+  const skuResult =
+    await client.query(
+      `
+        SELECT id
 
-  if (skuResult.rows.length > 0) {
+        FROM productos
+
+        WHERE LOWER(
+          TRIM(sku)
+        ) =
+        LOWER(
+          TRIM($1)
+        )
+      `,
+      [sku]
+    );
+
+  if (
+    skuResult.rows.length >
+    0
+  ) {
     return {
       valido: false,
       status: 409,
-      message: `Ya existe un producto con el SKU "${sku}"`
+      message:
+        `Ya existe un producto con el SKU "${sku}"`
     };
   }
 
   return {
     valido: true,
+
     datos: {
       nombre,
       descripcion,
       sku,
-      unidad_medida: unidadMedida,
-      categoria_id: categoriaId,
-      cantidad_solicitada: cantidad,
+
+      unidad_medida:
+        unidadMedida,
+
+      categoria_id:
+        categoriaId,
+
+      cantidad_solicitada:
+        cantidad,
+
       costo_unitario:
-        producto.costo_unitario === "" ||
-        producto.costo_unitario === null ||
-        producto.costo_unitario === undefined
+        producto
+          .costo_unitario ===
+            "" ||
+        producto
+          .costo_unitario ===
+            null ||
+        producto
+          .costo_unitario ===
+            undefined
           ? null
-          : Number(producto.costo_unitario),
+          : Number(
+              producto
+                .costo_unitario
+            ),
+
       solicitud_producto_nuevo_id:
         solicitudProductoNuevoId,
+
       solicitud_id:
-        origenSolicitud?.solicitud_id || null,
+        origenSolicitud
+          ?.solicitud_id ||
+        null,
+
       proveedor_sugerido:
-        origenSolicitud?.proveedor_sugerido || null,
+        origenSolicitud
+          ?.proveedor_sugerido ||
+        null,
+
       proveedor_link:
-        origenSolicitud?.proveedor_link || null
+        origenSolicitud
+          ?.proveedor_link ||
+        null
     }
   };
 };
@@ -752,7 +967,9 @@ const createOrden = async (
     } = req.body;
 
     const proveedorId =
-      Number(proveedor_id);
+      Number(
+        proveedor_id
+      );
 
     if (
       !proveedorId ||
@@ -767,7 +984,9 @@ const createOrden = async (
     }
 
     if (
-      !Array.isArray(lineas) ||
+      !Array.isArray(
+        lineas
+      ) ||
       !Array.isArray(
         productos_nuevos
       )
@@ -780,7 +999,8 @@ const createOrden = async (
 
     if (
       lineas.length === 0 &&
-      productos_nuevos.length === 0
+      productos_nuevos.length ===
+        0
     ) {
       return res.status(400).json({
         message:
@@ -800,7 +1020,9 @@ const createOrden = async (
           WHERE id = $1
             AND activo = TRUE
         `,
-        [proveedorId]
+        [
+          proveedorId
+        ]
       );
 
     if (
@@ -813,19 +1035,30 @@ const createOrden = async (
       });
     }
 
-    const lineasValidadas = [];
+    const lineasValidadas =
+      [];
 
-    for (const linea of lineas) {
-      const validacion = await validarProductoExistente(
-        client,
-        proveedorId,
-        linea
-      );
+    for (
+      const linea of lineas
+    ) {
+      const validacion =
+        await validarProductoExistente(
+          client,
+          proveedorId,
+          linea
+        );
 
-      if (!validacion.valido) {
+      if (
+        !validacion.valido
+      ) {
         return res
-          .status(validacion.status)
-          .json({ message: validacion.message });
+          .status(
+            validacion.status
+          )
+          .json({
+            message:
+              validacion.message
+          });
       }
 
       lineasValidadas.push({
@@ -834,7 +1067,8 @@ const createOrden = async (
       });
     }
 
-    const nuevosValidados = [];
+    const nuevosValidados =
+      [];
 
     for (
       const productoNuevo of
@@ -846,7 +1080,9 @@ const createOrden = async (
           productoNuevo
         );
 
-      if (!validacion.valido) {
+      if (
+        !validacion.valido
+      ) {
         return res
           .status(
             validacion.status
@@ -895,21 +1131,45 @@ const createOrden = async (
     const ordenId =
       ordenResult.rows[0].id;
 
-    for (const validada of lineasValidadas) {
-      const { linea, crearAsociacionProveedor } = validada;
+    for (
+      const validada of
+      lineasValidadas
+    ) {
+      const {
+        linea,
+        crearAsociacionProveedor
+      } = validada;
 
-      if (crearAsociacionProveedor) {
+      if (
+        crearAsociacionProveedor
+      ) {
         await client.query(
           `
             INSERT INTO proveedor_productos (
               proveedor_id,
               producto_id
             )
-            VALUES ($1, $2)
-            ON CONFLICT (proveedor_id, producto_id)
+
+            VALUES (
+              $1,
+              $2
+            )
+
+            ON CONFLICT (
+              proveedor_id,
+              producto_id
+            )
+
             DO NOTHING
           `,
-          [proveedorId, Number(linea.producto_id)]
+          [
+            proveedorId,
+
+            Number(
+              linea
+                .producto_id
+            )
+          ]
         );
       }
 
@@ -924,19 +1184,47 @@ const createOrden = async (
             solicitud_linea_id,
             solicitud_producto_nuevo_id
           )
-          VALUES ($1, $2, $3, 0, $4, $5, NULL)
+
+          VALUES (
+            $1,
+            $2,
+            $3,
+            0,
+            $4,
+            $5,
+            NULL
+          )
         `,
         [
           ordenId,
-          Number(linea.producto_id),
-          Number(linea.cantidad_solicitada),
-          linea.costo_unitario === "" ||
-          linea.costo_unitario === null ||
-          linea.costo_unitario === undefined
+
+          Number(
+            linea.producto_id
+          ),
+
+          Number(
+            linea
+              .cantidad_solicitada
+          ),
+
+          linea.costo_unitario ===
+              "" ||
+          linea.costo_unitario ===
+              null ||
+          linea.costo_unitario ===
+              undefined
             ? null
-            : Number(linea.costo_unitario),
-          linea.solicitud_linea_id
-            ? Number(linea.solicitud_linea_id)
+            : Number(
+                linea
+                  .costo_unitario
+              ),
+
+          linea
+            .solicitud_linea_id
+            ? Number(
+                linea
+                  .solicitud_linea_id
+              )
             : null
         ]
       );
@@ -973,18 +1261,23 @@ const createOrden = async (
           `,
           [
             productoNuevo.nombre,
+
             productoNuevo
               .descripcion,
+
             productoNuevo.sku,
+
             productoNuevo
               .categoria_id,
+
             productoNuevo
               .unidad_medida
           ]
         );
 
       const productoId =
-        productoResult.rows[0].id;
+        productoResult.rows[0]
+          .id;
 
       await client.query(
         `
@@ -993,12 +1286,16 @@ const createOrden = async (
             producto_id
           )
 
-          VALUES ($1, $2)
+          VALUES (
+            $1,
+            $2
+          )
 
           ON CONFLICT (
             proveedor_id,
             producto_id
           )
+
           DO NOTHING
         `,
         [
@@ -1018,14 +1315,30 @@ const createOrden = async (
             solicitud_linea_id,
             solicitud_producto_nuevo_id
           )
-          VALUES ($1, $2, $3, 0, $4, NULL, $5)
+
+          VALUES (
+            $1,
+            $2,
+            $3,
+            0,
+            $4,
+            NULL,
+            $5
+          )
         `,
         [
           ordenId,
+
           productoId,
-          productoNuevo.cantidad_solicitada,
-          productoNuevo.costo_unitario,
-          productoNuevo.solicitud_producto_nuevo_id
+
+          productoNuevo
+            .cantidad_solicitada,
+
+          productoNuevo
+            .costo_unitario,
+
+          productoNuevo
+            .solicitud_producto_nuevo_id
         ]
       );
     }
@@ -1088,6 +1401,656 @@ const createOrden = async (
   }
 };
 
+const editarOrden = async (
+  req,
+  res
+) => {
+  const client =
+    await pool.connect();
+
+  let transaccionIniciada =
+    false;
+
+  try {
+    if (
+      !validarAdminCentral(
+        req,
+        res
+      )
+    ) {
+      return;
+    }
+
+    const { id } =
+      req.params;
+
+    const {
+      proveedor_id,
+      lineas = []
+    } = req.body;
+
+    const ordenId =
+      Number(id);
+
+    const proveedorId =
+      Number(
+        proveedor_id
+      );
+
+    if (
+      !ordenId ||
+      !Number.isFinite(
+        ordenId
+      )
+    ) {
+      return res.status(400).json({
+        message:
+          "El id de la orden no es válido"
+      });
+    }
+
+    if (
+      !proveedorId ||
+      !Number.isFinite(
+        proveedorId
+      )
+    ) {
+      return res.status(400).json({
+        message:
+          "proveedor_id es obligatorio"
+      });
+    }
+
+    if (
+      !Array.isArray(
+        lineas
+      ) ||
+      lineas.length === 0
+    ) {
+      return res.status(400).json({
+        message:
+          "La orden debe contener al menos un producto"
+      });
+    }
+
+    await client.query(
+      "BEGIN"
+    );
+
+    transaccionIniciada =
+      true;
+
+    const ordenResult =
+      await client.query(
+        `
+          SELECT
+            id,
+            proveedor_id,
+            estado
+
+          FROM ordenes_compra
+
+          WHERE id = $1
+
+          FOR UPDATE
+        `,
+        [
+          ordenId
+        ]
+      );
+
+    if (
+      ordenResult.rows.length ===
+      0
+    ) {
+      await client.query(
+        "ROLLBACK"
+      );
+
+      transaccionIniciada =
+        false;
+
+      return res.status(404).json({
+        message:
+          "Orden de compra no encontrada"
+      });
+    }
+
+    if (
+      ordenResult.rows[0]
+        .estado !==
+      "borrador"
+    ) {
+      await client.query(
+        "ROLLBACK"
+      );
+
+      transaccionIniciada =
+        false;
+
+      return res.status(400).json({
+        message:
+          "Solo pueden editarse órdenes de compra en estado borrador"
+      });
+    }
+
+    const proveedorResult =
+      await client.query(
+        `
+          SELECT
+            id,
+            nombre
+
+          FROM proveedores
+
+          WHERE id = $1
+            AND activo = TRUE
+        `,
+        [
+          proveedorId
+        ]
+      );
+
+    if (
+      proveedorResult.rows.length ===
+      0
+    ) {
+      await client.query(
+        "ROLLBACK"
+      );
+
+      transaccionIniciada =
+        false;
+
+      return res.status(404).json({
+        message:
+          "Proveedor no encontrado o inactivo"
+      });
+    }
+
+    const lineasActualesResult =
+      await client.query(
+        `
+          SELECT
+            id,
+            producto_id,
+            solicitud_linea_id,
+            solicitud_producto_nuevo_id
+
+          FROM orden_compra_lineas
+
+          WHERE orden_compra_id = $1
+
+          FOR UPDATE
+        `,
+        [
+          ordenId
+        ]
+      );
+
+    const lineasActuales =
+      lineasActualesResult.rows;
+
+    const lineasValidadas =
+      [];
+
+    const idsLineaRecibidos =
+      new Set();
+
+    for (
+      const linea of lineas
+    ) {
+      const productoId =
+        Number(
+          linea.producto_id
+        );
+
+      const cantidad =
+        Number(
+          linea
+            .cantidad_solicitada
+        );
+
+      const lineaId =
+        linea.id
+          ? Number(
+              linea.id
+            )
+          : null;
+
+      if (
+        !productoId ||
+        !Number.isFinite(
+          productoId
+        ) ||
+        !Number.isFinite(
+          cantidad
+        ) ||
+        cantidad <= 0
+      ) {
+        await client.query(
+          "ROLLBACK"
+        );
+
+        transaccionIniciada =
+          false;
+
+        return res.status(400).json({
+          message:
+            "Cada línea necesita producto y una cantidad mayor a 0"
+        });
+      }
+
+      if (
+        linea.costo_unitario !==
+          null &&
+        linea.costo_unitario !==
+          undefined &&
+        linea.costo_unitario !==
+          "" &&
+        !validarNumeroNoNegativo(
+          linea
+            .costo_unitario
+        )
+      ) {
+        await client.query(
+          "ROLLBACK"
+        );
+
+        transaccionIniciada =
+          false;
+
+        return res.status(400).json({
+          message:
+            "El costo unitario no puede ser negativo"
+        });
+      }
+
+      let lineaActual =
+        null;
+
+      if (
+        lineaId
+      ) {
+        lineaActual =
+          lineasActuales.find(
+            (actual) =>
+              Number(
+                actual.id
+              ) ===
+              lineaId
+          );
+
+        if (
+          !lineaActual
+        ) {
+          await client.query(
+            "ROLLBACK"
+          );
+
+          transaccionIniciada =
+            false;
+
+          return res.status(400).json({
+            message:
+              `La línea ${lineaId} no pertenece a esta orden`
+          });
+        }
+
+        if (
+          idsLineaRecibidos.has(
+            lineaId
+          )
+        ) {
+          await client.query(
+            "ROLLBACK"
+          );
+
+          transaccionIniciada =
+            false;
+
+          return res.status(400).json({
+            message:
+              `La línea ${lineaId} está repetida en la edición`
+          });
+        }
+
+        idsLineaRecibidos.add(
+          lineaId
+        );
+      }
+
+      const solicitudLineaId =
+        lineaActual
+          ? lineaActual
+              .solicitud_linea_id
+          : linea
+              .solicitud_linea_id
+            ? Number(
+                linea
+                  .solicitud_linea_id
+              )
+            : null;
+
+      const solicitudProductoNuevoId =
+        lineaActual
+          ? lineaActual
+              .solicitud_producto_nuevo_id
+          : linea
+              .solicitud_producto_nuevo_id
+            ? Number(
+                linea
+                  .solicitud_producto_nuevo_id
+              )
+            : null;
+
+      if (
+        lineaActual &&
+        solicitudProductoNuevoId &&
+        Number(
+          lineaActual
+            .producto_id
+        ) !==
+          productoId
+      ) {
+        await client.query(
+          "ROLLBACK"
+        );
+
+        transaccionIniciada =
+          false;
+
+        return res.status(400).json({
+          message:
+            "No se puede cambiar el producto de una línea creada desde una solicitud de producto nuevo"
+        });
+      }
+
+      const lineaParaValidar =
+        {
+          ...linea,
+
+          producto_id:
+            productoId,
+
+          cantidad_solicitada:
+            cantidad,
+
+          solicitud_linea_id:
+            solicitudLineaId
+        };
+
+      const validacion =
+        await validarProductoExistente(
+          client,
+          proveedorId,
+          lineaParaValidar
+        );
+
+      if (
+        !validacion.valido
+      ) {
+        await client.query(
+          "ROLLBACK"
+        );
+
+        transaccionIniciada =
+          false;
+
+        return res
+          .status(
+            validacion.status
+          )
+          .json({
+            message:
+              validacion.message
+          });
+      }
+
+      lineasValidadas.push({
+        linea:
+          lineaParaValidar,
+
+        lineaActual,
+
+        solicitudProductoNuevoId,
+
+        crearAsociacionProveedor:
+          validacion
+            .crearAsociacionProveedor
+      });
+    }
+
+    await client.query(
+      `
+        UPDATE ordenes_compra
+
+        SET
+          proveedor_id = $1
+
+        WHERE id = $2
+          AND estado =
+              'borrador'
+      `,
+      [
+        proveedorId,
+        ordenId
+      ]
+    );
+
+    for (
+      const lineaActual of
+      lineasActuales
+    ) {
+      if (
+        !idsLineaRecibidos.has(
+          Number(
+            lineaActual.id
+          )
+        )
+      ) {
+        await client.query(
+          `
+            DELETE FROM orden_compra_lineas
+
+            WHERE id = $1
+              AND orden_compra_id =
+                  $2
+          `,
+          [
+            lineaActual.id,
+            ordenId
+          ]
+        );
+      }
+    }
+
+    for (
+      const item of
+      lineasValidadas
+    ) {
+      const {
+        linea,
+        lineaActual,
+        solicitudProductoNuevoId,
+        crearAsociacionProveedor
+      } = item;
+
+      if (
+        crearAsociacionProveedor
+      ) {
+        await client.query(
+          `
+            INSERT INTO proveedor_productos (
+              proveedor_id,
+              producto_id
+            )
+
+            VALUES (
+              $1,
+              $2
+            )
+
+            ON CONFLICT (
+              proveedor_id,
+              producto_id
+            )
+
+            DO NOTHING
+          `,
+          [
+            proveedorId,
+
+            Number(
+              linea.producto_id
+            )
+          ]
+        );
+      }
+
+      const costoUnitario =
+        linea.costo_unitario ===
+            "" ||
+        linea.costo_unitario ===
+            null ||
+        linea.costo_unitario ===
+            undefined
+          ? null
+          : Number(
+              linea
+                .costo_unitario
+            );
+
+      if (
+        lineaActual
+      ) {
+        await client.query(
+          `
+            UPDATE orden_compra_lineas
+
+            SET
+              producto_id = $1,
+              cantidad_solicitada = $2,
+              costo_unitario = $3
+
+            WHERE id = $4
+              AND orden_compra_id =
+                  $5
+          `,
+          [
+            Number(
+              linea.producto_id
+            ),
+
+            Number(
+              linea
+                .cantidad_solicitada
+            ),
+
+            costoUnitario,
+
+            lineaActual.id,
+
+            ordenId
+          ]
+        );
+      } else {
+        await client.query(
+          `
+            INSERT INTO orden_compra_lineas (
+              orden_compra_id,
+              producto_id,
+              cantidad_solicitada,
+              cantidad_recibida,
+              costo_unitario,
+              solicitud_linea_id,
+              solicitud_producto_nuevo_id
+            )
+
+            VALUES (
+              $1,
+              $2,
+              $3,
+              0,
+              $4,
+              $5,
+              $6
+            )
+          `,
+          [
+            ordenId,
+
+            Number(
+              linea.producto_id
+            ),
+
+            Number(
+              linea
+                .cantidad_solicitada
+            ),
+
+            costoUnitario,
+
+            linea
+              .solicitud_linea_id
+              ? Number(
+                  linea
+                    .solicitud_linea_id
+                )
+              : null,
+
+            solicitudProductoNuevoId
+          ]
+        );
+      }
+    }
+
+    await client.query(
+      "COMMIT"
+    );
+
+    transaccionIniciada =
+      false;
+
+    res.json({
+      message:
+        "Orden de compra actualizada correctamente",
+
+      orden_compra_id:
+        ordenId,
+
+      estado:
+        "borrador"
+    });
+  } catch (error) {
+    if (
+      transaccionIniciada
+    ) {
+      try {
+        await client.query(
+          "ROLLBACK"
+        );
+      } catch (
+        rollbackError
+      ) {
+        console.error(
+          "Error al revertir la transacción:",
+          rollbackError
+        );
+      }
+    }
+
+    res.status(500).json({
+      message:
+        "Error al editar la orden de compra",
+      error:
+        error.message
+    });
+  } finally {
+    client.release();
+  }
+};
+
 const enviarOrden = async (
   req,
   res
@@ -1110,7 +2073,8 @@ const enviarOrden = async (
         `
           UPDATE ordenes_compra
 
-          SET estado =
+          SET
+            estado =
               'enviada'
 
           WHERE id = $1
@@ -1149,6 +2113,225 @@ const enviarOrden = async (
   }
 };
 
+const actualizarSolicitudesRecibidasPorCentral =
+  async (
+    client,
+    ordenCompraId
+  ) => {
+    const solicitudesResult =
+      await client.query(
+        `
+          SELECT DISTINCT
+            COALESCE(
+              sl.solicitud_id,
+              spn.solicitud_id
+            ) AS solicitud_id
+
+          FROM orden_compra_lineas ocl
+
+          LEFT JOIN solicitud_lineas sl
+            ON ocl.solicitud_linea_id =
+               sl.id
+
+          LEFT JOIN solicitud_productos_nuevos spn
+            ON ocl.solicitud_producto_nuevo_id =
+               spn.id
+
+          WHERE ocl.orden_compra_id =
+                $1
+
+            AND COALESCE(
+              sl.solicitud_id,
+              spn.solicitud_id
+            ) IS NOT NULL
+        `,
+        [
+          ordenCompraId
+        ]
+      );
+
+    const actualizadas =
+      [];
+
+    for (
+      const fila of
+      solicitudesResult.rows
+    ) {
+      const solicitudId =
+        Number(
+          fila.solicitud_id
+        );
+
+      const solicitudResult =
+        await client.query(
+          `
+            SELECT
+              s.id,
+              s.estado,
+              destino.tipo AS destino_tipo
+
+            FROM solicitudes s
+
+            INNER JOIN ubicaciones destino
+              ON s.destino_ubicacion_id =
+                 destino.id
+
+            WHERE s.id = $1
+
+            FOR UPDATE OF s
+          `,
+          [
+            solicitudId
+          ]
+        );
+
+      if (
+        solicitudResult.rows
+          .length === 0
+      ) {
+        continue;
+      }
+
+      const solicitud =
+        solicitudResult.rows[0];
+
+      if (
+        solicitud
+          .destino_tipo !==
+        "equipo_interno"
+      ) {
+        continue;
+      }
+
+      if (
+        [
+          "rechazada",
+          "cerrada"
+        ].includes(
+          solicitud.estado
+        )
+      ) {
+        continue;
+      }
+
+      const pendientesExistentesResult =
+        await client.query(
+          `
+            SELECT
+              COUNT(*) AS total
+
+            FROM solicitud_lineas sl
+
+            WHERE sl.solicitud_id =
+                  $1
+
+              AND sl.cantidad_aprobada >
+                  0
+
+              AND COALESCE(
+                (
+                  SELECT
+                    SUM(
+                      ocl.cantidad_recibida
+                    )
+
+                  FROM orden_compra_lineas ocl
+
+                  WHERE ocl.solicitud_linea_id =
+                        sl.id
+                ),
+                0
+              ) <
+              sl.cantidad_aprobada
+          `,
+          [
+            solicitudId
+          ]
+        );
+
+      const pendientesNuevosResult =
+        await client.query(
+          `
+            SELECT
+              COUNT(*) AS total
+
+            FROM solicitud_productos_nuevos spn
+
+            WHERE spn.solicitud_id =
+                  $1
+
+              AND COALESCE(
+                (
+                  SELECT
+                    SUM(
+                      ocl.cantidad_recibida
+                    )
+
+                  FROM orden_compra_lineas ocl
+
+                  WHERE ocl.solicitud_producto_nuevo_id =
+                        spn.id
+                ),
+                0
+              ) <
+              spn.cantidad_solicitada
+          `,
+          [
+            solicitudId
+          ]
+        );
+
+      const pendientesExistentes =
+        Number(
+          pendientesExistentesResult
+            .rows[0]
+            .total ||
+            0
+        );
+
+      const pendientesNuevos =
+        Number(
+          pendientesNuevosResult
+            .rows[0]
+            .total ||
+            0
+        );
+
+      if (
+        pendientesExistentes ===
+          0 &&
+        pendientesNuevos ===
+          0
+      ) {
+        await client.query(
+          `
+            UPDATE solicitudes
+
+            SET
+              estado = 'recibida',
+              updated_at =
+                CURRENT_TIMESTAMP
+
+            WHERE id = $1
+              AND estado <>
+                  'cerrada'
+              AND estado <>
+                  'rechazada'
+          `,
+          [
+            solicitudId
+          ]
+        );
+
+        actualizadas.push(
+          solicitudId
+        );
+      }
+    }
+
+    return actualizadas;
+  };
+
 const recibirCompra = async (
   req,
   res
@@ -1177,7 +2360,9 @@ const recibirCompra = async (
     } = req.body;
 
     if (
-      !Array.isArray(lineas) ||
+      !Array.isArray(
+        lineas
+      ) ||
       lineas.length === 0
     ) {
       return res.status(400).json({
@@ -1206,7 +2391,9 @@ const recibirCompra = async (
 
           FOR UPDATE
         `,
-        [id]
+        [
+          id
+        ]
       );
 
     if (
@@ -1231,8 +2418,7 @@ const recibirCompra = async (
         "enviada",
         "parcial"
       ].includes(
-        ordenesResult
-          .rows[0]
+        ordenesResult.rows[0]
           .estado
       )
     ) {
@@ -1262,18 +2448,22 @@ const recibirCompra = async (
 
           FROM orden_compra_lineas
 
-          WHERE orden_compra_id = $1
+          WHERE orden_compra_id =
+                $1
 
           FOR UPDATE
         `,
-        [id]
+        [
+          id
+        ]
       );
 
     const lineasOrden =
       lineasOrdenResult.rows;
 
     for (
-      const recibida of lineas
+      const recibida of
+      lineas
     ) {
       const lineaOrden =
         lineasOrden.find(
@@ -1287,7 +2477,9 @@ const recibirCompra = async (
             )
         );
 
-      if (!lineaOrden) {
+      if (
+        !lineaOrden
+      ) {
         await client.query(
           "ROLLBACK"
         );
@@ -1336,7 +2528,8 @@ const recibirCompra = async (
         );
 
       if (
-        cantidad > pendiente
+        cantidad >
+        pendiente
       ) {
         await client.query(
           "ROLLBACK"
@@ -1358,7 +2551,8 @@ const recibirCompra = async (
         `
           UPDATE orden_compra_lineas
 
-          SET cantidad_recibida =
+          SET
+            cantidad_recibida =
               cantidad_recibida +
               $1
 
@@ -1367,84 +2561,6 @@ const recibirCompra = async (
         [
           cantidad,
           lineaOrden.id
-        ]
-      );
-
-      await client.query(
-        `
-          INSERT INTO inventario (
-            ubicacion_id,
-            producto_id,
-            cantidad
-          )
-
-          VALUES (
-            $1,
-            $2,
-            $3
-          )
-
-          ON CONFLICT (
-            ubicacion_id,
-            producto_id
-          )
-
-          DO UPDATE SET
-
-            cantidad =
-              inventario.cantidad +
-              EXCLUDED.cantidad,
-
-            updated_at =
-              CURRENT_TIMESTAMP
-        `,
-        [
-          CENTRAL_ID,
-          lineaOrden
-            .producto_id,
-          cantidad
-        ]
-      );
-
-      await client.query(
-        `
-          INSERT INTO movimientos (
-            ubicacion_id,
-            producto_id,
-            usuario_id,
-            tipo,
-            cantidad,
-            referencia_tipo,
-            referencia_id,
-            motivo
-          )
-
-          VALUES (
-            $1,
-            $2,
-            $3,
-            $4,
-            $5,
-            $6,
-            $7,
-            $8
-          )
-        `,
-        [
-          CENTRAL_ID,
-          lineaOrden
-            .producto_id,
-          req.usuario.id,
-          "entrada",
-          cantidad,
-          "orden_compra",
-          Number(id),
-
-          lineaOrden.solicitud_linea_id
-            ? `Recepción de orden de compra #${id}, vinculada a Solicitud_Línea #${lineaOrden.solicitud_linea_id}`
-            : lineaOrden.solicitud_producto_nuevo_id
-              ? `Recepción de orden de compra #${id}, vinculada a Producto_Nuevo_Solicitado #${lineaOrden.solicitud_producto_nuevo_id}`
-              : `Recepción de orden de compra #${id} por reorden de Central`
         ]
       );
     }
@@ -1457,11 +2573,15 @@ const recibirCompra = async (
 
           FROM orden_compra_lineas
 
-          WHERE orden_compra_id = $1
+          WHERE orden_compra_id =
+                $1
+
             AND cantidad_recibida <
                 cantidad_solicitada
         `,
-        [id]
+        [
+          id
+        ]
       );
 
     const completa =
@@ -1475,7 +2595,8 @@ const recibirCompra = async (
       `
         UPDATE ordenes_compra
 
-        SET estado = $1
+        SET
+          estado = $1
 
         WHERE id = $2
       `,
@@ -1487,6 +2608,25 @@ const recibirCompra = async (
         id
       ]
     );
+
+    /*
+     * IMPORTANTE:
+     *
+     * La Solicitud termina en
+     * "recibida" cuando Central
+     * ya recibió completamente
+     * todos los productos de esa
+     * solicitud.
+     *
+     * El envío posterior al
+     * solicitante ya no modifica
+     * el estado de Solicitudes.
+     */
+    const solicitudesRecibidasPorCentral =
+      await actualizarSolicitudesRecibidasPorCentral(
+        client,
+        Number(id)
+      );
 
     await client.query(
       "COMMIT"
@@ -1507,7 +2647,10 @@ const recibirCompra = async (
       estado:
         completa
           ? "recibida"
-          : "parcial"
+          : "parcial",
+
+      solicitudes_recibidas_por_central:
+        solicitudesRecibidasPorCentral
     });
   } catch (error) {
     if (
@@ -1530,6 +2673,7 @@ const recibirCompra = async (
     res.status(500).json({
       message:
         "Error al recibir la compra",
+
       error:
         error.message
     });
@@ -1542,8 +2686,7 @@ module.exports = {
   getOrdenes,
   getOrdenById,
   createOrden,
+  editarOrden,
   enviarOrden,
   recibirCompra
 };
-
-

@@ -4,6 +4,7 @@ const {
   getProveedores,
   getProveedorById,
   createProveedor,
+  editarProveedor,
   asociarProducto
 } = require("../controllers/proveedoresController");
 
@@ -13,11 +14,29 @@ const {
 
 const router = express.Router();
 
-router.get("/", verifyToken, getProveedores);
+router.get(
+  "/",
+  verifyToken,
+  getProveedores
+);
 
-router.get("/:id", verifyToken, getProveedorById);
+router.get(
+  "/:id",
+  verifyToken,
+  getProveedorById
+);
 
-router.post("/", verifyToken, createProveedor);
+router.post(
+  "/",
+  verifyToken,
+  createProveedor
+);
+
+router.put(
+  "/:id",
+  verifyToken,
+  editarProveedor
+);
 
 router.post(
   "/:id/productos",
