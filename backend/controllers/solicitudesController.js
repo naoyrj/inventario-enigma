@@ -1985,12 +1985,16 @@ const registrarPedidoEnInventario =
             SELECT
               COUNT(*) AS total
 
-            FROM envios
+            FROM envios e
 
-            WHERE solicitud_id = $1
-              AND destino_ubicacion_id =
+            INNER JOIN solicitudes s
+              ON e.solicitud_id =
+                 s.id
+
+            WHERE e.solicitud_id = $1
+              AND s.destino_ubicacion_id =
                   $2
-              AND estado = 'recibido'
+              AND e.estado = 'recibido'
           `,
           [
             solicitudId,
@@ -2145,10 +2149,14 @@ const registrarPedidoEnInventario =
                 ON el.envio_id =
                    e.id
 
+              INNER JOIN solicitudes s
+                ON e.solicitud_id =
+                   s.id
+
               WHERE e.solicitud_id =
                     $1
 
-                AND e.destino_ubicacion_id =
+                AND s.destino_ubicacion_id =
                     $2
 
                 AND e.estado =
@@ -2332,6 +2340,10 @@ const registrarPedidoEnInventario =
                 ON el.envio_id =
                    e.id
 
+              INNER JOIN solicitudes s
+                ON e.solicitud_id =
+                   s.id
+
               INNER JOIN productos p
                 ON el.producto_id =
                    p.id
@@ -2339,7 +2351,7 @@ const registrarPedidoEnInventario =
               WHERE e.solicitud_id =
                     $1
 
-                AND e.destino_ubicacion_id =
+                AND s.destino_ubicacion_id =
                     $2
 
                 AND e.estado =
