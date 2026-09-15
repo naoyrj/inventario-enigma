@@ -896,59 +896,114 @@ const Inventario = () => {
   const abrirDetalle = async (
     item
   ) => {
+    setError("");
+    setMensaje("");
+    setArticuloDetalle(item);
+    setMotivoExistencias("");
+
+    const productoLocal =
+      productos.find(
+        (producto) =>
+          Number(producto.id) ===
+          Number(item.producto_id)
+      ) || {};
+
+    const datosIniciales = {
+      nombre:
+        productoLocal.nombre ||
+        item.producto_nombre ||
+        item.nombre ||
+        "",
+
+      descripcion:
+        productoLocal.descripcion ||
+        item.descripcion ||
+        "",
+
+      existencias:
+        String(
+          item.cantidad ?? 0
+        ),
+
+      punto_reorden:
+        String(
+          productoLocal.punto_reorden ??
+            item.punto_reorden ??
+            0
+        ),
+
+      proveedor_id:
+        obtenerProveedorId(
+          productoLocal
+        ) ||
+        obtenerProveedorId(
+          item
+        ),
+
+      sku:
+        productoLocal.sku ||
+        item.sku ||
+        "",
+
+      unidad_medida:
+        productoLocal.unidad_medida ||
+        item.unidad_medida ||
+        ""
+    };
+
+    setFormularioDetalle(
+      datosIniciales
+    );
+
+    setDetalleOriginal(
+      datosIniciales
+    );
+
+    setMostrarDetalle(true);
+    setCargandoDetalle(true);
+
     try {
-      setError("");
-      setMensaje("");
-      setCargandoDetalle(true);
-
-      setArticuloDetalle(item);
-
       const response =
         await api.get(
           `/productos/${item.producto_id}`
         );
 
       const producto =
-        response.data || {};
-
-      const proveedorId =
-        obtenerProveedorId(
-          producto
-        );
+        response.data?.producto ||
+        response.data ||
+        {};
 
       const datosFormulario = {
         nombre:
           producto.nombre ||
-          item.producto_nombre ||
-          "",
+          datosIniciales.nombre,
 
         descripcion:
-          producto.descripcion || "",
+          producto.descripcion ??
+          datosIniciales.descripcion,
 
         existencias:
-          String(
-            item.cantidad ?? 0
-          ),
+          datosIniciales.existencias,
 
         punto_reorden:
           String(
             producto.punto_reorden ??
-              item.punto_reorden ??
-              0
+              datosIniciales.punto_reorden
           ),
 
         proveedor_id:
-          proveedorId,
+          obtenerProveedorId(
+            producto
+          ) ||
+          datosIniciales.proveedor_id,
 
         sku:
           producto.sku ||
-          item.sku ||
-          "",
+          datosIniciales.sku,
 
         unidad_medida:
           producto.unidad_medida ||
-          item.unidad_medida ||
-          ""
+          datosIniciales.unidad_medida
       };
 
       setFormularioDetalle(
@@ -958,25 +1013,15 @@ const Inventario = () => {
       setDetalleOriginal(
         datosFormulario
       );
-
-      setMotivoExistencias("");
-
-      setMostrarDetalle(true);
     } catch (errorPeticion) {
-      console.error(errorPeticion);
-
-      setArticuloDetalle(null);
-
-      setError(
-        errorPeticion.response?.data
-          ?.message ||
-          "No fue posible cargar las especificaciones del producto."
+      console.error(
+        "No fue posible actualizar los datos del producto:",
+        errorPeticion
       );
     } finally {
       setCargandoDetalle(false);
     }
   };
-
   const cerrarDetalle = () => {
     if (guardando) {
       return;
