@@ -20,6 +20,14 @@ const esAdministradorCentral = (req) => {
   );
 };
 
+const obtenerUsuarioAutenticadoId = (req) => {
+  return Number(
+    req.usuario?.id ||
+      req.usuario?.usuario_id ||
+      0
+  );
+};
+
 const rolPorTipoUbicacion = (tipo) => {
   if (tipo === "central") {
     return "principal";
@@ -665,12 +673,71 @@ const deactivateUsuario = async (
 
     const { id } = req.params;
 
+    const usuarioId = Number(id);
+    const usuarioAutenticadoId =
+      obtenerUsuarioAutenticadoId(req);
+
+    if (
+      usuarioAutenticadoId &&
+      usuarioId === usuarioAutenticadoId
+    ) {
+      return res.status(400).json({
+        message:
+          "No puedes desactivar tu propio usuario mientras tienes la sesión iniciada"
+      });
+    }
+
     const result = await pool.query(
       `
         UPDATE usuarios
         SET activo = FALSE
         WHERE id = $1
-        RETURNING id
+        RETURNING id, activo
+      `,
+      [usuarioId]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({
+        message:
+          "Usuario no encontrado"
+      });
+    }
+
+    return res.json({
+      message:
+        "Usuario desactivado correctamente",
+      usuario: result.rows[0]
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message:
+        "Error al desactivar el usuario",
+      error: error.message
+    });
+  }
+};
+
+const activateUsuario = async (
+  req,
+  res
+) => {
+  try {
+    if (!esAdministradorCentral(req)) {
+      return res.status(403).json({
+        message:
+          "Solo un Aprobador/Administrador puede reactivar usuarios"
+      });
+    }
+
+    const { id } = req.params;
+
+    const result = await pool.query(
+      `
+        UPDATE usuarios
+        SET activo = TRUE
+        WHERE id = $1
+        RETURNING id, activo
       `,
       [id]
     );
@@ -684,14 +751,126 @@ const deactivateUsuario = async (
 
     return res.json({
       message:
-        "Usuario desactivado correctamente"
+        "Usuario reactivado correctamente",
+      usuario: result.rows[0]
     });
   } catch (error) {
     return res.status(500).json({
       message:
-        "Error al desactivar el usuario",
+        "Error al reactivar el usuario",
       error: error.message
     });
+  }
+};
+
+const deleteUsuario = async (
+  req,
+  res
+) => {
+  const client = await pool.connect();
+
+  try {
+    if (!esAdministradorCentral(req)) {
+      return res.status(403).json({
+        message:
+          "Solo un Aprobador/Administrador puede eliminar usuarios"
+      });
+    }
+
+    const { id } = req.params;
+
+    const usuarioId = Number(id);
+    const usuarioAutenticadoId =
+      obtenerUsuarioAutenticadoId(req);
+
+    if (
+      !Number.isInteger(usuarioId) ||
+      usuarioId <= 0
+    ) {
+      return res.status(400).json({
+        message:
+          "El identificador del usuario no es válido"
+      });
+    }
+
+    if (
+      usuarioAutenticadoId &&
+      usuarioId === usuarioAutenticadoId
+    ) {
+      return res.status(400).json({
+        message:
+          "No puedes eliminar tu propio usuario mientras tienes la sesión iniciada"
+      });
+    }
+
+    await client.query("BEGIN");
+
+    const usuarioResult =
+      await client.query(
+        `
+          SELECT
+            id,
+            nombre,
+            activo
+          FROM usuarios
+          WHERE id = $1
+          FOR UPDATE
+        `,
+        [usuarioId]
+      );
+
+    if (
+      usuarioResult.rows.length === 0
+    ) {
+      await client.query("ROLLBACK");
+
+      return res.status(404).json({
+        message:
+          "Usuario no encontrado"
+      });
+    }
+
+    const deleteResult =
+      await client.query(
+        `
+          DELETE FROM usuarios
+          WHERE id = $1
+          RETURNING id, nombre
+        `,
+        [usuarioId]
+      );
+
+    await client.query("COMMIT");
+
+    return res.json({
+      message:
+        "Usuario eliminado correctamente",
+      usuario: deleteResult.rows[0]
+    });
+  } catch (error) {
+    try {
+      await client.query("ROLLBACK");
+    } catch (rollbackError) {
+      console.error(
+        "Error al revertir eliminación de usuario:",
+        rollbackError
+      );
+    }
+
+    if (error.code === "23503") {
+      return res.status(409).json({
+        message:
+          "Este usuario tiene historial relacionado y no puede eliminarse. Puedes mantenerlo en estado Inactivo para conservar la trazabilidad."
+      });
+    }
+
+    return res.status(500).json({
+      message:
+        "Error al eliminar el usuario",
+      error: error.message
+    });
+  } finally {
+    client.release();
   }
 };
 
@@ -701,5 +880,7 @@ module.exports = {
   createUsuario,
   updateUsuario,
   validarPin,
-  deactivateUsuario
+  deactivateUsuario,
+  activateUsuario,
+  deleteUsuario
 };

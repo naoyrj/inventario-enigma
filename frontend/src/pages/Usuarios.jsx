@@ -8,6 +8,8 @@ import {
   Pencil,
   Plus,
   RefreshCw,
+  RotateCcw,
+  Trash2,
   UserX
 } from "lucide-react";
 
@@ -63,6 +65,11 @@ const Usuarios = () => {
     guardando,
     setGuardando
   ] = useState(false);
+
+  const [
+    procesandoUsuarioId,
+    setProcesandoUsuarioId
+  ] = useState(null);
 
   const [
     error,
@@ -535,6 +542,7 @@ const Usuarios = () => {
       }
 
       try {
+        setProcesandoUsuarioId(id);
         setError("");
         setMensaje("");
 
@@ -552,6 +560,89 @@ const Usuarios = () => {
           error.response?.data
             ?.message ||
             "No fue posible desactivar el usuario"
+        );
+      } finally {
+        setProcesandoUsuarioId(
+          null
+        );
+      }
+    };
+
+  const reactivarUsuario =
+    async (id) => {
+      const confirmar =
+        window.confirm(
+          "¿Deseas reactivar este usuario?"
+        );
+
+      if (!confirmar) {
+        return;
+      }
+
+      try {
+        setProcesandoUsuarioId(id);
+        setError("");
+        setMensaje("");
+
+        await api.patch(
+          `/usuarios/${id}/reactivar`
+        );
+
+        setMensaje(
+          "Usuario reactivado correctamente"
+        );
+
+        await cargarDatos();
+      } catch (error) {
+        setError(
+          error.response?.data
+            ?.message ||
+            "No fue posible reactivar el usuario"
+        );
+      } finally {
+        setProcesandoUsuarioId(
+          null
+        );
+      }
+    };
+
+  const eliminarUsuario =
+    async (usuario) => {
+      const confirmar =
+        window.confirm(
+          `¿Deseas eliminar al usuario "${usuario.nombre}"?\n\nSi el usuario tiene historial relacionado, el sistema no permitirá eliminarlo y deberá permanecer inactivo.`
+        );
+
+      if (!confirmar) {
+        return;
+      }
+
+      try {
+        setProcesandoUsuarioId(
+          usuario.id
+        );
+
+        setError("");
+        setMensaje("");
+
+        await api.delete(
+          `/usuarios/${usuario.id}`
+        );
+
+        setMensaje(
+          "Usuario eliminado correctamente"
+        );
+
+        await cargarDatos();
+      } catch (error) {
+        setError(
+          error.response?.data
+            ?.message ||
+            "No fue posible eliminar el usuario"
+        );
+      } finally {
+        setProcesandoUsuarioId(
+          null
         );
       }
     };
@@ -573,9 +664,8 @@ const Usuarios = () => {
           </h1>
 
           <p>
-            Administración de
-            usuarios, ubicaciones y
-            permisos.
+            Administración de usuarios,
+            ubicaciones y permisos.
           </p>
         </div>
 
@@ -626,8 +716,7 @@ const Usuarios = () => {
       <section className="content-card">
         {usuarios.length === 0 ? (
           <div className="empty-state">
-            No hay usuarios
-            registrados.
+            No hay usuarios registrados.
           </div>
         ) : (
           <div className="table-container">
@@ -662,112 +751,162 @@ const Usuarios = () => {
 
               <tbody>
                 {usuarios.map(
-                  (usuario) => (
-                    <tr
-                      key={
+                  (usuario) => {
+                    const procesando =
+                      Number(
+                        procesandoUsuarioId
+                      ) ===
+                      Number(
                         usuario.id
-                      }
-                    >
-                      <td>
-                        <strong>
-                          {
-                            usuario.nombre
-                          }
-                        </strong>
+                      );
 
-                        <small className="table-secondary">
-                          {usuario.email ||
-                            "Acceso PIN"}
-                        </small>
-                      </td>
-
-                      <td>
-                        {obtenerNombreRol(
-                          usuario.rol
-                        )}
-                      </td>
-
-                      <td>
-                        {
-                          usuario.ubicacion_nombre
+                    return (
+                      <tr
+                        key={
+                          usuario.id
                         }
-                      </td>
+                      >
+                        <td>
+                          <strong>
+                            {
+                              usuario.nombre
+                            }
+                          </strong>
 
-                      <td>
-                        {obtenerNombrePermiso(
-                          usuario.nivel_permiso
-                        )}
-                      </td>
+                          <small className="table-secondary">
+                            {usuario.email ||
+                              "Acceso PIN"}
+                          </small>
+                        </td>
 
-                      <td>
-                        <span
-                          className={
-                            usuario.activo
-                              ? "status success"
-                              : "status danger"
+                        <td>
+                          {obtenerNombreRol(
+                            usuario.rol
+                          )}
+                        </td>
+
+                        <td>
+                          {
+                            usuario.ubicacion_nombre
                           }
-                        >
-                          {usuario.activo
-                            ? "Activo"
-                            : "Inactivo"}
-                        </span>
-                      </td>
+                        </td>
 
-                      <td>
-                        <div
-                          style={{
-                            display:
-                              "flex",
-                            gap: "12px",
-                            alignItems:
-                              "center",
-                            flexWrap:
-                              "wrap"
-                          }}
-                        >
-                          <button
-                            type="button"
-                            className="table-action"
-                            onClick={() =>
-                              abrirEditarUsuario(
-                                usuario
-                              )
+                        <td>
+                          {obtenerNombrePermiso(
+                            usuario.nivel_permiso
+                          )}
+                        </td>
+
+                        <td>
+                          <span
+                            className={
+                              usuario.activo
+                                ? "status success"
+                                : "status danger"
                             }
                           >
-                            <Pencil
-                              size={
-                                17
+                            {usuario.activo
+                              ? "Activo"
+                              : "Inactivo"}
+                          </span>
+                        </td>
+
+                        <td>
+                          <div
+                            style={{
+                              display:
+                                "flex",
+                              gap: "12px",
+                              alignItems:
+                                "center",
+                              flexWrap:
+                                "wrap"
+                            }}
+                          >
+                            <button
+                              type="button"
+                              className="table-action"
+                              onClick={() =>
+                                abrirEditarUsuario(
+                                  usuario
+                                )
                               }
-                            />
+                              disabled={
+                                procesando
+                              }
+                            >
+                              <Pencil
+                                size={17}
+                              />
 
-                            Editar
-                          </button>
+                              Editar
+                            </button>
 
-                          {usuario.activo ? (
+                            {usuario.activo ? (
+                              <button
+                                type="button"
+                                className="table-action danger-text"
+                                onClick={() =>
+                                  desactivarUsuario(
+                                    usuario.id
+                                  )
+                                }
+                                disabled={
+                                  procesando
+                                }
+                              >
+                                <UserX
+                                  size={17}
+                                />
+
+                                Desactivar
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                className="table-action"
+                                onClick={() =>
+                                  reactivarUsuario(
+                                    usuario.id
+                                  )
+                                }
+                                disabled={
+                                  procesando
+                                }
+                              >
+                                <RotateCcw
+                                  size={17}
+                                />
+
+                                Reactivar
+                              </button>
+                            )}
+
                             <button
                               type="button"
                               className="table-action danger-text"
                               onClick={() =>
-                                desactivarUsuario(
-                                  usuario.id
+                                eliminarUsuario(
+                                  usuario
                                 )
                               }
+                              disabled={
+                                procesando
+                              }
                             >
-                              <UserX
-                                size={
-                                  17
-                                }
+                              <Trash2
+                                size={17}
                               />
 
-                              Desactivar
+                              {procesando
+                                ? "Procesando..."
+                                : "Eliminar"}
                             </button>
-                          ) : (
-                            "-"
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  )
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  }
                 )}
               </tbody>
             </table>
@@ -928,13 +1067,11 @@ const Usuarios = () => {
                     </option>
 
                     <option value="operador">
-                      Operador de
-                      solicitudes
+                      Operador de solicitudes
                     </option>
 
                     <option value="aprobador_admin">
-                      Aprobador /
-                      Administrador
+                      Aprobador / Administrador
                     </option>
                   </select>
                 </div>
@@ -1061,12 +1198,11 @@ const Usuarios = () => {
                     opacity: 0.7
                   }}
                 >
-                  Selecciona primero
-                  una ubicación. El
-                  formulario adaptará
-                  automáticamente el
-                  rol, permisos y tipo
-                  de credencial.
+                  Selecciona primero una
+                  ubicación. El formulario
+                  adaptará automáticamente el
+                  rol, permisos y tipo de
+                  credencial.
                 </p>
               )}
 

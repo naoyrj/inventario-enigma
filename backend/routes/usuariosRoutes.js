@@ -6,7 +6,9 @@ const {
   createUsuario,
   updateUsuario,
   validarPin,
-  deactivateUsuario
+  deactivateUsuario,
+  activateUsuario,
+  deleteUsuario
 } = require("../controllers/usuariosController");
 
 const {
@@ -48,6 +50,18 @@ router.patch(
   "/:id/desactivar",
   verifyToken,
   deactivateUsuario
+);
+
+router.patch(
+  "/:id/reactivar",
+  verifyToken,
+  activateUsuario
+);
+
+router.delete(
+  "/:id",
+  verifyToken,
+  deleteUsuario
 );
 
 module.exports = router;
