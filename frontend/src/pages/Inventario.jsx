@@ -1,4 +1,4 @@
-import {
+﻿import {
   useEffect,
   useMemo,
   useRef,
@@ -21,149 +21,46 @@ import {
 } from "lucide-react";
 
 import api from "../services/api";
+import "../App.css";
 
 const Inventario = () => {
-  const [inventario, setInventario] =
-    useState([]);
+  const [inventario, setInventario] = useState([]);
+  const [categorias, setCategorias] = useState([]);
+  const [ubicaciones, setUbicaciones] = useState([]);
+  const [productos, setProductos] = useState([]);
+  const [proveedores, setProveedores] = useState([]);
 
-  const [categorias, setCategorias] =
-    useState([]);
+  const [loading, setLoading] = useState(true);
+  const [guardando, setGuardando] = useState(false);
+  const [importando, setImportando] = useState(false);
+  const [error, setError] = useState("");
+  const [mensaje, setMensaje] = useState("");
 
-  const [ubicaciones, setUbicaciones] =
-    useState([]);
+  const [busqueda, setBusqueda] = useState("");
+  const [categoria, setCategoria] = useState("");
+  const [ubicacion, setUbicacion] = useState("");
+  const [soloBajoStock, setSoloBajoStock] = useState(false);
 
-  const [productos, setProductos] =
-    useState([]);
+  const [mostrarModal, setMostrarModal] = useState(false);
+  const [mostrarImportacion, setMostrarImportacion] = useState(false);
+  const [mostrarDetalle, setMostrarDetalle] = useState(false);
 
-  const [proveedores, setProveedores] =
-    useState([]);
+  const [cargandoDetalle, setCargandoDetalle] = useState(false);
+  const [articuloDetalle, setArticuloDetalle] = useState(null);
 
-  const [busqueda, setBusqueda] =
-    useState("");
-
-  const [categoria, setCategoria] =
-    useState("");
-
-  const [ubicacion, setUbicacion] =
-    useState("");
-
-  const [
-    soloBajoStock,
-    setSoloBajoStock
-  ] = useState(false);
-
-  const [loading, setLoading] =
-    useState(true);
-
-  const [error, setError] =
-    useState("");
-
-  const [mensaje, setMensaje] =
-    useState("");
-
-  const [guardando, setGuardando] =
-    useState(false);
-
-  const [importando, setImportando] =
-    useState(false);
-
-  const usuario = JSON.parse(
-    localStorage.getItem("usuario") ||
-      "{}"
-  );
-
-  const esPrincipal =
-    usuario.rol === "principal";
-
-  // =======================================================
-  // AGREGAR ARTÍCULO
-  // =======================================================
-
-  const [
-    mostrarModal,
-    setMostrarModal
-  ] = useState(false);
-
-  const [tipoAlta, setTipoAlta] =
-    useState("existente");
-
-  const [
-    categoriaProductoExistente,
-    setCategoriaProductoExistente
-  ] = useState("");
-
-  const [
-    productoExistenteId,
-    setProductoExistenteId
-  ] = useState("");
-
-  const [
-    cantidadExistente,
-    setCantidadExistente
-  ] = useState("");
-
-  const [
-    nuevoProducto,
-    setNuevoProducto
-  ] = useState({
-    nombre: "",
-    descripcion: "",
-    sku: "",
-    categoria_id: "",
-    unidad_medida: "pieza",
-    punto_reorden: "",
-    cantidad: ""
-  });
-
-  // =======================================================
-  // IMPORTACIÓN CSV
-  // =======================================================
-
-  const [
-    mostrarImportacion,
-    setMostrarImportacion
-  ] = useState(false);
-
-  const [
-    archivoCsv,
-    setArchivoCsv
-  ] = useState(null);
-
-  const [
-    resultadoImportacion,
-    setResultadoImportacion
-  ] = useState(null);
+  const [archivoCsv, setArchivoCsv] = useState(null);
+  const [resultadoImportacion, setResultadoImportacion] = useState(null);
 
   const inputArchivoRef = useRef(null);
 
-  // =======================================================
-  // ENI-45 - ESPECIFICACIONES DEL PRODUCTO
-  // =======================================================
+  const [formulario, setFormulario] = useState({
+    producto_id: "",
+    cantidad: "",
+    ubicacion_id: "",
+    motivo: ""
+  });
 
-  const [
-    mostrarDetalle,
-    setMostrarDetalle
-  ] = useState(false);
-
-  const [
-    cargandoDetalle,
-    setCargandoDetalle
-  ] = useState(false);
-
-  const [
-    articuloDetalle,
-    setArticuloDetalle
-  ] = useState(null);
-
-  const [
-    detalleOriginal,
-    setDetalleOriginal
-  ] = useState(null);
-
-  const [
-    formularioDetalle,
-    setFormularioDetalle
-  ] = useState({
+  const [formularioDetalle, setFormularioDetalle] = useState({
     nombre: "",
     descripcion: "",
     existencias: "",
@@ -173,71 +70,244 @@ const Inventario = () => {
     unidad_medida: ""
   });
 
-  const [
-    motivoExistencias,
-    setMotivoExistencias
-  ] = useState("");
+  const [detalleOriginal, setDetalleOriginal] = useState({
+    nombre: "",
+    descripcion: "",
+    existencias: "",
+    punto_reorden: "",
+    proveedor_id: "",
+    sku: "",
+    unidad_medida: ""
+  });
 
-  // =======================================================
-  // CARGAR DATOS
-  // =======================================================
+  const [motivoExistencias, setMotivoExistencias] = useState("");
 
-  const cargarDatos = async () => {
+  const usuario = useMemo(() => {
     try {
-      setLoading(true);
-      setError("");
+      const datos = localStorage.getItem("usuario");
+      return datos ? JSON.parse(datos) : null;
+    } catch {
+      return null;
+    }
+  }, []);
 
-      const peticiones = [
-        api.get(
-          "/reportes/inventario"
-        ),
-        api.get("/categorias"),
-        api.get("/productos")
-      ];
+  const ubicacionUsuario =
+    usuario?.ubicacion ||
+    usuario?.ubicacion_nombre ||
+    "";
+
+  const tipoUbicacion =
+    usuario?.tipo_ubicacion ||
+    usuario?.ubicacion_tipo ||
+    "";
+
+  const esPrincipal =
+    tipoUbicacion === "principal" ||
+    usuario?.es_principal === true ||
+    usuario?.es_principal === 1;
+
+  const obtenerProveedorId = (producto) => {
+    if (!producto) {
+      return "";
+    }
+
+    if (producto.proveedor_id) {
+      return String(producto.proveedor_id);
+    }
+
+    if (
+      Array.isArray(producto.proveedores) &&
+      producto.proveedores.length > 0
+    ) {
+      const proveedor = producto.proveedores[0];
+
+      return String(
+        proveedor?.id ||
+        proveedor?.proveedor_id ||
+        ""
+      );
+    }
+
+    if (
+      Array.isArray(producto.proveedor_ids) &&
+      producto.proveedor_ids.length > 0
+    ) {
+      return String(producto.proveedor_ids[0]);
+    }
+
+    return "";
+  };
+
+  const normalizarInventario = (respuesta) => {
+    if (Array.isArray(respuesta)) {
+      return respuesta;
+    }
+
+    if (Array.isArray(respuesta?.inventario)) {
+      return respuesta.inventario;
+    }
+
+    if (Array.isArray(respuesta?.data)) {
+      return respuesta.data;
+    }
+
+    return [];
+  };
+
+  const normalizarLista = (
+    respuesta,
+    propiedad
+  ) => {
+    if (Array.isArray(respuesta)) {
+      return respuesta;
+    }
+
+    if (
+      propiedad &&
+      Array.isArray(respuesta?.[propiedad])
+    ) {
+      return respuesta[propiedad];
+    }
+
+    if (Array.isArray(respuesta?.data)) {
+      return respuesta.data;
+    }
+
+    return [];
+  };
+
+  const cargarInventario = async () => {
+    try {
+      let response;
 
       if (esPrincipal) {
-        peticiones.push(
-          api.get("/ubicaciones")
+        response = await api.get(
+          "/reportes/inventario"
         );
-
-        peticiones.push(
-          api.get("/proveedores")
+      } else {
+        response = await api.get(
+          "/inventario"
         );
       }
 
-      const respuestas =
-        await Promise.all(
-          peticiones
-        );
-
       setInventario(
-        respuestas[0].data || []
+        normalizarInventario(response.data)
+      );
+    } catch (err) {
+      console.error(
+        "Error al cargar inventario:",
+        err
+      );
+
+      throw err;
+    }
+  };
+
+  const cargarCategorias = async () => {
+    try {
+      const response = await api.get(
+        "/categorias"
       );
 
       setCategorias(
-        respuestas[1].data || []
+        normalizarLista(
+          response.data,
+          "categorias"
+        )
+      );
+    } catch (err) {
+      console.error(
+        "Error al cargar categorías:",
+        err
+      );
+
+      setCategorias([]);
+    }
+  };
+
+  const cargarUbicaciones = async () => {
+    try {
+      const response = await api.get(
+        "/ubicaciones"
+      );
+
+      setUbicaciones(
+        normalizarLista(
+          response.data,
+          "ubicaciones"
+        )
+      );
+    } catch (err) {
+      console.error(
+        "Error al cargar ubicaciones:",
+        err
+      );
+
+      setUbicaciones([]);
+    }
+  };
+
+  const cargarProductos = async () => {
+    try {
+      const response = await api.get(
+        "/productos"
       );
 
       setProductos(
-        respuestas[2].data || []
+        normalizarLista(
+          response.data,
+          "productos"
+        )
+      );
+    } catch (err) {
+      console.error(
+        "Error al cargar productos:",
+        err
       );
 
-      if (esPrincipal) {
-        setUbicaciones(
-          respuestas[3].data || []
-        );
+      setProductos([]);
+    }
+  };
 
-        setProveedores(
-          respuestas[4].data || []
-        );
-      }
-    } catch (errorPeticion) {
-      console.error(errorPeticion);
+  const cargarProveedores = async () => {
+    try {
+      const response = await api.get(
+        "/proveedores"
+      );
 
+      setProveedores(
+        normalizarLista(
+          response.data,
+          "proveedores"
+        )
+      );
+    } catch (err) {
+      console.error(
+        "Error al cargar proveedores:",
+        err
+      );
+
+      setProveedores([]);
+    }
+  };
+
+  const cargarDatos = async () => {
+    setLoading(true);
+    setError("");
+
+    try {
+      await Promise.all([
+        cargarInventario(),
+        cargarCategorias(),
+        cargarUbicaciones(),
+        cargarProductos(),
+        cargarProveedores()
+      ]);
+    } catch (err) {
       setError(
-        errorPeticion.response?.data
-          ?.message ||
-          "No fue posible cargar el inventario"
+        err.response?.data?.message ||
+        err.response?.data?.mensaje ||
+        "No fue posible cargar el inventario."
       );
     } finally {
       setLoading(false);
@@ -246,163 +316,84 @@ const Inventario = () => {
 
   useEffect(() => {
     cargarDatos();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // =======================================================
-  // FILTROS
-  // =======================================================
+  const inventarioFiltrado = useMemo(() => {
+    const termino =
+      busqueda.trim().toLowerCase();
 
-  const inventarioFiltrado =
-    useMemo(() => {
-      return inventario.filter(
-        (item) => {
-          const texto =
-            busqueda
-              .toLowerCase()
-              .trim();
+    return inventario.filter((item) => {
+      const nombre = String(
+        item.producto_nombre ||
+        item.nombre ||
+        ""
+      ).toLowerCase();
 
-          const nombre =
-            item.producto_nombre
-              ?.toLowerCase() || "";
+      const sku = String(
+        item.sku || ""
+      ).toLowerCase();
 
-          const sku =
-            item.sku
-              ?.toLowerCase() || "";
+      const proveedor = String(
+        item.proveedor_nombre ||
+        item.proveedor ||
+        ""
+      ).toLowerCase();
 
-          const proveedor =
-            item.proveedor_nombre
-              ?.toLowerCase() || "";
+      const coincideBusqueda =
+        !termino ||
+        nombre.includes(termino) ||
+        sku.includes(termino) ||
+        proveedor.includes(termino);
 
-          const coincideBusqueda =
-            !texto ||
-            nombre.includes(texto) ||
-            sku.includes(texto) ||
-            proveedor.includes(texto);
+      const coincideCategoria =
+        !categoria ||
+        String(item.categoria_id) ===
+        String(categoria);
 
-          const coincideCategoria =
-            !categoria ||
-            Number(
-              item.categoria_id
-            ) === Number(categoria);
+      const coincideUbicacion =
+        !ubicacion ||
+        String(item.ubicacion_id) ===
+        String(ubicacion);
 
-          const coincideUbicacion =
-            !ubicacion ||
-            Number(
-              item.ubicacion_id
-            ) === Number(ubicacion);
+      const stockBajo =
+        Number(item.stock_bajo) === 1 ||
+        Number(item.cantidad || 0) <=
+        Number(item.punto_reorden || 0);
 
-          const coincideStock =
-            !soloBajoStock ||
-            Number(
-              item.stock_bajo
-            ) === 1;
+      const coincideStock =
+        !soloBajoStock || stockBajo;
 
-          return (
-            coincideBusqueda &&
-            coincideCategoria &&
-            coincideUbicacion &&
-            coincideStock
-          );
-        }
+      return (
+        coincideBusqueda &&
+        coincideCategoria &&
+        coincideUbicacion &&
+        coincideStock
       );
-    }, [
-      inventario,
-      busqueda,
-      categoria,
-      ubicacion,
-      soloBajoStock
-    ]);
-
-  const categoriasParaAlta =
-    useMemo(() => {
-      return categorias.filter(
-        (item) => {
-          if (
-            item.tipo === "global"
-          ) {
-            return true;
-          }
-
-          if (
-            usuario.rol ===
-              "equipo_interno" &&
-            item.tipo ===
-              "privada" &&
-            Number(
-              item
-                .ubicacion_propietaria_id
-            ) ===
-              Number(
-                usuario.ubicacion_id
-              )
-          ) {
-            return true;
-          }
-
-          return false;
-        }
-      );
-    }, [
-      categorias,
-      usuario.rol,
-      usuario.ubicacion_id
-    ]);
-
-  const productosDisponibles =
-    useMemo(() => {
-      return productos.filter(
-        (producto) => {
-          if (
-            producto.solo_lectura
-          ) {
-            return false;
-          }
-
-          if (
-            !categoriaProductoExistente
-          ) {
-            return true;
-          }
-
-          return (
-            Number(
-              producto.categoria_id
-            ) ===
-            Number(
-              categoriaProductoExistente
-            )
-          );
-        }
-      );
-    }, [
-      productos,
-      categoriaProductoExistente
-    ]);
-
-  // =======================================================
-  // RESUMEN
-  // =======================================================
+    });
+  }, [
+    inventario,
+    busqueda,
+    categoria,
+    ubicacion,
+    soloBajoStock
+  ]);
 
   const totalProductos =
-    new Set(
-      inventario.map(
-        (item) => item.producto_id
-      )
-    ).size;
+    inventarioFiltrado.length;
 
   const totalUnidades =
-    inventario.reduce(
+    inventarioFiltrado.reduce(
       (total, item) =>
-        total +
-        Number(item.cantidad || 0),
+        total + Number(item.cantidad || 0),
       0
     );
 
   const totalAlertas =
-    inventario.filter(
+    inventarioFiltrado.filter(
       (item) =>
-        Number(item.stock_bajo) === 1
+        Number(item.stock_bajo) === 1 ||
+        Number(item.cantidad || 0) <=
+        Number(item.punto_reorden || 0)
     ).length;
 
   const limpiarFiltros = () => {
@@ -412,36 +403,16 @@ const Inventario = () => {
     setSoloBajoStock(false);
   };
 
-  // =======================================================
-  // AGREGAR ARTÍCULO
-  // =======================================================
-
-  const limpiarFormulario = () => {
-    setTipoAlta("existente");
-
-    setCategoriaProductoExistente(
-      ""
-    );
-
-    setProductoExistenteId("");
-    setCantidadExistente("");
-
-    setNuevoProducto({
-      nombre: "",
-      descripcion: "",
-      sku: "",
-      categoria_id: "",
-      unidad_medida: "pieza",
-      punto_reorden: "",
-      cantidad: ""
-    });
-  };
-
   const abrirModal = () => {
     setError("");
     setMensaje("");
 
-    limpiarFormulario();
+    setFormulario({
+      producto_id: "",
+      cantidad: "",
+      ubicacion_id: "",
+      motivo: ""
+    });
 
     setMostrarModal(true);
   };
@@ -452,233 +423,94 @@ const Inventario = () => {
     }
 
     setMostrarModal(false);
-    limpiarFormulario();
     setError("");
   };
 
-  const handleNuevoProducto = (
-    event
-  ) => {
+  const handleFormulario = (event) => {
     const {
       name,
       value
     } = event.target;
 
-    setNuevoProducto(
-      (anterior) => ({
-        ...anterior,
-        [name]: value
-      })
-    );
+    setFormulario((actual) => ({
+      ...actual,
+      [name]: value
+    }));
   };
 
-  const agregarProductoExistente =
-    async (event) => {
-      event.preventDefault();
+  const guardarArticulo = async (event) => {
+    event.preventDefault();
 
-      try {
-        setError("");
-        setMensaje("");
+    setError("");
+    setMensaje("");
 
-        if (!productoExistenteId) {
-          setError(
-            "Selecciona un producto."
-          );
+    if (!formulario.producto_id) {
+      setError(
+        "Selecciona un producto."
+      );
+      return;
+    }
 
-          return;
-        }
+    const cantidad = Number(
+      formulario.cantidad
+    );
 
-        const cantidadNumero =
-          Number(
-            cantidadExistente
-          );
+    if (
+      Number.isNaN(cantidad) ||
+      cantidad < 0
+    ) {
+      setError(
+        "La cantidad debe ser un número válido."
+      );
+      return;
+    }
 
-        if (
-          !Number.isFinite(
-            cantidadNumero
-          ) ||
-          cantidadNumero <= 0
-        ) {
-          setError(
-            "La cantidad debe ser mayor a cero."
-          );
+    setGuardando(true);
 
-          return;
-        }
+    try {
+      const payload = {
+        producto_id:
+          Number(formulario.producto_id),
+        cantidad
+      };
 
-        setGuardando(true);
-
-        const response =
-          await api.post(
-            "/inventario/propio/existente",
-            {
-              producto_id:
-                Number(
-                  productoExistenteId
-                ),
-
-              cantidad:
-                cantidadNumero
-            }
-          );
-
-        setMostrarModal(false);
-        limpiarFormulario();
-
-        setMensaje(
-          response.data?.message ||
-            "Artículo agregado correctamente."
-        );
-
-        await cargarDatos();
-      } catch (errorPeticion) {
-        console.error(errorPeticion);
-
-        setError(
-          errorPeticion.response?.data
-            ?.message ||
-            "No fue posible agregar el artículo."
-        );
-      } finally {
-        setGuardando(false);
+      if (formulario.ubicacion_id) {
+        payload.ubicacion_id =
+          Number(formulario.ubicacion_id);
       }
-    };
 
-  const agregarProductoNuevo =
-    async (event) => {
-      event.preventDefault();
-
-      try {
-        setError("");
-        setMensaje("");
-
-        if (
-          !nuevoProducto.nombre.trim()
-        ) {
-          setError(
-            "Escribe el nombre del producto."
-          );
-
-          return;
-        }
-
-        if (
-          !nuevoProducto
-            .unidad_medida
-            .trim()
-        ) {
-          setError(
-            "Escribe la unidad de medida."
-          );
-
-          return;
-        }
-
-        const cantidad =
-          Number(
-            nuevoProducto.cantidad
-          );
-
-        if (
-          !Number.isFinite(cantidad) ||
-          cantidad <= 0
-        ) {
-          setError(
-            "La cantidad debe ser mayor a cero."
-          );
-
-          return;
-        }
-
-        const puntoReorden =
-          nuevoProducto
-            .punto_reorden === ""
-            ? 0
-            : Number(
-                nuevoProducto
-                  .punto_reorden
-              );
-
-        if (
-          !Number.isFinite(
-            puntoReorden
-          ) ||
-          puntoReorden < 0
-        ) {
-          setError(
-            "El punto de reorden debe ser mayor o igual a cero."
-          );
-
-          return;
-        }
-
-        setGuardando(true);
-
-        const response =
-          await api.post(
-            "/inventario/propio/nuevo",
-            {
-              nombre:
-                nuevoProducto
-                  .nombre
-                  .trim(),
-
-              descripcion:
-                nuevoProducto
-                  .descripcion
-                  .trim() || null,
-
-              sku:
-                nuevoProducto
-                  .sku
-                  .trim() || null,
-
-              categoria_id:
-                nuevoProducto
-                  .categoria_id
-                  ? Number(
-                      nuevoProducto
-                        .categoria_id
-                    )
-                  : null,
-
-              unidad_medida:
-                nuevoProducto
-                  .unidad_medida
-                  .trim(),
-
-              punto_reorden:
-                puntoReorden,
-
-              cantidad
-            }
-          );
-
-        setMostrarModal(false);
-        limpiarFormulario();
-
-        setMensaje(
-          response.data?.message ||
-            "Producto creado correctamente."
-        );
-
-        await cargarDatos();
-      } catch (errorPeticion) {
-        console.error(errorPeticion);
-
-        setError(
-          errorPeticion.response?.data
-            ?.message ||
-            "No fue posible crear el producto."
-        );
-      } finally {
-        setGuardando(false);
+      if (formulario.motivo.trim()) {
+        payload.motivo =
+          formulario.motivo.trim();
       }
-    };
 
-  // =======================================================
-  // IMPORTAR CSV
-  // =======================================================
+      await api.post(
+        "/inventario/stock-inicial",
+        payload
+      );
+
+      setMensaje(
+        "Artículo agregado correctamente al inventario."
+      );
+
+      setMostrarModal(false);
+
+      await cargarInventario();
+    } catch (err) {
+      console.error(
+        "Error al agregar artículo:",
+        err
+      );
+
+      setError(
+        err.response?.data?.message ||
+        err.response?.data?.mensaje ||
+        "No fue posible agregar el artículo."
+      );
+    } finally {
+      setGuardando(false);
+    }
+  };
 
   const abrirImportacion = () => {
     setError("");
@@ -687,8 +519,7 @@ const Inventario = () => {
     setResultadoImportacion(null);
 
     if (inputArchivoRef.current) {
-      inputArchivoRef.current.value =
-        "";
+      inputArchivoRef.current.value = "";
     }
 
     setMostrarImportacion(true);
@@ -703,199 +534,97 @@ const Inventario = () => {
     setArchivoCsv(null);
     setResultadoImportacion(null);
     setError("");
-
-    if (inputArchivoRef.current) {
-      inputArchivoRef.current.value =
-        "";
-    }
   };
 
   const seleccionarArchivoCsv = (
     event
   ) => {
-    setError("");
-    setResultadoImportacion(null);
-
     const archivo =
-      event.target.files?.[0];
-
-    if (!archivo) {
-      setArchivoCsv(null);
-      return;
-    }
-
-    if (
-      !archivo.name
-        .toLowerCase()
-        .endsWith(".csv")
-    ) {
-      setArchivoCsv(null);
-
-      event.target.value = "";
-
-      setError(
-        "Selecciona un archivo con extensión .csv."
-      );
-
-      return;
-    }
-
-    if (
-      archivo.size >
-      5 * 1024 * 1024
-    ) {
-      setArchivoCsv(null);
-
-      event.target.value = "";
-
-      setError(
-        "El archivo CSV no puede superar los 5 MB."
-      );
-
-      return;
-    }
+      event.target.files?.[0] || null;
 
     setArchivoCsv(archivo);
+    setResultadoImportacion(null);
+    setError("");
+    setMensaje("");
   };
 
-  const importarCsv = async (
-    event
-  ) => {
-    event.preventDefault();
-
+  const importarCsv = async () => {
     if (!archivoCsv) {
       setError(
         "Selecciona un archivo CSV."
       );
-
       return;
     }
 
-    try {
-      setImportando(true);
-      setError("");
-      setMensaje("");
-      setResultadoImportacion(null);
+    setImportando(true);
+    setError("");
+    setMensaje("");
+    setResultadoImportacion(null);
 
-      const formData =
-        new FormData();
+    try {
+      const formData = new FormData();
 
       formData.append(
         "archivo",
         archivoCsv
       );
 
-      const response =
-        await api.post(
-          "/inventario/importar-csv",
-          formData
-        );
+      const response = await api.post(
+        "/inventario/importar-csv",
+        formData,
+        {
+          headers: {
+            "Content-Type":
+              "multipart/form-data"
+          }
+        }
+      );
 
-      const datos =
-        response.data || {};
+      setResultadoImportacion(
+        response.data
+      );
 
-      setResultadoImportacion(datos);
+      setMensaje(
+        response.data?.message ||
+        response.data?.mensaje ||
+        "Archivo procesado correctamente."
+      );
 
-      const resumen =
-        datos.resumen || {};
-
-      const agregados =
-        Number(
-          resumen.agregados || 0
-        );
-
-      const errores =
-        Number(
-          resumen.filas_con_error || 0
-        );
-
-      if (errores > 0) {
-        setMensaje(
-          `Importación procesada: ${agregados} fila(s) agregada(s) y ${errores} fila(s) con error.`
-        );
-      } else {
-        setMensaje(
-          datos.message ||
-            `Importación completada correctamente. ${agregados} fila(s) agregada(s).`
-        );
-      }
-
-      await cargarDatos();
-    } catch (errorPeticion) {
-      console.error(errorPeticion);
+      await Promise.all([
+        cargarInventario(),
+        cargarProductos()
+      ]);
+    } catch (err) {
+      console.error(
+        "Error al importar CSV:",
+        err
+      );
 
       setError(
-        errorPeticion.response?.data
-          ?.message ||
-          "No fue posible importar el archivo CSV."
+        err.response?.data?.message ||
+        err.response?.data?.mensaje ||
+        "No fue posible importar el archivo CSV."
       );
+
+      if (err.response?.data) {
+        setResultadoImportacion(
+          err.response.data
+        );
+      }
     } finally {
       setImportando(false);
     }
   };
 
-  // =======================================================
-  // ENI-45 - VER / EDITAR ESPECIFICACIONES
-  // =======================================================
+  const abrirDetalle = (item) => {
+    /*
+      IMPORTANTE:
+      El modal se abre inmediatamente.
+      La consulta al backend se realiza después.
+      De esta forma el botón Ver nunca depende
+      de que la petición HTTP termine.
+    */
 
-  const obtenerProveedorId = (
-    producto
-  ) => {
-    if (!producto) {
-      return "";
-    }
-
-    if (producto.proveedor_id) {
-      return String(
-        producto.proveedor_id
-      );
-    }
-
-    if (
-      Array.isArray(
-        producto.proveedor_ids
-      ) &&
-      producto.proveedor_ids.length >
-        0
-    ) {
-      return String(
-        producto.proveedor_ids[0]
-      );
-    }
-
-    if (
-      Array.isArray(
-        producto.proveedores
-      ) &&
-      producto.proveedores.length >
-        0
-    ) {
-      const primerProveedor =
-        producto.proveedores[0];
-
-      if (
-        typeof primerProveedor ===
-        "object"
-      ) {
-        return String(
-          primerProveedor.id ||
-            primerProveedor
-              .proveedor_id ||
-            ""
-        );
-      }
-
-      return String(
-        primerProveedor
-      );
-    }
-
-    return "";
-  };
-
-  const abrirDetalle = async (
-    item
-  ) => {
     setError("");
     setMensaje("");
     setArticuloDetalle(item);
@@ -928,17 +657,15 @@ const Inventario = () => {
       punto_reorden:
         String(
           productoLocal.punto_reorden ??
-            item.punto_reorden ??
-            0
+          item.punto_reorden ??
+          0
         ),
 
       proveedor_id:
         obtenerProveedorId(
           productoLocal
         ) ||
-        obtenerProveedorId(
-          item
-        ),
+        obtenerProveedorId(item),
 
       sku:
         productoLocal.sku ||
@@ -959,7 +686,26 @@ const Inventario = () => {
       datosIniciales
     );
 
+    /*
+      Esta línea abre la ventana antes de
+      cualquier petición al servidor.
+    */
     setMostrarDetalle(true);
+
+    /*
+      Después actualizamos los datos con
+      la información completa del producto.
+    */
+    cargarDetalleProducto(
+      item,
+      datosIniciales
+    );
+  };
+
+  const cargarDetalleProducto = async (
+    item,
+    datosIniciales
+  ) => {
     setCargandoDetalle(true);
 
     try {
@@ -988,7 +734,7 @@ const Inventario = () => {
         punto_reorden:
           String(
             producto.punto_reorden ??
-              datosIniciales.punto_reorden
+            datosIniciales.punto_reorden
           ),
 
         proveedor_id:
@@ -1013,15 +759,20 @@ const Inventario = () => {
       setDetalleOriginal(
         datosFormulario
       );
-    } catch (errorPeticion) {
+    } catch (err) {
+      /*
+        Si falla la consulta, el modal permanece
+        abierto con la información del inventario.
+      */
       console.error(
-        "No fue posible actualizar los datos del producto:",
-        errorPeticion
+        "No fue posible obtener el detalle completo del producto:",
+        err
       );
     } finally {
       setCargandoDetalle(false);
     }
   };
+
   const cerrarDetalle = () => {
     if (guardando) {
       return;
@@ -1029,127 +780,92 @@ const Inventario = () => {
 
     setMostrarDetalle(false);
     setArticuloDetalle(null);
-    setDetalleOriginal(null);
-
-    setFormularioDetalle({
-      nombre: "",
-      descripcion: "",
-      existencias: "",
-      punto_reorden: "",
-      proveedor_id: "",
-      sku: "",
-      unidad_medida: ""
-    });
-
     setMotivoExistencias("");
     setError("");
   };
 
-  const handleDetalle = (
-    event
-  ) => {
+  const handleDetalle = (event) => {
     const {
       name,
       value
     } = event.target;
 
     setFormularioDetalle(
-      (anterior) => ({
-        ...anterior,
+      (actual) => ({
+        ...actual,
         [name]: value
       })
     );
   };
 
   const existenciasCambiaron =
-    detalleOriginal
-      ? Number(
-          formularioDetalle
-            .existencias
-        ) !==
-        Number(
-          detalleOriginal
-            .existencias
-        )
-      : false;
+    Number(
+      formularioDetalle.existencias
+    ) !==
+    Number(
+      detalleOriginal.existencias
+    );
 
   const guardarDetalle = async (
     event
   ) => {
     event.preventDefault();
 
-    if (
-      !articuloDetalle ||
-      !detalleOriginal
-    ) {
-      return;
-    }
-
     setError("");
     setMensaje("");
 
-    if (
-      !formularioDetalle
-        .nombre
-        .trim()
-    ) {
+    const nombre =
+      formularioDetalle.nombre.trim();
+
+    const unidadMedida =
+      formularioDetalle.unidad_medida.trim();
+
+    const existencias =
+      Number(
+        formularioDetalle.existencias
+      );
+
+    const puntoReorden =
+      formularioDetalle.punto_reorden ===
+      ""
+        ? 0
+        : Number(
+            formularioDetalle.punto_reorden
+          );
+
+    if (!nombre) {
       setError(
         "El nombre es obligatorio."
       );
-
       return;
     }
 
     if (
-      !formularioDetalle
-        .unidad_medida
-        .trim()
+      formularioDetalle.existencias ===
+      "" ||
+      Number.isNaN(existencias) ||
+      existencias < 0
     ) {
+      setError(
+        "Las existencias son obligatorias y deben ser un número válido."
+      );
+      return;
+    }
+
+    if (!unidadMedida) {
       setError(
         "La unidad de medida es obligatoria."
       );
-
       return;
     }
 
-    const nuevasExistencias =
-      Number(
-        formularioDetalle
-          .existencias
-      );
-
     if (
-      !Number.isFinite(
-        nuevasExistencias
-      ) ||
-      nuevasExistencias < 0
+      Number.isNaN(puntoReorden) ||
+      puntoReorden < 0
     ) {
       setError(
-        "Las existencias deben ser un número mayor o igual a cero."
+        "El punto de reorden debe ser un número válido."
       );
-
-      return;
-    }
-
-    const nuevoPuntoReorden =
-      formularioDetalle
-        .punto_reorden === ""
-        ? 0
-        : Number(
-            formularioDetalle
-              .punto_reorden
-          );
-
-    if (
-      !Number.isFinite(
-        nuevoPuntoReorden
-      ) ||
-      nuevoPuntoReorden < 0
-    ) {
-      setError(
-        "El punto de reorden debe ser mayor o igual a cero."
-      );
-
       return;
     }
 
@@ -1158,119 +874,113 @@ const Inventario = () => {
       !motivoExistencias.trim()
     ) {
       setError(
-        "Debes indicar una justificación para modificar las existencias."
+        "Debes escribir una justificación para modificar las existencias."
       );
-
       return;
     }
 
-    try {
-      setGuardando(true);
+    if (!articuloDetalle?.producto_id) {
+      setError(
+        "No se encontró el producto seleccionado."
+      );
+      return;
+    }
 
+    setGuardando(true);
+
+    try {
       const proveedorId =
-        formularioDetalle
-          .proveedor_id
+        formularioDetalle.proveedor_id
           ? Number(
-              formularioDetalle
-                .proveedor_id
+              formularioDetalle.proveedor_id
             )
           : null;
 
+      const payloadProducto = {
+        nombre,
+        descripcion:
+          formularioDetalle.descripcion.trim(),
+        punto_reorden:
+          puntoReorden,
+        sku:
+          formularioDetalle.sku.trim() ||
+          null,
+        unidad_medida:
+          unidadMedida,
+        proveedor_id:
+          proveedorId,
+        proveedor_ids:
+          proveedorId
+            ? [proveedorId]
+            : [],
+        activo: true
+      };
+
       await api.put(
         `/productos/${articuloDetalle.producto_id}`,
-        {
-          nombre:
-            formularioDetalle
-              .nombre
-              .trim(),
-
-          descripcion:
-            formularioDetalle
-              .descripcion
-              .trim() || null,
-
-          sku:
-            formularioDetalle
-              .sku
-              .trim() || null,
-
-          unidad_medida:
-            formularioDetalle
-              .unidad_medida
-              .trim(),
-
-          punto_reorden:
-            nuevoPuntoReorden,
-
-          categoria_id:
-            articuloDetalle
-              .categoria_id
-              ? Number(
-                  articuloDetalle
-                    .categoria_id
-                )
-              : null,
-
-          proveedor_id:
-            proveedorId,
-
-          proveedor_ids:
-            proveedorId
-              ? [proveedorId]
-              : [],
-
-          activo: true
-        }
+        payloadProducto
       );
 
       if (existenciasCambiaron) {
-        await api.patch(
+        const diferencia =
+          existencias -
+          Number(
+            detalleOriginal.existencias
+          );
+
+        const payloadAjuste = {
+          producto_id:
+            Number(
+              articuloDetalle.producto_id
+            ),
+          cantidad:
+            diferencia,
+          motivo:
+            motivoExistencias.trim()
+        };
+
+        if (
+          articuloDetalle.ubicacion_id
+        ) {
+          payloadAjuste.ubicacion_id =
+            Number(
+              articuloDetalle.ubicacion_id
+            );
+        }
+
+        await api.post(
           "/inventario/ajuste",
-          {
-            producto_id:
-              Number(
-                articuloDetalle
-                  .producto_id
-              ),
-
-            cantidad_nueva:
-              nuevasExistencias,
-
-            motivo:
-              motivoExistencias
-                .trim()
-          }
+          payloadAjuste
         );
       }
 
-      setMostrarDetalle(false);
-      setArticuloDetalle(null);
-      setDetalleOriginal(null);
-      setMotivoExistencias("");
-
       setMensaje(
-        existenciasCambiaron
-          ? "Producto y existencias actualizados correctamente."
-          : "Especificaciones del producto actualizadas correctamente."
+        "Producto actualizado correctamente."
       );
 
-      await cargarDatos();
-    } catch (errorPeticion) {
-      console.error(errorPeticion);
+      setMostrarDetalle(false);
+      setArticuloDetalle(null);
+      setMotivoExistencias("");
+
+      await Promise.all([
+        cargarInventario(),
+        cargarProductos()
+      ]);
+    } catch (err) {
+      console.error(
+        "Error al guardar producto:",
+        err
+      );
 
       setError(
-        errorPeticion.response?.data
-          ?.message ||
-          "No fue posible actualizar el producto."
+        err.response?.data?.message ||
+        err.response?.data?.mensaje ||
+        "No fue posible guardar los cambios."
       );
     } finally {
       setGuardando(false);
     }
   };
-
-  // =======================================================
-  // LOADING
-  // =======================================================
 
   if (loading) {
     return (
@@ -1279,10 +989,6 @@ const Inventario = () => {
       </div>
     );
   }
-
-  // =======================================================
-  // RENDER
-  // =======================================================
 
   return (
     <div>
@@ -1358,7 +1064,6 @@ const Inventario = () => {
 
           <div>
             <span>Productos</span>
-
             <strong>
               {totalProductos}
             </strong>
@@ -1386,7 +1091,6 @@ const Inventario = () => {
 
           <div>
             <span>Alertas</span>
-
             <strong>
               {totalAlertas}
             </strong>
@@ -1596,9 +1300,6 @@ const Inventario = () => {
                                 item
                               )
                             }
-                            disabled={
-                              cargandoDetalle
-                            }
                           >
                             <Eye size={16} />
                             Ver
@@ -1614,14 +1315,22 @@ const Inventario = () => {
         )}
       </section>
 
-      {/* ============================================= */}
-      {/* ENI-45 - ESPECIFICACIONES */}
-      {/* ============================================= */}
-
       {mostrarDetalle &&
         articuloDetalle && (
           <div
             className="modal-overlay"
+            style={{
+              position: "fixed",
+              inset: 0,
+              zIndex: 999999,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "16px",
+              background:
+                "rgba(15, 23, 42, 0.65)",
+              overflowY: "auto"
+            }}
             onMouseDown={(event) => {
               if (
                 event.target ===
@@ -1634,11 +1343,18 @@ const Inventario = () => {
             <div
               className="modal-content"
               style={{
+                position: "relative",
+                zIndex: 1000000,
                 maxWidth: "760px",
                 width:
                   "calc(100% - 32px)",
                 maxHeight: "90vh",
-                overflowY: "auto"
+                overflowY: "auto",
+                background: "#ffffff",
+                borderRadius: "16px",
+                padding: "24px",
+                boxShadow:
+                  "0 24px 70px rgba(15, 23, 42, 0.28)"
               }}
             >
               <div className="modal-header">
@@ -1665,6 +1381,17 @@ const Inventario = () => {
                   <X size={22} />
                 </button>
               </div>
+
+              {cargandoDetalle && (
+                <div
+                  className="table-secondary"
+                  style={{
+                    marginBottom: "16px"
+                  }}
+                >
+                  Actualizando información del producto...
+                </div>
+              )}
 
               {error && (
                 <div className="error-message page-error">
@@ -1937,13 +1664,21 @@ const Inventario = () => {
           </div>
         )}
 
-      {/* ============================================= */}
-      {/* IMPORTAR CSV */}
-      {/* ============================================= */}
-
       {mostrarImportacion && (
         <div
           className="modal-overlay"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 999999,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "16px",
+            background:
+              "rgba(15, 23, 42, 0.65)",
+            overflowY: "auto"
+          }}
           onMouseDown={(event) => {
             if (
               event.target ===
@@ -1956,11 +1691,17 @@ const Inventario = () => {
           <div
             className="modal-content"
             style={{
+              position: "relative",
               maxWidth: "650px",
               width:
                 "calc(100% - 32px)",
               maxHeight: "90vh",
-              overflowY: "auto"
+              overflowY: "auto",
+              background: "#ffffff",
+              borderRadius: "16px",
+              padding: "24px",
+              boxShadow:
+                "0 24px 70px rgba(15, 23, 42, 0.28)"
             }}
           >
             <div className="modal-header">
@@ -2018,7 +1759,6 @@ const Inventario = () => {
                 }}
               >
                 <FileText size={24} />
-
                 <strong>
                   Archivo CSV
                 </strong>
@@ -2101,21 +1841,16 @@ const Inventario = () => {
                       <td>
                         Mouse Logitech
                       </td>
-
                       <td>
                         pieza
                       </td>
-
                       <td>10</td>
-
                       <td>
                         Opcional
                       </td>
-
                       <td>
                         Opcional
                       </td>
-
                       <td>
                         Opcional
                       </td>
@@ -2227,11 +1962,9 @@ const Inventario = () => {
                             <th>
                               Fila
                             </th>
-
                             <th>
                               Producto
                             </th>
-
                             <th>
                               Error
                             </th>
@@ -2275,58 +2008,62 @@ const Inventario = () => {
               </div>
             )}
 
-            <form
-              onSubmit={importarCsv}
+            <div
+              style={{
+                display: "flex",
+                justifyContent:
+                  "flex-end",
+                gap: "10px",
+                marginTop: "20px",
+                flexWrap: "wrap"
+              }}
             >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent:
-                    "flex-end",
-                  gap: "10px",
-                  marginTop: "24px"
-                }}
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={
+                  cerrarImportacion
+                }
+                disabled={importando}
               >
-                <button
-                  type="button"
-                  className="secondary-button"
-                  onClick={
-                    cerrarImportacion
-                  }
-                  disabled={importando}
-                >
-                  {resultadoImportacion
-                    ? "Cerrar"
-                    : "Cancelar"}
-                </button>
+                Cerrar
+              </button>
 
-                <button
-                  type="submit"
-                  className="primary-button"
-                  disabled={
-                    importando ||
-                    !archivoCsv
-                  }
-                >
-                  <Upload size={18} />
+              <button
+                type="button"
+                className="primary-button"
+                onClick={importarCsv}
+                disabled={
+                  importando ||
+                  !archivoCsv
+                }
+              >
+                <Upload size={18} />
 
-                  {importando
-                    ? "Importando..."
-                    : "Importar CSV"}
-                </button>
-              </div>
-            </form>
+                {importando
+                  ? "Importando..."
+                  : "Importar CSV"}
+              </button>
+            </div>
           </div>
         </div>
       )}
 
-      {/* ============================================= */}
-      {/* AGREGAR ARTÍCULO */}
-      {/* ============================================= */}
-
       {mostrarModal && (
         <div
           className="modal-overlay"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 999999,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "16px",
+            background:
+              "rgba(15, 23, 42, 0.65)",
+            overflowY: "auto"
+          }}
           onMouseDown={(event) => {
             if (
               event.target ===
@@ -2339,29 +2076,37 @@ const Inventario = () => {
           <div
             className="modal-content"
             style={{
-              maxWidth: "720px",
+              position: "relative",
+              maxWidth: "650px",
               width:
                 "calc(100% - 32px)",
               maxHeight: "90vh",
-              overflowY: "auto"
+              overflowY: "auto",
+              background: "#ffffff",
+              borderRadius: "16px",
+              padding: "24px",
+              boxShadow:
+                "0 24px 70px rgba(15, 23, 42, 0.28)"
             }}
           >
             <div className="modal-header">
               <div>
                 <h2>
-                  Agregar artículo al stock
+                  Agregar artículo
                 </h2>
 
                 <p>
-                  Se agregará directamente
-                  a tu ubicación.
+                  Agrega existencias al
+                  inventario.
                 </p>
               </div>
 
               <button
                 type="button"
                 className="text-button"
-                onClick={cerrarModal}
+                onClick={
+                  cerrarModal
+                }
                 disabled={guardando}
               >
                 <X size={22} />
@@ -2374,418 +2119,163 @@ const Inventario = () => {
               </div>
             )}
 
-            <div
-              style={{
-                display: "flex",
-                gap: "10px",
-                marginBottom: "24px",
-                flexWrap: "wrap"
-              }}
+            <form
+              onSubmit={
+                guardarArticulo
+              }
             >
-              <button
-                type="button"
-                className={
-                  tipoAlta ===
-                  "existente"
-                    ? "primary-button"
-                    : "secondary-button"
-                }
-                onClick={() =>
-                  setTipoAlta(
-                    "existente"
-                  )
-                }
-              >
-                <Package size={18} />
-                Producto existente
-              </button>
+              <div className="form-group">
+                <label>
+                  Producto *
+                </label>
 
-              <button
-                type="button"
-                className={
-                  tipoAlta ===
-                  "nuevo"
-                    ? "primary-button"
-                    : "secondary-button"
-                }
-                onClick={() =>
-                  setTipoAlta("nuevo")
-                }
-              >
-                <PackagePlus
-                  size={18}
+                <select
+                  name="producto_id"
+                  value={
+                    formulario.producto_id
+                  }
+                  onChange={
+                    handleFormulario
+                  }
+                  required
+                >
+                  <option value="">
+                    Selecciona un producto
+                  </option>
+
+                  {productos.map(
+                    (producto) => (
+                      <option
+                        key={
+                          producto.id
+                        }
+                        value={
+                          producto.id
+                        }
+                      >
+                        {producto.nombre}
+                        {producto.sku
+                          ? ` - ${producto.sku}`
+                          : ""}
+                      </option>
+                    )
+                  )}
+                </select>
+              </div>
+
+              {esPrincipal && (
+                <div className="form-group">
+                  <label>
+                    Ubicación
+                  </label>
+
+                  <select
+                    name="ubicacion_id"
+                    value={
+                      formulario.ubicacion_id
+                    }
+                    onChange={
+                      handleFormulario
+                    }
+                  >
+                    <option value="">
+                      Almacén Central
+                    </option>
+
+                    {ubicaciones.map(
+                      (item) => (
+                        <option
+                          key={
+                            item.id
+                          }
+                          value={
+                            item.id
+                          }
+                        >
+                          {
+                            item.nombre
+                          }
+                        </option>
+                      )
+                    )}
+                  </select>
+                </div>
+              )}
+
+              <div className="form-group">
+                <label>
+                  Existencias *
+                </label>
+
+                <input
+                  type="number"
+                  min="0"
+                  step="any"
+                  name="cantidad"
+                  value={
+                    formulario.cantidad
+                  }
+                  onChange={
+                    handleFormulario
+                  }
+                  required
                 />
-                Producto nuevo
-              </button>
-            </div>
+              </div>
 
-            {tipoAlta ===
-              "existente" && (
-              <form
-                onSubmit={
-                  agregarProductoExistente
-                }
+              <div className="form-group">
+                <label>
+                  Motivo
+                </label>
+
+                <textarea
+                  name="motivo"
+                  rows="3"
+                  value={
+                    formulario.motivo
+                  }
+                  onChange={
+                    handleFormulario
+                  }
+                  placeholder="Opcional"
+                />
+              </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent:
+                    "flex-end",
+                  gap: "10px",
+                  marginTop: "24px",
+                  flexWrap: "wrap"
+                }}
               >
-                <div className="form-group">
-                  <label>
-                    Categoría
-                  </label>
-
-                  <select
-                    value={
-                      categoriaProductoExistente
-                    }
-                    onChange={(
-                      event
-                    ) => {
-                      setCategoriaProductoExistente(
-                        event.target
-                          .value
-                      );
-
-                      setProductoExistenteId(
-                        ""
-                      );
-                    }}
-                  >
-                    <option value="">
-                      Todas las categorías
-                    </option>
-
-                    {categoriasParaAlta.map(
-                      (item) => (
-                        <option
-                          key={
-                            item.id
-                          }
-                          value={
-                            item.id
-                          }
-                        >
-                          {
-                            item.nombre
-                          }
-
-                          {item.tipo ===
-                          "privada"
-                            ? " (Privada)"
-                            : ""}
-                        </option>
-                      )
-                    )}
-                  </select>
-                </div>
-
-                <div className="form-group">
-                  <label>
-                    Producto
-                  </label>
-
-                  <select
-                    value={
-                      productoExistenteId
-                    }
-                    onChange={(
-                      event
-                    ) =>
-                      setProductoExistenteId(
-                        event.target
-                          .value
-                      )
-                    }
-                    required
-                  >
-                    <option value="">
-                      Selecciona un producto
-                    </option>
-
-                    {productosDisponibles.map(
-                      (producto) => (
-                        <option
-                          key={
-                            producto.id
-                          }
-                          value={
-                            producto.id
-                          }
-                        >
-                          {
-                            producto.nombre
-                          }
-
-                          {producto.sku
-                            ? ` — ${producto.sku}`
-                            : ""}
-                        </option>
-                      )
-                    )}
-                  </select>
-                </div>
-
-                <div className="form-group">
-                  <label>
-                    Cantidad a agregar
-                  </label>
-
-                  <input
-                    type="number"
-                    min="0.01"
-                    step="any"
-                    value={
-                      cantidadExistente
-                    }
-                    onChange={(
-                      event
-                    ) =>
-                      setCantidadExistente(
-                        event.target
-                          .value
-                      )
-                    }
-                    required
-                  />
-                </div>
-
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent:
-                      "flex-end",
-                    gap: "10px",
-                    marginTop: "24px"
-                  }}
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={
+                    cerrarModal
+                  }
+                  disabled={guardando}
                 >
-                  <button
-                    type="button"
-                    className="secondary-button"
-                    onClick={
-                      cerrarModal
-                    }
-                    disabled={
-                      guardando
-                    }
-                  >
-                    Cancelar
-                  </button>
+                  Cancelar
+                </button>
 
-                  <button
-                    type="submit"
-                    className="primary-button"
-                    disabled={
-                      guardando
-                    }
-                  >
-                    <Plus size={18} />
-
-                    {guardando
-                      ? "Agregando..."
-                      : "Agregar al stock"}
-                  </button>
-                </div>
-              </form>
-            )}
-
-            {tipoAlta === "nuevo" && (
-              <form
-                onSubmit={
-                  agregarProductoNuevo
-                }
-              >
-                <div className="form-group">
-                  <label>
-                    Nombre *
-                  </label>
-
-                  <input
-                    name="nombre"
-                    value={
-                      nuevoProducto.nombre
-                    }
-                    onChange={
-                      handleNuevoProducto
-                    }
-                    required
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>
-                    Descripción
-                  </label>
-
-                  <textarea
-                    name="descripcion"
-                    value={
-                      nuevoProducto
-                        .descripcion
-                    }
-                    onChange={
-                      handleNuevoProducto
-                    }
-                    rows="3"
-                    placeholder="Opcional"
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>
-                    SKU
-                  </label>
-
-                  <input
-                    name="sku"
-                    value={
-                      nuevoProducto.sku
-                    }
-                    onChange={
-                      handleNuevoProducto
-                    }
-                    placeholder="Opcional"
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>
-                    Categoría
-                  </label>
-
-                  <select
-                    name="categoria_id"
-                    value={
-                      nuevoProducto
-                        .categoria_id
-                    }
-                    onChange={
-                      handleNuevoProducto
-                    }
-                  >
-                    <option value="">
-                      Sin categoría
-                    </option>
-
-                    {categoriasParaAlta.map(
-                      (item) => (
-                        <option
-                          key={
-                            item.id
-                          }
-                          value={
-                            item.id
-                          }
-                        >
-                          {
-                            item.nombre
-                          }
-
-                          {item.tipo ===
-                          "privada"
-                            ? " (Privada)"
-                            : ""}
-                        </option>
-                      )
-                    )}
-                  </select>
-                </div>
-
-                <div className="form-group">
-                  <label>
-                    Unidad de medida *
-                  </label>
-
-                  <input
-                    name="unidad_medida"
-                    value={
-                      nuevoProducto
-                        .unidad_medida
-                    }
-                    onChange={
-                      handleNuevoProducto
-                    }
-                    required
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>
-                    Punto de reorden
-                  </label>
-
-                  <input
-                    type="number"
-                    min="0"
-                    step="any"
-                    name="punto_reorden"
-                    value={
-                      nuevoProducto
-                        .punto_reorden
-                    }
-                    onChange={
-                      handleNuevoProducto
-                    }
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>
-                    Cantidad inicial *
-                  </label>
-
-                  <input
-                    type="number"
-                    min="0.01"
-                    step="any"
-                    name="cantidad"
-                    value={
-                      nuevoProducto
-                        .cantidad
-                    }
-                    onChange={
-                      handleNuevoProducto
-                    }
-                    required
-                  />
-                </div>
-
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent:
-                      "flex-end",
-                    gap: "10px",
-                    marginTop: "24px"
-                  }}
+                <button
+                  type="submit"
+                  className="primary-button"
+                  disabled={guardando}
                 >
-                  <button
-                    type="button"
-                    className="secondary-button"
-                    onClick={
-                      cerrarModal
-                    }
-                    disabled={
-                      guardando
-                    }
-                  >
-                    Cancelar
-                  </button>
+                  <PackagePlus
+                    size={18}
+                  />
 
-                  <button
-                    type="submit"
-                    className="primary-button"
-                    disabled={
-                      guardando
-                    }
-                  >
-                    <PackagePlus
-                      size={18}
-                    />
-
-                    {guardando
-                      ? "Creando..."
-                      : "Crear y agregar"}
-                  </button>
-                </div>
-              </form>
-            )}
+                  {guardando
+                    ? "Guardando..."
+                    : "Agregar artículo"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
