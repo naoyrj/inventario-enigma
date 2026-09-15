@@ -820,7 +820,7 @@ const agregarProductoNuevoPropio =
 // COLUMNAS:
 // nombre
 // descripcion (opcional)
-// sku
+// sku (opcional)
 // categoria_id (opcional)
 // unidad_medida
 // punto_reorden
@@ -829,9 +829,10 @@ const agregarProductoNuevoPropio =
 // REGLAS:
 // - Siempre importa al inventario del usuario autenticado.
 // - Nunca acepta ubicacion_id desde el CSV.
-// - Descripción y categoría pueden estar vacías.
-// - Si el SKU ya existe, utiliza ese producto.
-// - Si el SKU no existe, crea el producto.
+// - Descripción, SKU y categoría pueden estar vacíos.
+// - Si se proporciona SKU y ya existe, utiliza ese producto.
+// - Si no se proporciona SKU, genera uno automáticamente.
+// - Si el SKU proporcionado no existe, crea el producto.
 // - Si ya existe en el inventario, suma la cantidad.
 // - Una fila incorrecta no cancela las demás.
 // =========================================================
@@ -890,7 +891,6 @@ const importarInventarioCsv = async (
 
   const columnasObligatorias = [
     "nombre",
-    "sku",
     "unidad_medida",
     "cantidad"
   ];
@@ -953,7 +953,7 @@ const importarInventarioCsv = async (
         fila.descripcion?.trim() || null;
 
       const sku =
-        fila.sku?.trim();
+        fila.sku?.trim() || null;
 
       const categoriaId =
         fila.categoria_id === undefined ||
@@ -979,17 +979,6 @@ const importarInventarioCsv = async (
           sku: sku || null,
           error:
             "El nombre es obligatorio"
-        });
-
-        continue;
-      }
-
-      if (!sku) {
-        resultados.errores.push({
-          fila: numeroFila,
-          sku: null,
-          error:
-            "El SKU es obligatorio"
         });
 
         continue;
@@ -1106,30 +1095,36 @@ const importarInventarioCsv = async (
           }
         }
 
-        const productoExistente =
-          await client.query(
-            `
-              SELECT
-                p.id,
-                p.nombre,
-                p.sku,
-                p.categoria_id,
-                p.activo,
+        let productoExistente = {
+          rows: []
+        };
 
-                c.tipo AS categoria_tipo,
-                c.ubicacion_propietaria_id
+        if (sku) {
+          productoExistente =
+            await client.query(
+              `
+                SELECT
+                  p.id,
+                  p.nombre,
+                  p.sku,
+                  p.categoria_id,
+                  p.activo,
 
-              FROM productos p
+                  c.tipo AS categoria_tipo,
+                  c.ubicacion_propietaria_id
 
-              LEFT JOIN categorias c
-                ON p.categoria_id = c.id
+                FROM productos p
 
-              WHERE LOWER(p.sku) =
-                    LOWER($1)
-              LIMIT 1
-            `,
-            [sku]
-          );
+                LEFT JOIN categorias c
+                  ON p.categoria_id = c.id
+
+                WHERE LOWER(p.sku) =
+                      LOWER($1)
+                LIMIT 1
+              `,
+              [sku]
+            );
+        }
 
         let productoId;
 
@@ -1183,6 +1178,9 @@ const importarInventarioCsv = async (
 
           resultados.productos_existentes++;
         } else {
+          const skuFinal =
+            sku || generarSku();
+
           const productoCreado =
             await client.query(
               `
@@ -1209,7 +1207,7 @@ const importarInventarioCsv = async (
               [
                 nombre,
                 descripcion,
-                sku,
+                skuFinal,
                 categoriaId,
                 unidadMedida,
                 puntoReorden
