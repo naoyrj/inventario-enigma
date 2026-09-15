@@ -1126,16 +1126,11 @@ const Inventario = () => {
               <thead>
                 <tr>
                   <th>Producto</th>
+                  <th>Proveedor</th>
                   <th>Categoría</th>
                   <th>Ubicación</th>
-                  <th>Existencia</th>
-
-                  <th>
-                    Punto reorden
-                  </th>
-
+                  <th>Existencias</th>
                   <th>Estado</th>
-                  <th>Acción</th>
                 </tr>
               </thead>
 
@@ -1165,6 +1160,11 @@ const Inventario = () => {
                         </td>
 
                         <td>
+                          {item.proveedor_nombre ||
+                            "Sin proveedor"}
+                        </td>
+
+                        <td>
                           {item.categoria_nombre ||
                             "Sin categoría"}
                         </td>
@@ -1189,15 +1189,6 @@ const Inventario = () => {
                         </td>
 
                         <td>
-                          {Number(
-                            item.punto_reorden ||
-                              0
-                          ).toLocaleString(
-                            "es-MX"
-                          )}
-                        </td>
-
-                        <td>
                           {bajoStock ? (
                             <span className="status danger">
                               Stock bajo
@@ -1205,31 +1196,6 @@ const Inventario = () => {
                           ) : (
                             <span className="status success">
                               Disponible
-                            </span>
-                          )}
-                        </td>
-
-                        <td>
-                          {puedeAjustar(
-                            item
-                          ) ? (
-                            <button
-                              type="button"
-                              className="table-action"
-                              onClick={() =>
-                                abrirAjuste(
-                                  item
-                                )
-                              }
-                            >
-                              <SlidersHorizontal
-                                size={17}
-                              />
-                              Ajustar
-                            </button>
-                          ) : (
-                            <span className="table-secondary">
-                              Solo lectura
                             </span>
                           )}
                         </td>
