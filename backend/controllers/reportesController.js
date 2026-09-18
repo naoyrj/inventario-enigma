@@ -123,18 +123,10 @@ const getInventario = async (
 
         p.punto_reorden,
 
+        p.proveedor_id,
+
         COALESCE(
-          (
-            SELECT STRING_AGG(
-              DISTINCT pr.nombre,
-              ', ' ORDER BY pr.nombre
-            )
-            FROM proveedor_productos pp
-            INNER JOIN proveedores pr
-              ON pp.proveedor_id = pr.id
-            WHERE pp.producto_id = p.id
-              AND pr.activo = TRUE
-          ),
+          pr.nombre,
           'Sin proveedor'
         ) AS proveedor_nombre,
 
@@ -171,6 +163,10 @@ const getInventario = async (
 
       INNER JOIN productos p
         ON i.producto_id = p.id
+
+      LEFT JOIN proveedores pr
+        ON p.proveedor_id = pr.id
+        AND pr.activo = TRUE
 
       LEFT JOIN categorias c
         ON p.categoria_id = c.id

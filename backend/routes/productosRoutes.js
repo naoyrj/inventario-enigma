@@ -5,7 +5,6 @@ const {
   getProductos,
   getProductoById,
   getImagenProducto,
-  updateImagenProducto,
   createProducto,
   updateProducto,
   deactivateProducto
@@ -128,27 +127,13 @@ router.get(
 // OBTENER IMAGEN DEL PRODUCTO
 //
 // IMPORTANTE:
-// Debe estar antes de "/:id".
+// Esta ruta debe estar antes de "/:id".
 // =========================================================
 
 router.get(
   "/:id/imagen",
   verifyToken,
   getImagenProducto
-);
-
-// =========================================================
-// ACTUALIZAR IMAGEN DEL PRODUCTO
-//
-// Solo procesa multipart/form-data.
-// Campo del archivo: "imagen"
-// =========================================================
-
-router.put(
-  "/:id/imagen",
-  verifyToken,
-  procesarImagen,
-  updateImagenProducto
 );
 
 // =========================================================
@@ -164,7 +149,9 @@ router.get(
 // =========================================================
 // CREAR PRODUCTO
 //
-// Permite imagen opcional durante la creación.
+// Acepta:
+// multipart/form-data
+// Campo del archivo: "imagen"
 // =========================================================
 
 router.post(
@@ -175,16 +162,18 @@ router.post(
 );
 
 // =========================================================
-// ACTUALIZAR DATOS DEL PRODUCTO
+// ACTUALIZAR PRODUCTO
 //
-// Este endpoint trabaja con JSON.
-// Proveedor, categoría y demás especificaciones se actualizan
-// independientemente de la imagen.
+// Acepta:
+// multipart/form-data
+// Campo del archivo: "imagen"
+// Si no se envía imagen, conserva la imagen existente.
 // =========================================================
 
 router.put(
   "/:id",
   verifyToken,
+  procesarImagen,
   updateProducto
 );
 

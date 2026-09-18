@@ -85,7 +85,7 @@ const puedeUsarCategoriaParaAlta = (
   req
 ) => {
   if (!categoria) {
-    return true;
+    return esPrincipal(req);
   }
 
   if (
@@ -155,6 +155,32 @@ const getInventario = async (req, res) => {
           p.sku,
           p.unidad_medida,
           p.punto_reorden,
+
+          (
+            SELECT pp.proveedor_id
+            FROM proveedor_productos pp
+            INNER JOIN proveedores pr
+              ON pr.id = pp.proveedor_id
+            WHERE pp.producto_id = p.id
+              AND pr.activo = TRUE
+            ORDER BY pr.nombre
+            LIMIT 1
+          ) AS proveedor_id,
+
+          COALESCE(
+            (
+              SELECT STRING_AGG(
+                DISTINCT pr.nombre,
+                ', ' ORDER BY pr.nombre
+              )
+              FROM proveedor_productos pp
+              INNER JOIN proveedores pr
+                ON pr.id = pp.proveedor_id
+              WHERE pp.producto_id = p.id
+                AND pr.activo = TRUE
+            ),
+            'Sin proveedor'
+          ) AS proveedor_nombre,
 
           p.categoria_id,
           c.nombre AS categoria_nombre,
@@ -276,6 +302,32 @@ const getInventarioByUbicacion = async (
           p.sku,
           p.unidad_medida,
           p.punto_reorden,
+
+          (
+            SELECT pp.proveedor_id
+            FROM proveedor_productos pp
+            INNER JOIN proveedores pr
+              ON pr.id = pp.proveedor_id
+            WHERE pp.producto_id = p.id
+              AND pr.activo = TRUE
+            ORDER BY pr.nombre
+            LIMIT 1
+          ) AS proveedor_id,
+
+          COALESCE(
+            (
+              SELECT STRING_AGG(
+                DISTINCT pr.nombre,
+                ', ' ORDER BY pr.nombre
+              )
+              FROM proveedor_productos pp
+              INNER JOIN proveedores pr
+                ON pr.id = pp.proveedor_id
+              WHERE pp.producto_id = p.id
+                AND pr.activo = TRUE
+            ),
+            'Sin proveedor'
+          ) AS proveedor_nombre,
 
           p.categoria_id,
           c.nombre AS categoria_nombre,
@@ -500,13 +552,11 @@ const agregarProductoExistentePropio =
       const producto =
         productoResult.rows[0];
 
-      const categoria = producto.categoria_id
-        ? {
-            tipo: producto.categoria_tipo,
-            ubicacion_propietaria_id:
-              producto.ubicacion_propietaria_id
-          }
-        : null;
+      const categoria = {
+        tipo: producto.categoria_tipo,
+        ubicacion_propietaria_id:
+          producto.ubicacion_propietaria_id
+      };
 
       if (
         !puedeUsarCategoriaParaAlta(
@@ -585,7 +635,6 @@ const agregarProductoExistentePropio =
 
 // =========================================================
 // CREAR PRODUCTO NUEVO + STOCK
-// DESCRIPCIÓN Y CATEGORÍA SON OPCIONALES
 // =========================================================
 
 const agregarProductoNuevoPropio =
@@ -613,6 +662,13 @@ const agregarProductoNuevoPropio =
         return res.status(400).json({
           message:
             "El nombre del producto es obligatorio"
+        });
+      }
+
+      if (!categoria_id) {
+        return res.status(400).json({
+          message:
+            "La categoría es obligatoria"
         });
       }
 
@@ -656,66 +712,42 @@ const agregarProductoNuevoPropio =
         });
       }
 
-      let categoria = null;
-      let categoriaIdFinal = null;
+      const categoriaResult =
+        await client.query(
+          `
+            SELECT
+              id,
+              nombre,
+              tipo,
+              ubicacion_propietaria_id,
+              activo
+            FROM categorias
+            WHERE id = $1
+              AND activo = TRUE
+          `,
+          [categoria_id]
+        );
+
+      if (!categoriaResult.rows.length) {
+        return res.status(404).json({
+          message:
+            "La categoría no existe o está inactiva"
+        });
+      }
+
+      const categoria =
+        categoriaResult.rows[0];
 
       if (
-        categoria_id !== undefined &&
-        categoria_id !== null &&
-        categoria_id !== ""
+        !puedeUsarCategoriaParaAlta(
+          categoria,
+          req
+        )
       ) {
-        categoriaIdFinal =
-          Number(categoria_id);
-
-        if (
-          !Number.isInteger(
-            categoriaIdFinal
-          ) ||
-          categoriaIdFinal <= 0
-        ) {
-          return res.status(400).json({
-            message:
-              "La categoría seleccionada no es válida"
-          });
-        }
-
-        const categoriaResult =
-          await client.query(
-            `
-              SELECT
-                id,
-                nombre,
-                tipo,
-                ubicacion_propietaria_id,
-                activo
-              FROM categorias
-              WHERE id = $1
-                AND activo = TRUE
-            `,
-            [categoriaIdFinal]
-          );
-
-        if (!categoriaResult.rows.length) {
-          return res.status(404).json({
-            message:
-              "La categoría no existe o está inactiva"
-          });
-        }
-
-        categoria =
-          categoriaResult.rows[0];
-
-        if (
-          !puedeUsarCategoriaParaAlta(
-            categoria,
-            req
-          )
-        ) {
-          return res.status(403).json({
-            message:
-              "No tienes permiso para utilizar esta categoría"
-          });
-        }
+        return res.status(403).json({
+          message:
+            "No tienes permiso para utilizar esta categoría"
+        });
       }
 
       const skuFinal =
@@ -750,7 +782,7 @@ const agregarProductoNuevoPropio =
             nombre.trim(),
             descripcion?.trim() || null,
             skuFinal,
-            categoriaIdFinal,
+            Number(categoria_id),
             unidad_medida.trim(),
             puntoReorden
           ]
@@ -819,9 +851,9 @@ const agregarProductoNuevoPropio =
 //
 // COLUMNAS:
 // nombre
-// descripcion (opcional)
-// sku (opcional)
-// categoria_id (opcional)
+// descripcion
+// sku
+// categoria_id
 // unidad_medida
 // punto_reorden
 // cantidad
@@ -829,10 +861,8 @@ const agregarProductoNuevoPropio =
 // REGLAS:
 // - Siempre importa al inventario del usuario autenticado.
 // - Nunca acepta ubicacion_id desde el CSV.
-// - Descripción, SKU y categoría pueden estar vacíos.
-// - Si se proporciona SKU y ya existe, utiliza ese producto.
-// - Si no se proporciona SKU, genera uno automáticamente.
-// - Si el SKU proporcionado no existe, crea el producto.
+// - Si el SKU ya existe, utiliza ese producto.
+// - Si el SKU no existe, crea el producto.
 // - Si ya existe en el inventario, suma la cantidad.
 // - Una fila incorrecta no cancela las demás.
 // =========================================================
@@ -891,6 +921,8 @@ const importarInventarioCsv = async (
 
   const columnasObligatorias = [
     "nombre",
+    "sku",
+    "categoria_id",
     "unidad_medida",
     "cantidad"
   ];
@@ -953,13 +985,10 @@ const importarInventarioCsv = async (
         fila.descripcion?.trim() || null;
 
       const sku =
-        fila.sku?.trim() || null;
+        fila.sku?.trim();
 
       const categoriaId =
-        fila.categoria_id === undefined ||
-        fila.categoria_id === ""
-          ? null
-          : Number(fila.categoria_id);
+        Number(fila.categoria_id);
 
       const unidadMedida =
         fila.unidad_medida?.trim();
@@ -984,18 +1013,26 @@ const importarInventarioCsv = async (
         continue;
       }
 
+      if (!sku) {
+        resultados.errores.push({
+          fila: numeroFila,
+          sku: null,
+          error:
+            "El SKU es obligatorio"
+        });
+
+        continue;
+      }
+
       if (
-        categoriaId !== null &&
-        (
-          !Number.isInteger(categoriaId) ||
-          categoriaId <= 0
-        )
+        !Number.isInteger(categoriaId) ||
+        categoriaId <= 0
       ) {
         resultados.errores.push({
           fila: numeroFila,
           sku,
           error:
-            "categoria_id debe ser un número válido o estar vacío"
+            "categoria_id debe ser un número válido"
         });
 
         continue;
@@ -1043,88 +1080,80 @@ const importarInventarioCsv = async (
       try {
         await client.query("BEGIN");
 
-        if (categoriaId !== null) {
-          const categoriaResult =
-            await client.query(
-              `
-                SELECT
-                  id,
-                  nombre,
-                  tipo,
-                  ubicacion_propietaria_id,
-                  activo
-                FROM categorias
-                WHERE id = $1
-                  AND activo = TRUE
-              `,
-              [categoriaId]
-            );
+        const categoriaResult =
+          await client.query(
+            `
+              SELECT
+                id,
+                nombre,
+                tipo,
+                ubicacion_propietaria_id,
+                activo
+              FROM categorias
+              WHERE id = $1
+                AND activo = TRUE
+            `,
+            [categoriaId]
+          );
 
-          if (!categoriaResult.rows.length) {
-            await client.query("ROLLBACK");
+        if (!categoriaResult.rows.length) {
+          await client.query("ROLLBACK");
 
-            resultados.errores.push({
-              fila: numeroFila,
-              sku,
-              error:
-                "La categoría no existe o está inactiva"
-            });
+          resultados.errores.push({
+            fila: numeroFila,
+            sku,
+            error:
+              "La categoría no existe o está inactiva"
+          });
 
-            continue;
-          }
-
-          const categoria =
-            categoriaResult.rows[0];
-
-          if (
-            !puedeUsarCategoriaParaAlta(
-              categoria,
-              req
-            )
-          ) {
-            await client.query("ROLLBACK");
-
-            resultados.errores.push({
-              fila: numeroFila,
-              sku,
-              error:
-                "No tienes permiso para utilizar esta categoría"
-            });
-
-            continue;
-          }
+          continue;
         }
 
-        let productoExistente = {
-          rows: []
-        };
+        const categoria =
+          categoriaResult.rows[0];
 
-        if (sku) {
-          productoExistente =
-            await client.query(
-              `
-                SELECT
-                  p.id,
-                  p.nombre,
-                  p.sku,
-                  p.categoria_id,
-                  p.activo,
+        if (
+          !puedeUsarCategoriaParaAlta(
+            categoria,
+            req
+          )
+        ) {
+          await client.query("ROLLBACK");
 
-                  c.tipo AS categoria_tipo,
-                  c.ubicacion_propietaria_id
+          resultados.errores.push({
+            fila: numeroFila,
+            sku,
+            error:
+              "No tienes permiso para utilizar esta categoría"
+          });
 
-                FROM productos p
-
-                LEFT JOIN categorias c
-                  ON p.categoria_id = c.id
-
-                WHERE LOWER(p.sku) =
-                      LOWER($1)
-                LIMIT 1
-              `,
-              [sku]
-            );
+          continue;
         }
+
+        const productoExistente =
+          await client.query(
+            `
+              SELECT
+                p.id,
+                p.nombre,
+                p.sku,
+                p.categoria_id,
+                p.activo,
+
+                c.tipo AS categoria_tipo,
+                c.ubicacion_propietaria_id
+
+              FROM productos p
+
+              LEFT JOIN categorias c
+                ON p.categoria_id = c.id
+
+              WHERE LOWER(p.sku) =
+                    LOWER($1)
+              LIMIT 1
+            `,
+            [sku]
+          );
 
         let productoId;
 
@@ -1145,15 +1174,12 @@ const importarInventarioCsv = async (
             continue;
           }
 
-          const categoriaProducto =
-            producto.categoria_id
-              ? {
-                  tipo:
-                    producto.categoria_tipo,
-                  ubicacion_propietaria_id:
-                    producto.ubicacion_propietaria_id
-                }
-              : null;
+          const categoriaProducto = {
+            tipo:
+              producto.categoria_tipo,
+            ubicacion_propietaria_id:
+              producto.ubicacion_propietaria_id
+          };
 
           if (
             !puedeUsarCategoriaParaAlta(
@@ -1178,9 +1204,6 @@ const importarInventarioCsv = async (
 
           resultados.productos_existentes++;
         } else {
-          const skuFinal =
-            sku || generarSku();
-
           const productoCreado =
             await client.query(
               `
@@ -1207,7 +1230,7 @@ const importarInventarioCsv = async (
               [
                 nombre,
                 descripcion,
-                skuFinal,
+                sku,
                 categoriaId,
                 unidadMedida,
                 puntoReorden
