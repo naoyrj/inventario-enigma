@@ -17,7 +17,8 @@ import {
   Upload,
   FileText,
   Eye,
-  Save
+  Save,
+  Pencil
 } from "lucide-react";
 
 import api from "../services/api";
@@ -33,6 +34,8 @@ const Inventario = () => {
   const [loading, setLoading] = useState(true);
   const [guardando, setGuardando] = useState(false);
   const [importando, setImportando] = useState(false);
+  const [cargandoDetalle, setCargandoDetalle] = useState(false);
+
   const [error, setError] = useState("");
   const [mensaje, setMensaje] = useState("");
 
@@ -45,13 +48,23 @@ const Inventario = () => {
   const [mostrarImportacion, setMostrarImportacion] = useState(false);
   const [mostrarDetalle, setMostrarDetalle] = useState(false);
 
-  const [cargandoDetalle, setCargandoDetalle] = useState(false);
   const [articuloDetalle, setArticuloDetalle] = useState(null);
+  const [editandoDetalle, setEditandoDetalle] = useState(false);
 
   const [archivoCsv, setArchivoCsv] = useState(null);
-  const [resultadoImportacion, setResultadoImportacion] = useState(null);
+  const [resultadoImportacion, setResultadoImportacion] =
+    useState(null);
+
+  const [imagenDetalleUrl, setImagenDetalleUrl] = useState("");
+  const [archivoImagenDetalle, setArchivoImagenDetalle] =
+    useState(null);
+  const [previewImagenDetalle, setPreviewImagenDetalle] =
+    useState("");
+  const [tieneImagenDetalle, setTieneImagenDetalle] =
+    useState(false);
 
   const inputArchivoRef = useRef(null);
+  const inputImagenDetalleRef = useRef(null);
 
   const [formulario, setFormulario] = useState({
     producto_id: "",
@@ -66,6 +79,7 @@ const Inventario = () => {
     existencias: "",
     punto_reorden: "",
     proveedor_id: "",
+    categoria_id: "",
     sku: "",
     unidad_medida: ""
   });
@@ -76,11 +90,13 @@ const Inventario = () => {
     existencias: "",
     punto_reorden: "",
     proveedor_id: "",
+    categoria_id: "",
     sku: "",
     unidad_medida: ""
   });
 
-  const [motivoExistencias, setMotivoExistencias] = useState("");
+  const [motivoExistencias, setMotivoExistencias] =
+    useState("");
 
   const usuario = useMemo(() => {
     try {
@@ -91,11 +107,6 @@ const Inventario = () => {
     }
   }, []);
 
-  const ubicacionUsuario =
-    usuario?.ubicacion ||
-    usuario?.ubicacion_nombre ||
-    "";
-
   const tipoUbicacion =
     usuario?.tipo_ubicacion ||
     usuario?.ubicacion_tipo ||
@@ -105,38 +116,6 @@ const Inventario = () => {
     tipoUbicacion === "principal" ||
     usuario?.es_principal === true ||
     usuario?.es_principal === 1;
-
-  const obtenerProveedorId = (producto) => {
-    if (!producto) {
-      return "";
-    }
-
-    if (producto.proveedor_id) {
-      return String(producto.proveedor_id);
-    }
-
-    if (
-      Array.isArray(producto.proveedores) &&
-      producto.proveedores.length > 0
-    ) {
-      const proveedor = producto.proveedores[0];
-
-      return String(
-        proveedor?.id ||
-        proveedor?.proveedor_id ||
-        ""
-      );
-    }
-
-    if (
-      Array.isArray(producto.proveedor_ids) &&
-      producto.proveedor_ids.length > 0
-    ) {
-      return String(producto.proveedor_ids[0]);
-    }
-
-    return "";
-  };
 
   const normalizarInventario = (respuesta) => {
     if (Array.isArray(respuesta)) {
@@ -176,31 +155,99 @@ const Inventario = () => {
     return [];
   };
 
-  const cargarInventario = async () => {
-    try {
-      let response;
-
-      if (esPrincipal) {
-        response = await api.get(
-          "/reportes/inventario"
-        );
-      } else {
-        response = await api.get(
-          "/inventario"
-        );
-      }
-
-      setInventario(
-        normalizarInventario(response.data)
-      );
-    } catch (err) {
-      console.error(
-        "Error al cargar inventario:",
-        err
-      );
-
-      throw err;
+  const obtenerProveedorId = (producto) => {
+    if (!producto) {
+      return "";
     }
+
+    if (producto.proveedor_id) {
+      return String(producto.proveedor_id);
+    }
+
+    if (
+      Array.isArray(producto.proveedores) &&
+      producto.proveedores.length > 0
+    ) {
+      const proveedor = producto.proveedores[0];
+
+      return String(
+        proveedor?.id ||
+          proveedor?.proveedor_id ||
+          ""
+      );
+    }
+
+    if (
+      Array.isArray(producto.proveedor_ids) &&
+      producto.proveedor_ids.length > 0
+    ) {
+      return String(producto.proveedor_ids[0]);
+    }
+
+    return "";
+  };
+
+  const obtenerCategoriaId = (producto) => {
+    if (!producto) {
+      return "";
+    }
+
+    return String(
+      producto.categoria_id ||
+        producto.categoria?.id ||
+        ""
+    );
+  };
+
+  const obtenerNombreProveedor = (
+    proveedorId
+  ) => {
+    if (!proveedorId) {
+      return "Sin proveedor";
+    }
+
+    const proveedor = proveedores.find(
+      (item) =>
+        Number(item.id) === Number(proveedorId)
+    );
+
+    return proveedor?.nombre || "Sin proveedor";
+  };
+
+  const obtenerNombreCategoria = (
+    categoriaId
+  ) => {
+    if (!categoriaId) {
+      return "Sin categoría";
+    }
+
+    const categoriaEncontrada =
+      categorias.find(
+        (item) =>
+          Number(item.id) ===
+          Number(categoriaId)
+      );
+
+    return (
+      categoriaEncontrada?.nombre ||
+      "Sin categoría"
+    );
+  };
+
+  const cargarInventario = async () => {
+    let response;
+
+    if (esPrincipal) {
+      response = await api.get(
+        "/reportes/inventario"
+      );
+    } else {
+      response = await api.get("/inventario");
+    }
+
+    setInventario(
+      normalizarInventario(response.data)
+    );
   };
 
   const cargarCategorias = async () => {
@@ -304,10 +351,15 @@ const Inventario = () => {
         cargarProveedores()
       ]);
     } catch (err) {
+      console.error(
+        "Error al cargar inventario:",
+        err
+      );
+
       setError(
         err.response?.data?.message ||
-        err.response?.data?.mensaje ||
-        "No fue posible cargar el inventario."
+          err.response?.data?.mensaje ||
+          "No fue posible cargar el inventario."
       );
     } finally {
       setLoading(false);
@@ -318,6 +370,31 @@ const Inventario = () => {
     cargarDatos();
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (
+        imagenDetalleUrl &&
+        imagenDetalleUrl.startsWith("blob:")
+      ) {
+        URL.revokeObjectURL(
+          imagenDetalleUrl
+        );
+      }
+
+      if (
+        previewImagenDetalle &&
+        previewImagenDetalle.startsWith("blob:")
+      ) {
+        URL.revokeObjectURL(
+          previewImagenDetalle
+        );
+      }
+    };
+  }, [
+    imagenDetalleUrl,
+    previewImagenDetalle
+  ]);
+
   const inventarioFiltrado = useMemo(() => {
     const termino =
       busqueda.trim().toLowerCase();
@@ -325,8 +402,8 @@ const Inventario = () => {
     return inventario.filter((item) => {
       const nombre = String(
         item.producto_nombre ||
-        item.nombre ||
-        ""
+          item.nombre ||
+          ""
       ).toLowerCase();
 
       const sku = String(
@@ -335,8 +412,8 @@ const Inventario = () => {
 
       const proveedor = String(
         item.proveedor_nombre ||
-        item.proveedor ||
-        ""
+          item.proveedor ||
+          ""
       ).toLowerCase();
 
       const coincideBusqueda =
@@ -348,17 +425,19 @@ const Inventario = () => {
       const coincideCategoria =
         !categoria ||
         String(item.categoria_id) ===
-        String(categoria);
+          String(categoria);
 
       const coincideUbicacion =
         !ubicacion ||
         String(item.ubicacion_id) ===
-        String(ubicacion);
+          String(ubicacion);
 
       const stockBajo =
         Number(item.stock_bajo) === 1 ||
         Number(item.cantidad || 0) <=
-        Number(item.punto_reorden || 0);
+          Number(
+            item.punto_reorden || 0
+          );
 
       const coincideStock =
         !soloBajoStock || stockBajo;
@@ -393,7 +472,9 @@ const Inventario = () => {
       (item) =>
         Number(item.stock_bajo) === 1 ||
         Number(item.cantidad || 0) <=
-        Number(item.punto_reorden || 0)
+          Number(
+            item.punto_reorden || 0
+          )
     ).length;
 
   const limpiarFiltros = () => {
@@ -470,13 +551,17 @@ const Inventario = () => {
     try {
       const payload = {
         producto_id:
-          Number(formulario.producto_id),
+          Number(
+            formulario.producto_id
+          ),
         cantidad
       };
 
       if (formulario.ubicacion_id) {
         payload.ubicacion_id =
-          Number(formulario.ubicacion_id);
+          Number(
+            formulario.ubicacion_id
+          );
       }
 
       if (formulario.motivo.trim()) {
@@ -504,8 +589,8 @@ const Inventario = () => {
 
       setError(
         err.response?.data?.message ||
-        err.response?.data?.mensaje ||
-        "No fue posible agregar el artículo."
+          err.response?.data?.mensaje ||
+          "No fue posible agregar el artículo."
       );
     } finally {
       setGuardando(false);
@@ -540,7 +625,8 @@ const Inventario = () => {
     event
   ) => {
     const archivo =
-      event.target.files?.[0] || null;
+      event.target.files?.[0] ||
+      null;
 
     setArchivoCsv(archivo);
     setResultadoImportacion(null);
@@ -562,7 +648,8 @@ const Inventario = () => {
     setResultadoImportacion(null);
 
     try {
-      const formData = new FormData();
+      const formData =
+        new FormData();
 
       formData.append(
         "archivo",
@@ -571,13 +658,7 @@ const Inventario = () => {
 
       const response = await api.post(
         "/inventario/importar-csv",
-        formData,
-        {
-          headers: {
-            "Content-Type":
-              "multipart/form-data"
-          }
-        }
+        formData
       );
 
       setResultadoImportacion(
@@ -586,8 +667,8 @@ const Inventario = () => {
 
       setMensaje(
         response.data?.message ||
-        response.data?.mensaje ||
-        "Archivo procesado correctamente."
+          response.data?.mensaje ||
+          "Archivo procesado correctamente."
       );
 
       await Promise.all([
@@ -602,8 +683,8 @@ const Inventario = () => {
 
       setError(
         err.response?.data?.message ||
-        err.response?.data?.mensaje ||
-        "No fue posible importar el archivo CSV."
+          err.response?.data?.mensaje ||
+          "No fue posible importar el archivo CSV."
       );
 
       if (err.response?.data) {
@@ -616,19 +697,159 @@ const Inventario = () => {
     }
   };
 
-  const abrirDetalle = (item) => {
-    /*
-      IMPORTANTE:
-      El modal se abre inmediatamente.
-      La consulta al backend se realiza después.
-      De esta forma el botón Ver nunca depende
-      de que la petición HTTP termine.
-    */
+  const liberarUrlImagen = (url) => {
+    if (
+      url &&
+      url.startsWith("blob:")
+    ) {
+      URL.revokeObjectURL(url);
+    }
+  };
 
+  const limpiarSeleccionImagen = () => {
+    setArchivoImagenDetalle(null);
+
+    setPreviewImagenDetalle(
+      (urlActual) => {
+        liberarUrlImagen(urlActual);
+        return "";
+      }
+    );
+
+    if (inputImagenDetalleRef.current) {
+      inputImagenDetalleRef.current.value =
+        "";
+    }
+  };
+
+  const limpiarImagenActual = () => {
+    setImagenDetalleUrl(
+      (urlActual) => {
+        liberarUrlImagen(urlActual);
+        return "";
+      }
+    );
+
+    setTieneImagenDetalle(false);
+  };
+
+  const cargarImagenProducto = async (
+    productoId,
+    tieneImagen
+  ) => {
+    limpiarImagenActual();
+
+    if (!tieneImagen) {
+      return;
+    }
+
+    setTieneImagenDetalle(true);
+
+    try {
+      const response = await api.get(
+        `/productos/${productoId}/imagen`,
+        {
+          responseType: "blob"
+        }
+      );
+
+      const url =
+        URL.createObjectURL(
+          response.data
+        );
+
+      setImagenDetalleUrl(url);
+    } catch (err) {
+      console.error(
+        "No fue posible cargar la imagen del producto:",
+        err
+      );
+
+      setTieneImagenDetalle(false);
+    }
+  };
+
+  const seleccionarImagenDetalle = (
+    event
+  ) => {
+    const archivo =
+      event.target.files?.[0] ||
+      null;
+
+    setError("");
+    setMensaje("");
+
+    if (!archivo) {
+      limpiarSeleccionImagen();
+      return;
+    }
+
+    const tiposPermitidos = [
+      "image/png",
+      "image/jpeg"
+    ];
+
+    if (
+      !tiposPermitidos.includes(
+        archivo.type
+      )
+    ) {
+      setError(
+        "Formato de imagen no permitido. Solo se aceptan PNG, JPG y JPEG."
+      );
+
+      if (
+        inputImagenDetalleRef.current
+      ) {
+        inputImagenDetalleRef.current.value =
+          "";
+      }
+
+      return;
+    }
+
+    if (
+      archivo.size >
+      5 * 1024 * 1024
+    ) {
+      setError(
+        "La imagen no puede superar los 5 MB."
+      );
+
+      if (
+        inputImagenDetalleRef.current
+      ) {
+        inputImagenDetalleRef.current.value =
+          "";
+      }
+
+      return;
+    }
+
+    setArchivoImagenDetalle(
+      archivo
+    );
+
+    setPreviewImagenDetalle(
+      (urlActual) => {
+        liberarUrlImagen(urlActual);
+
+        return URL.createObjectURL(
+          archivo
+        );
+      }
+    );
+  };
+
+  const abrirDetalle = (item) => {
     setError("");
     setMensaje("");
     setArticuloDetalle(item);
     setMotivoExistencias("");
+    setEditandoDetalle(false);
+
+    limpiarSeleccionImagen();
+    limpiarImagenActual();
 
     const productoLocal =
       productos.find(
@@ -657,8 +878,8 @@ const Inventario = () => {
       punto_reorden:
         String(
           productoLocal.punto_reorden ??
-          item.punto_reorden ??
-          0
+            item.punto_reorden ??
+            0
         ),
 
       proveedor_id:
@@ -666,6 +887,14 @@ const Inventario = () => {
           productoLocal
         ) ||
         obtenerProveedorId(item),
+
+      categoria_id:
+        obtenerCategoriaId(
+          productoLocal
+        ) ||
+        String(
+          item.categoria_id || ""
+        ),
 
       sku:
         productoLocal.sku ||
@@ -686,92 +915,92 @@ const Inventario = () => {
       datosIniciales
     );
 
-    /*
-      Esta línea abre la ventana antes de
-      cualquier petición al servidor.
-    */
     setMostrarDetalle(true);
 
-    /*
-      Después actualizamos los datos con
-      la información completa del producto.
-    */
     cargarDetalleProducto(
       item,
       datosIniciales
     );
   };
 
-  const cargarDetalleProducto = async (
-    item,
-    datosIniciales
-  ) => {
-    setCargandoDetalle(true);
+  const cargarDetalleProducto =
+    async (
+      item,
+      datosIniciales
+    ) => {
+      setCargandoDetalle(true);
 
-    try {
-      const response =
-        await api.get(
-          `/productos/${item.producto_id}`
+      try {
+        const response =
+          await api.get(
+            `/productos/${item.producto_id}`
+          );
+
+        const producto =
+          response.data?.producto ||
+          response.data ||
+          {};
+
+        const datosFormulario = {
+          nombre:
+            producto.nombre ||
+            datosIniciales.nombre,
+
+          descripcion:
+            producto.descripcion ??
+            datosIniciales.descripcion,
+
+          existencias:
+            datosIniciales.existencias,
+
+          punto_reorden:
+            String(
+              producto.punto_reorden ??
+                datosIniciales.punto_reorden
+            ),
+
+          proveedor_id:
+            obtenerProveedorId(
+              producto
+            ) ||
+            datosIniciales.proveedor_id,
+
+          categoria_id:
+            obtenerCategoriaId(
+              producto
+            ) ||
+            datosIniciales.categoria_id,
+
+          sku:
+            producto.sku ||
+            datosIniciales.sku,
+
+          unidad_medida:
+            producto.unidad_medida ||
+            datosIniciales.unidad_medida
+        };
+
+        setFormularioDetalle(
+          datosFormulario
         );
 
-      const producto =
-        response.data?.producto ||
-        response.data ||
-        {};
+        setDetalleOriginal(
+          datosFormulario
+        );
 
-      const datosFormulario = {
-        nombre:
-          producto.nombre ||
-          datosIniciales.nombre,
-
-        descripcion:
-          producto.descripcion ??
-          datosIniciales.descripcion,
-
-        existencias:
-          datosIniciales.existencias,
-
-        punto_reorden:
-          String(
-            producto.punto_reorden ??
-            datosIniciales.punto_reorden
-          ),
-
-        proveedor_id:
-          obtenerProveedorId(
-            producto
-          ) ||
-          datosIniciales.proveedor_id,
-
-        sku:
-          producto.sku ||
-          datosIniciales.sku,
-
-        unidad_medida:
-          producto.unidad_medida ||
-          datosIniciales.unidad_medida
-      };
-
-      setFormularioDetalle(
-        datosFormulario
-      );
-
-      setDetalleOriginal(
-        datosFormulario
-      );
-    } catch (err) {
-      /*
-        Si falla la consulta, el modal permanece
-        abierto con la información del inventario.
-      */
-      console.error(
-        "No fue posible obtener el detalle completo del producto:",
-        err
-      );
-    } finally {
-      setCargandoDetalle(false);
-    }
-  };
+        await cargarImagenProducto(
+          item.producto_id,
+          producto.tiene_imagen
+        );
+      } catch (err) {
+        console.error(
+          "No fue posible obtener el detalle completo del producto:",
+          err
+        );
+      } finally {
+        setCargandoDetalle(false);
+      }
+    };
 
   const cerrarDetalle = () => {
     if (guardando) {
@@ -780,8 +1009,38 @@ const Inventario = () => {
 
     setMostrarDetalle(false);
     setArticuloDetalle(null);
+    setEditandoDetalle(false);
     setMotivoExistencias("");
+    limpiarSeleccionImagen();
+    limpiarImagenActual();
     setError("");
+    setMensaje("");
+  };
+
+  const activarEdicionDetalle = () => {
+    setError("");
+    setMensaje("");
+    setMotivoExistencias("");
+
+    setDetalleOriginal({
+      ...formularioDetalle
+    });
+
+    limpiarSeleccionImagen();
+
+    setEditandoDetalle(true);
+  };
+
+  const cancelarEdicionDetalle = () => {
+    setFormularioDetalle({
+      ...detalleOriginal
+    });
+
+    setMotivoExistencias("");
+    limpiarSeleccionImagen();
+    setError("");
+    setMensaje("");
+    setEditandoDetalle(false);
   };
 
   const handleDetalle = (event) => {
@@ -798,14 +1057,6 @@ const Inventario = () => {
     );
   };
 
-  const existenciasCambiaron =
-    Number(
-      formularioDetalle.existencias
-    ) !==
-    Number(
-      detalleOriginal.existencias
-    );
-
   const guardarDetalle = async (
     event
   ) => {
@@ -817,37 +1068,39 @@ const Inventario = () => {
     const nombre =
       formularioDetalle.nombre.trim();
 
+    const existencias = Number(
+      formularioDetalle.existencias
+    );
+
+    const puntoReorden = Number(
+      formularioDetalle.punto_reorden
+    );
+
     const unidadMedida =
       formularioDetalle.unidad_medida.trim();
 
-    const existencias =
+    const existenciasOriginales =
       Number(
-        formularioDetalle.existencias
+        detalleOriginal.existencias
       );
 
-    const puntoReorden =
-      formularioDetalle.punto_reorden ===
-      ""
-        ? 0
-        : Number(
-            formularioDetalle.punto_reorden
-          );
+    const existenciasCambiaron =
+      existencias !==
+      existenciasOriginales;
 
     if (!nombre) {
       setError(
-        "El nombre es obligatorio."
+        "El nombre del producto es obligatorio."
       );
       return;
     }
 
     if (
-      formularioDetalle.existencias ===
-      "" ||
       Number.isNaN(existencias) ||
       existencias < 0
     ) {
       setError(
-        "Las existencias son obligatorias y deben ser un número válido."
+        "Las existencias deben ser un número válido mayor o igual a cero."
       );
       return;
     }
@@ -879,7 +1132,9 @@ const Inventario = () => {
       return;
     }
 
-    if (!articuloDetalle?.producto_id) {
+    if (
+      !articuloDetalle?.producto_id
+    ) {
       setError(
         "No se encontró el producto seleccionado."
       );
@@ -896,23 +1151,40 @@ const Inventario = () => {
             )
           : null;
 
+      const categoriaId =
+        formularioDetalle.categoria_id
+          ? Number(
+              formularioDetalle.categoria_id
+            )
+          : null;
+
       const payloadProducto = {
         nombre,
+
         descripcion:
           formularioDetalle.descripcion.trim(),
+
         punto_reorden:
           puntoReorden,
+
         sku:
           formularioDetalle.sku.trim() ||
           null,
+
         unidad_medida:
           unidadMedida,
+
         proveedor_id:
           proveedorId,
+
         proveedor_ids:
           proveedorId
             ? [proveedorId]
             : [],
+
+        categoria_id:
+          categoriaId,
+
         activo: true
       };
 
@@ -922,19 +1194,15 @@ const Inventario = () => {
       );
 
       if (existenciasCambiaron) {
-        const diferencia =
-          existencias -
-          Number(
-            detalleOriginal.existencias
-          );
-
         const payloadAjuste = {
           producto_id:
             Number(
               articuloDetalle.producto_id
             ),
-          cantidad:
-            diferencia,
+
+          cantidad_nueva:
+            existencias,
+
           motivo:
             motivoExistencias.trim()
         };
@@ -954,13 +1222,68 @@ const Inventario = () => {
         );
       }
 
+      if (archivoImagenDetalle) {
+        const formDataImagen =
+          new FormData();
+
+        formDataImagen.append(
+          "imagen",
+          archivoImagenDetalle
+        );
+
+        await api.put(
+          `/productos/${articuloDetalle.producto_id}/imagen`,
+          formDataImagen
+        );
+      }
+
+      const datosGuardados = {
+        ...formularioDetalle,
+
+        nombre,
+
+        descripcion:
+          formularioDetalle.descripcion.trim(),
+
+        existencias:
+          String(existencias),
+
+        punto_reorden:
+          String(puntoReorden),
+
+        proveedor_id:
+          proveedorId
+            ? String(proveedorId)
+            : "",
+
+        categoria_id:
+          categoriaId
+            ? String(categoriaId)
+            : "",
+
+        sku:
+          formularioDetalle.sku.trim(),
+
+        unidad_medida:
+          unidadMedida
+      };
+
+      setFormularioDetalle(
+        datosGuardados
+      );
+
+      setDetalleOriginal(
+        datosGuardados
+      );
+
+      setMotivoExistencias("");
+      setEditandoDetalle(false);
+
       setMensaje(
         "Producto actualizado correctamente."
       );
 
-      setMostrarDetalle(false);
-      setArticuloDetalle(null);
-      setMotivoExistencias("");
+      limpiarSeleccionImagen();
 
       await Promise.all([
         cargarInventario(),
@@ -974,34 +1297,82 @@ const Inventario = () => {
 
       setError(
         err.response?.data?.message ||
-        err.response?.data?.mensaje ||
-        "No fue posible guardar los cambios."
+          err.response?.data?.mensaje ||
+          "No fue posible guardar los cambios."
       );
     } finally {
       setGuardando(false);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="page-loading">
-        Cargando inventario...
-      </div>
+  const obtenerEstado = (item) => {
+    const cantidad = Number(
+      item.cantidad || 0
     );
-  }
+
+    const puntoReorden = Number(
+      item.punto_reorden || 0
+    );
+
+    if (cantidad <= 0) {
+      return {
+        texto: "Agotado",
+        clase: "badge-danger"
+      };
+    }
+
+    if (
+      cantidad <= puntoReorden
+    ) {
+      return {
+        texto: "Stock bajo",
+        clase: "badge-warning"
+      };
+    }
+
+    return {
+      texto: "Disponible",
+      clase: "badge-success"
+    };
+  };
+
+  const formatearFecha = (
+    fecha
+  ) => {
+    if (!fecha) {
+      return "Sin fecha";
+    }
+
+    try {
+      return new Date(
+        fecha
+      ).toLocaleString(
+        "es-MX",
+        {
+          dateStyle: "short",
+          timeStyle: "short"
+        }
+      );
+    } catch {
+      return "Sin fecha";
+    }
+  };
 
   return (
-    <div>
-      <header className="page-header">
+    <div className="page-container">
+      <section className="page-header">
         <div>
-          <h1>Inventario</h1>
+          <div className="page-title-row">
+            <Package size={28} />
+            <div>
+              <h1>Inventario</h1>
 
-          <p>
-            Consulta existencias,
-            agrega artículos y administra
-            las especificaciones de los
-            productos.
-          </p>
+              <p>
+                Consulta y administra las
+                existencias de productos.
+              </p>
+            </div>
+          </div>
         </div>
 
         <div
@@ -1013,151 +1384,201 @@ const Inventario = () => {
         >
           <button
             type="button"
-            className="secondary-button"
+            className="btn btn-secondary"
             onClick={cargarDatos}
+            disabled={loading}
           >
-            <RefreshCw size={18} />
+            <RefreshCw
+              size={17}
+              className={
+                loading
+                  ? "spin"
+                  : ""
+              }
+            />
             Actualizar
           </button>
 
           <button
             type="button"
-            className="secondary-button"
-            onClick={abrirImportacion}
+            className="btn btn-secondary"
+            onClick={
+              abrirImportacion
+            }
           >
-            <Upload size={18} />
+            <Upload size={17} />
             Importar CSV
           </button>
 
           <button
             type="button"
-            className="primary-button"
+            className="btn btn-primary"
             onClick={abrirModal}
           >
-            <Plus size={18} />
+            <Plus size={17} />
             Agregar artículo
           </button>
         </div>
-      </header>
+      </section>
 
-      {error &&
-        !mostrarModal &&
-        !mostrarImportacion &&
-        !mostrarDetalle && (
-          <div className="error-message page-error">
-            {error}
+      {error && (
+        <div className="alert alert-danger">
+          <AlertTriangle size={18} />
+          <span>{error}</span>
+
+          <button
+            type="button"
+            onClick={() =>
+              setError("")
+            }
+            aria-label="Cerrar"
+          >
+            <X size={17} />
+          </button>
+        </div>
+      )}
+
+      {mensaje && (
+        <div className="alert alert-success">
+          <span>{mensaje}</span>
+
+          <button
+            type="button"
+            onClick={() =>
+              setMensaje("")
+            }
+            aria-label="Cerrar"
+          >
+            <X size={17} />
+          </button>
+        </div>
+      )}
+
+      <section
+        className="dashboard-grid"
+        style={{
+          marginBottom: "20px"
+        }}
+      >
+        <div className="dashboard-card">
+          <div className="dashboard-card-icon">
+            <Boxes size={22} />
           </div>
-        )}
-
-      {mensaje &&
-        !mostrarModal &&
-        !mostrarImportacion &&
-        !mostrarDetalle && (
-          <div className="success-message page-error">
-            {mensaje}
-          </div>
-        )}
-
-      <section className="inventory-summary">
-        <div className="mini-stat">
-          <Package size={21} />
 
           <div>
-            <span>Productos</span>
-            <strong>
+            <span className="dashboard-card-label">
+              Productos
+            </span>
+
+            <strong className="dashboard-card-value">
               {totalProductos}
             </strong>
           </div>
         </div>
 
-        <div className="mini-stat">
-          <Boxes size={21} />
+        <div className="dashboard-card">
+          <div className="dashboard-card-icon">
+            <Package size={22} />
+          </div>
 
           <div>
-            <span>
-              Existencias totales
+            <span className="dashboard-card-label">
+              Unidades
             </span>
 
-            <strong>
-              {totalUnidades.toLocaleString(
-                "es-MX"
-              )}
+            <strong className="dashboard-card-value">
+              {totalUnidades}
             </strong>
           </div>
         </div>
 
-        <div className="mini-stat">
-          <AlertTriangle size={21} />
+        <div className="dashboard-card">
+          <div className="dashboard-card-icon">
+            <AlertTriangle size={22} />
+          </div>
 
           <div>
-            <span>Alertas</span>
-            <strong>
+            <span className="dashboard-card-label">
+              Alertas
+            </span>
+
+            <strong className="dashboard-card-value">
               {totalAlertas}
             </strong>
           </div>
         </div>
       </section>
 
-      <section className="content-card">
-        <div className="filters-row">
-          <div className="search-box">
-            <Search size={18} />
+      <section className="card">
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns:
+              "minmax(240px, 2fr) repeat(3, minmax(160px, 1fr))",
+            gap: "12px",
+            alignItems: "end",
+            marginBottom: "18px"
+          }}
+        >
+          <div className="form-group">
+            <label>
+              Buscar
+            </label>
 
-            <input
-              type="text"
-              placeholder="Buscar producto, SKU o proveedor..."
-              value={busqueda}
-              onChange={(event) =>
-                setBusqueda(
-                  event.target.value
-                )
-              }
-            />
+            <div
+              style={{
+                position: "relative"
+              }}
+            >
+              <Search
+                size={17}
+                style={{
+                  position:
+                    "absolute",
+                  left: "12px",
+                  top: "50%",
+                  transform:
+                    "translateY(-50%)",
+                  pointerEvents:
+                    "none"
+                }}
+              />
+
+              <input
+                type="text"
+                value={busqueda}
+                onChange={(event) =>
+                  setBusqueda(
+                    event.target.value
+                  )
+                }
+                placeholder="Producto, SKU o proveedor..."
+                style={{
+                  paddingLeft:
+                    "38px"
+                }}
+              />
+            </div>
           </div>
 
-          <select
-            value={categoria}
-            onChange={(event) =>
-              setCategoria(
-                event.target.value
-              )
-            }
-          >
-            <option value="">
-              Todas las categorías
-            </option>
+          <div className="form-group">
+            <label>
+              Categoría
+            </label>
 
-            {categorias.map(
-              (item) => (
-                <option
-                  key={item.id}
-                  value={item.id}
-                >
-                  {item.nombre}
-
-                  {item.tipo ===
-                  "privada"
-                    ? " (Privada)"
-                    : ""}
-                </option>
-              )
-            )}
-          </select>
-
-          {esPrincipal && (
             <select
-              value={ubicacion}
+              value={categoria}
               onChange={(event) =>
-                setUbicacion(
+                setCategoria(
                   event.target.value
                 )
               }
             >
               <option value="">
-                Todas las ubicaciones
+                Todas
               </option>
 
-              {ubicaciones.map(
+              {categorias.map(
                 (item) => (
                   <option
                     key={item.id}
@@ -1168,140 +1589,262 @@ const Inventario = () => {
                 )
               )}
             </select>
+          </div>
+
+          {esPrincipal && (
+            <div className="form-group">
+              <label>
+                Ubicación
+              </label>
+
+              <select
+                value={ubicacion}
+                onChange={(event) =>
+                  setUbicacion(
+                    event.target.value
+                  )
+                }
+              >
+                <option value="">
+                  Todas
+                </option>
+
+                {ubicaciones.map(
+                  (item) => (
+                    <option
+                      key={item.id}
+                      value={item.id}
+                    >
+                      {item.nombre}
+                    </option>
+                  )
+                )}
+              </select>
+            </div>
           )}
 
-          <label className="stock-filter">
-            <input
-              type="checkbox"
-              checked={soloBajoStock}
-              onChange={(event) =>
-                setSoloBajoStock(
-                  event.target.checked
-                )
+          <div
+            style={{
+              display: "flex",
+              gap: "10px",
+              alignItems: "center",
+              paddingBottom:
+                "4px"
+            }}
+          >
+            <label
+              style={{
+                display: "flex",
+                gap: "8px",
+                alignItems:
+                  "center",
+                cursor: "pointer",
+                margin: 0
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={
+                  soloBajoStock
+                }
+                onChange={(event) =>
+                  setSoloBajoStock(
+                    event.target
+                      .checked
+                  )
+                }
+              />
+
+              <span>
+                Solo stock bajo
+              </span>
+            </label>
+
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={
+                limpiarFiltros
               }
+            >
+              Limpiar
+            </button>
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="empty-state">
+            <RefreshCw
+              size={28}
+              className="spin"
             />
 
-            Solo stock bajo
-          </label>
-
-          <button
-            type="button"
-            className="text-button"
-            onClick={limpiarFiltros}
-          >
-            Limpiar
-          </button>
-        </div>
-
-        <div className="results-info">
-          Mostrando{" "}
-          <strong>
-            {
-              inventarioFiltrado.length
-            }
-          </strong>{" "}
-          registros
-        </div>
-
-        {inventarioFiltrado.length ===
-        0 ? (
+            <p>
+              Cargando inventario...
+            </p>
+          </div>
+        ) : inventarioFiltrado.length ===
+          0 ? (
           <div className="empty-state">
-            No hay productos que
-            coincidan con los filtros.
+            <Package size={36} />
+
+            <h3>
+              No hay productos
+            </h3>
+
+            <p>
+              No se encontraron
+              productos con los
+              filtros actuales.
+            </p>
           </div>
         ) : (
           <div className="table-container">
-            <table>
+            <table className="data-table">
               <thead>
                 <tr>
-                  <th>Producto</th>
-                  <th>Proveedor</th>
-                  <th>Categoría</th>
-                  <th>Ubicación</th>
-                  <th>Existencias</th>
-                  <th>Estado</th>
-                  <th>Acción</th>
+                  <th>
+                    Producto
+                  </th>
+
+                  {esPrincipal && (
+                    <th>
+                      Proveedor
+                    </th>
+                  )}
+
+                  <th>
+                    Categoría
+                  </th>
+
+                  <th>
+                    Ubicación
+                  </th>
+
+                  <th>
+                    Existencias
+                  </th>
+
+                  <th>
+                    Estado
+                  </th>
+
+                  <th>
+                    Acción
+                  </th>
                 </tr>
               </thead>
 
               <tbody>
                 {inventarioFiltrado.map(
                   (item) => {
-                    const bajoStock =
-                      Number(
-                        item.stock_bajo
-                      ) === 1;
+                    const estado =
+                      obtenerEstado(
+                        item
+                      );
+
+                    const proveedorNombre =
+                      item.proveedor_nombre ||
+                      item.proveedor ||
+                      obtenerNombreProveedor(
+                        obtenerProveedorId(
+                          item
+                        )
+                      );
+
+                    const categoriaNombre =
+                      item.categoria_nombre ||
+                      obtenerNombreCategoria(
+                        item.categoria_id
+                      );
 
                     return (
                       <tr
                         key={`${item.ubicacion_id}-${item.producto_id}`}
                       >
                         <td>
+                          <div
+                            style={{
+                              display:
+                                "flex",
+                              flexDirection:
+                                "column",
+                              gap: "3px"
+                            }}
+                          >
+                            <strong>
+                              {item.producto_nombre ||
+                                item.nombre ||
+                                "Sin nombre"}
+                            </strong>
+
+                            {item.sku && (
+                              <small className="table-secondary">
+                                SKU:{" "}
+                                {
+                                  item.sku
+                                }
+                              </small>
+                            )}
+                          </div>
+                        </td>
+
+                        {esPrincipal && (
+                          <td>
+                            {proveedorNombre ||
+                              "Sin proveedor"}
+                          </td>
+                        )}
+
+                        <td>
+                          {categoriaNombre}
+                        </td>
+
+                        <td>
+                          {item.ubicacion_nombre ||
+                            "Sin ubicación"}
+                        </td>
+
+                        <td>
                           <strong>
                             {
-                              item.producto_nombre
+                              item.cantidad
                             }
                           </strong>
 
-                          <small className="table-secondary">
-                            SKU:{" "}
-                            {item.sku ||
-                              "Sin SKU"}
-                          </small>
-                        </td>
-
-                        <td>
-                          {item.proveedor_nombre ||
-                            "Sin proveedor"}
-                        </td>
-
-                        <td>
-                          {item.categoria_nombre ||
-                            "Sin categoría"}
-                        </td>
-
-                        <td>
-                          {
-                            item.ubicacion_nombre
-                          }
-                        </td>
-
-                        <td>
-                          <strong>
-                            {Number(
-                              item.cantidad
-                            ).toLocaleString(
-                              "es-MX"
-                            )}
-                          </strong>{" "}
-                          {
-                            item.unidad_medida
-                          }
-                        </td>
-
-                        <td>
-                          {bajoStock ? (
-                            <span className="status danger">
-                              Stock bajo
-                            </span>
-                          ) : (
-                            <span className="status success">
-                              Disponible
-                            </span>
+                          {item.unidad_medida && (
+                            <small className="table-secondary">
+                              {" "}
+                              {
+                                item.unidad_medida
+                              }
+                            </small>
                           )}
+                        </td>
+
+                        <td>
+                          <span
+                            className={`badge ${estado.clase}`}
+                          >
+                            {
+                              estado.texto
+                            }
+                          </span>
                         </td>
 
                         <td>
                           <button
                             type="button"
-                            className="secondary-button"
+                            className="btn btn-secondary btn-sm"
                             onClick={() =>
                               abrirDetalle(
                                 item
                               )
                             }
                           >
-                            <Eye size={16} />
+                            <Eye
+                              size={16}
+                            />
                             Ver
                           </button>
                         </td>
@@ -1315,370 +1858,244 @@ const Inventario = () => {
         )}
       </section>
 
-      {mostrarDetalle &&
-        articuloDetalle && (
+      {mostrarModal && (
+        <div
+          className="modal-overlay"
+          onMouseDown={(event) => {
+            if (
+              event.target ===
+              event.currentTarget
+            ) {
+              cerrarModal();
+            }
+          }}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 1000,
+            background:
+              "rgba(15, 23, 42, 0.55)",
+            display: "flex",
+            alignItems:
+              "center",
+            justifyContent:
+              "center",
+            padding: "16px"
+          }}
+        >
           <div
-            className="modal-overlay"
+            className="modal-content"
             style={{
-              position: "fixed",
-              inset: 0,
-              zIndex: 999999,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: "16px",
+              width:
+                "min(620px, 100%)",
+              maxHeight:
+                "calc(100vh - 32px)",
+              overflowY:
+                "auto",
               background:
-                "rgba(15, 23, 42, 0.65)",
-              overflowY: "auto"
-            }}
-            onMouseDown={(event) => {
-              if (
-                event.target ===
-                event.currentTarget
-              ) {
-                cerrarDetalle();
-              }
+                "#fff",
+              borderRadius:
+                "14px"
             }}
           >
-            <div
-              className="modal-content"
-              style={{
-                position: "relative",
-                zIndex: 1000000,
-                maxWidth: "760px",
-                width:
-                  "calc(100% - 32px)",
-                maxHeight: "90vh",
-                overflowY: "auto",
-                background: "#ffffff",
-                borderRadius: "16px",
-                padding: "24px",
-                boxShadow:
-                  "0 24px 70px rgba(15, 23, 42, 0.28)"
-              }}
-            >
-              <div className="modal-header">
-                <div>
-                  <h2>
-                    Especificaciones del
-                    producto
-                  </h2>
+            <div className="modal-header">
+              <div>
+                <h2>
+                  Agregar artículo
+                </h2>
 
-                  <p>
-                    Consulta y edita los
-                    datos del producto.
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  className="text-button"
-                  onClick={
-                    cerrarDetalle
-                  }
-                  disabled={guardando}
-                >
-                  <X size={22} />
-                </button>
+                <p>
+                  Agrega un producto
+                  existente al
+                  inventario.
+                </p>
               </div>
 
-              {cargandoDetalle && (
-                <div
-                  className="table-secondary"
-                  style={{
-                    marginBottom: "16px"
-                  }}
-                >
-                  Actualizando información del producto...
-                </div>
-              )}
-
-              {error && (
-                <div className="error-message page-error">
-                  {error}
-                </div>
-              )}
-
-              <form
-                onSubmit={
-                  guardarDetalle
+              <button
+                type="button"
+                className="modal-close"
+                onClick={
+                  cerrarModal
                 }
               >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form
+              onSubmit={
+                guardarArticulo
+              }
+            >
+              <div className="modal-body">
                 <div className="form-group">
                   <label>
-                    Nombre *
+                    Producto *
+                  </label>
+
+                  <select
+                    name="producto_id"
+                    value={
+                      formulario.producto_id
+                    }
+                    onChange={
+                      handleFormulario
+                    }
+                    required
+                  >
+                    <option value="">
+                      Selecciona un
+                      producto
+                    </option>
+
+                    {productos.map(
+                      (producto) => (
+                        <option
+                          key={
+                            producto.id
+                          }
+                          value={
+                            producto.id
+                          }
+                        >
+                          {
+                            producto.nombre
+                          }
+                          {producto.sku
+                            ? ` - ${producto.sku}`
+                            : ""}
+                        </option>
+                      )
+                    )}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>
+                    Cantidad *
                   </label>
 
                   <input
-                    name="nombre"
+                    type="number"
+                    name="cantidad"
+                    min="0"
+                    step="any"
                     value={
-                      formularioDetalle
-                        .nombre
+                      formulario.cantidad
                     }
                     onChange={
-                      handleDetalle
+                      handleFormulario
                     }
                     required
                   />
                 </div>
 
-                <div className="form-group">
-                  <label>
-                    Descripción
-                  </label>
-
-                  <textarea
-                    name="descripcion"
-                    rows="3"
-                    value={
-                      formularioDetalle
-                        .descripcion
-                    }
-                    onChange={
-                      handleDetalle
-                    }
-                    placeholder="Descripción opcional"
-                  />
-                </div>
-
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns:
-                      "repeat(auto-fit, minmax(220px, 1fr))",
-                    gap: "16px"
-                  }}
-                >
+                {esPrincipal && (
                   <div className="form-group">
                     <label>
-                      Existencias *
-                    </label>
-
-                    <input
-                      type="number"
-                      min="0"
-                      step="any"
-                      name="existencias"
-                      value={
-                        formularioDetalle
-                          .existencias
-                      }
-                      onChange={
-                        handleDetalle
-                      }
-                      required
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label>
-                      Punto de reorden
-                    </label>
-
-                    <input
-                      type="number"
-                      min="0"
-                      step="any"
-                      name="punto_reorden"
-                      value={
-                        formularioDetalle
-                          .punto_reorden
-                      }
-                      onChange={
-                        handleDetalle
-                      }
-                    />
-                  </div>
-                </div>
-
-                {existenciasCambiaron && (
-                  <div className="form-group">
-                    <label>
-                      Justificación del
-                      cambio de existencias *
-                    </label>
-
-                    <textarea
-                      rows="3"
-                      value={
-                        motivoExistencias
-                      }
-                      onChange={(
-                        event
-                      ) =>
-                        setMotivoExistencias(
-                          event.target
-                            .value
-                        )
-                      }
-                      placeholder="Ej. Corrección después de conteo físico"
-                      required
-                    />
-
-                    <small className="table-secondary">
-                      La justificación
-                      solamente es obligatoria
-                      porque modificaste las
-                      existencias.
-                    </small>
-                  </div>
-                )}
-
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns:
-                      "repeat(auto-fit, minmax(220px, 1fr))",
-                    gap: "16px"
-                  }}
-                >
-                  <div className="form-group">
-                    <label>
-                      Proveedor
+                      Ubicación
                     </label>
 
                     <select
-                      name="proveedor_id"
+                      name="ubicacion_id"
                       value={
-                        formularioDetalle
-                          .proveedor_id
+                        formulario.ubicacion_id
                       }
                       onChange={
-                        handleDetalle
+                        handleFormulario
                       }
                     >
                       <option value="">
-                        Sin proveedor
+                        Ubicación
+                        del usuario
                       </option>
 
-                      {proveedores.map(
-                        (proveedor) => (
+                      {ubicaciones.map(
+                        (item) => (
                           <option
                             key={
-                              proveedor.id
+                              item.id
                             }
                             value={
-                              proveedor.id
+                              item.id
                             }
                           >
                             {
-                              proveedor.nombre
+                              item.nombre
                             }
                           </option>
                         )
                       )}
                     </select>
                   </div>
-
-                  <div className="form-group">
-                    <label>
-                      SKU
-                    </label>
-
-                    <input
-                      name="sku"
-                      value={
-                        formularioDetalle
-                          .sku
-                      }
-                      onChange={
-                        handleDetalle
-                      }
-                      placeholder="Opcional"
-                    />
-                  </div>
-                </div>
+                )}
 
                 <div className="form-group">
                   <label>
-                    Unidad de medida *
+                    Motivo
                   </label>
 
-                  <input
-                    name="unidad_medida"
+                  <textarea
+                    name="motivo"
+                    rows="3"
                     value={
-                      formularioDetalle
-                        .unidad_medida
+                      formulario.motivo
                     }
                     onChange={
-                      handleDetalle
+                      handleFormulario
                     }
-                    required
+                    placeholder="Opcional"
                   />
                 </div>
+              </div>
 
-                <div
-                  style={{
-                    padding: "12px 14px",
-                    border:
-                      "1px solid #e2e8f0",
-                    borderRadius: "10px",
-                    marginTop: "8px"
-                  }}
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={
+                    cerrarModal
+                  }
+                  disabled={
+                    guardando
+                  }
                 >
-                  <small className="table-secondary">
-                    Campos obligatorios:
-                    Nombre, Existencias y
-                    Unidad de medida.
-                    Descripción, Punto de
-                    reorden, Proveedor y SKU
-                    son opcionales.
-                  </small>
-                </div>
+                  Cancelar
+                </button>
 
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent:
-                      "flex-end",
-                    gap: "10px",
-                    marginTop: "24px",
-                    flexWrap: "wrap"
-                  }}
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={
+                    guardando
+                  }
                 >
-                  <button
-                    type="button"
-                    className="secondary-button"
-                    onClick={
-                      cerrarDetalle
-                    }
-                    disabled={guardando}
-                  >
-                    Cancelar
-                  </button>
-
-                  <button
-                    type="submit"
-                    className="primary-button"
-                    disabled={guardando}
-                  >
-                    <Save size={18} />
-
-                    {guardando
-                      ? "Guardando..."
-                      : "Guardar cambios"}
-                  </button>
-                </div>
-              </form>
-            </div>
+                  {guardando ? (
+                    <>
+                      <RefreshCw
+                        size={17}
+                        className="spin"
+                      />
+                      Guardando...
+                    </>
+                  ) : (
+                    <>
+                      <PackagePlus
+                        size={17}
+                      />
+                      Agregar
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
-        )}
+        </div>
+      )}
 
       {mostrarImportacion && (
         <div
           className="modal-overlay"
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 999999,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "16px",
-            background:
-              "rgba(15, 23, 42, 0.65)",
-            overflowY: "auto"
-          }}
           onMouseDown={(event) => {
             if (
               event.target ===
@@ -1691,591 +2108,1079 @@ const Inventario = () => {
           <div
             className="modal-content"
             style={{
-              position: "relative",
-              maxWidth: "650px",
+              maxWidth:
+                "650px",
               width:
-                "calc(100% - 32px)",
-              maxHeight: "90vh",
-              overflowY: "auto",
-              background: "#ffffff",
-              borderRadius: "16px",
-              padding: "24px",
-              boxShadow:
-                "0 24px 70px rgba(15, 23, 42, 0.28)"
+                "calc(100% - 32px)"
             }}
           >
             <div className="modal-header">
               <div>
                 <h2>
-                  Importar inventario CSV
+                  Importar inventario
+                  CSV
                 </h2>
 
                 <p>
-                  Agrega varios productos
-                  directamente al inventario
-                  de tu ubicación.
+                  Agrega varios
+                  productos
+                  directamente al
+                  inventario de tu
+                  ubicación.
                 </p>
               </div>
 
               <button
                 type="button"
-                className="text-button"
+                className="modal-close"
                 onClick={
                   cerrarImportacion
                 }
-                disabled={importando}
               >
-                <X size={22} />
+                <X size={20} />
               </button>
             </div>
 
-            {error && (
-              <div className="error-message page-error">
-                {error}
-              </div>
-            )}
-
-            {mensaje && (
-              <div className="success-message page-error">
-                {mensaje}
-              </div>
-            )}
-
-            <div
-              style={{
-                padding: "16px",
-                border:
-                  "1px dashed #cbd5e1",
-                borderRadius: "10px",
-                marginBottom: "20px"
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "10px",
-                  marginBottom: "12px"
-                }}
-              >
-                <FileText size={24} />
-                <strong>
+            <div className="modal-body">
+              <div className="form-group">
+                <label>
                   Archivo CSV
-                </strong>
-              </div>
+                </label>
 
-              <input
-                ref={inputArchivoRef}
-                type="file"
-                accept=".csv,text/csv"
-                onChange={
-                  seleccionarArchivoCsv
-                }
-                disabled={importando}
-              />
+                <input
+                  ref={
+                    inputArchivoRef
+                  }
+                  type="file"
+                  accept=".csv,text/csv"
+                  onChange={
+                    seleccionarArchivoCsv
+                  }
+                />
+
+                <small className="table-secondary">
+                  Campos obligatorios:
+                  nombre, cantidad y
+                  unidad_medida.
+                </small>
+              </div>
 
               {archivoCsv && (
                 <div
-                  className="table-secondary"
                   style={{
-                    marginTop: "12px"
+                    display:
+                      "flex",
+                    alignItems:
+                      "center",
+                    gap: "10px",
+                    padding:
+                      "12px",
+                    border:
+                      "1px solid #e2e8f0",
+                    borderRadius:
+                      "10px"
                   }}
                 >
-                  Archivo seleccionado:{" "}
-                  <strong>
-                    {archivoCsv.name}
-                  </strong>
-                </div>
-              )}
-            </div>
+                  <FileText
+                    size={20}
+                  />
 
-            <div
-              style={{
-                marginBottom: "20px"
-              }}
-            >
-              <strong>
-                Formato esperado
-              </strong>
-
-              <p
-                className="table-secondary"
-                style={{
-                  marginTop: "8px"
-                }}
-              >
-                Las columnas obligatorias
-                son nombre, unidad_medida y
-                cantidad. SKU, descripción,
-                categoria_id y
-                punto_reorden son
-                opcionales.
-              </p>
-
-              <div
-                style={{
-                  overflowX: "auto",
-                  marginTop: "12px"
-                }}
-              >
-                <table>
-                  <thead>
-                    <tr>
-                      <th>nombre</th>
-                      <th>
-                        unidad_medida
-                      </th>
-                      <th>cantidad</th>
-                      <th>sku</th>
-                      <th>
-                        categoria_id
-                      </th>
-                      <th>
-                        punto_reorden
-                      </th>
-                    </tr>
-                  </thead>
-
-                  <tbody>
-                    <tr>
-                      <td>
-                        Mouse Logitech
-                      </td>
-                      <td>
-                        pieza
-                      </td>
-                      <td>10</td>
-                      <td>
-                        Opcional
-                      </td>
-                      <td>
-                        Opcional
-                      </td>
-                      <td>
-                        Opcional
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {resultadoImportacion && (
-              <div
-                style={{
-                  marginTop: "20px",
-                  marginBottom: "20px"
-                }}
-              >
-                <h3>
-                  Resultado de la
-                  importación
-                </h3>
-
-                <div
-                  className="inventory-summary"
-                  style={{
-                    marginTop: "14px"
-                  }}
-                >
-                  <div className="mini-stat">
-                    <FileText
-                      size={20}
-                    />
-
-                    <div>
-                      <span>
-                        Filas
-                      </span>
-
-                      <strong>
-                        {resultadoImportacion
-                          .resumen
-                          ?.total_filas ||
-                          0}
-                      </strong>
-                    </div>
-                  </div>
-
-                  <div className="mini-stat">
-                    <PackagePlus
-                      size={20}
-                    />
-
-                    <div>
-                      <span>
-                        Agregadas
-                      </span>
-
-                      <strong>
-                        {resultadoImportacion
-                          .resumen
-                          ?.agregados ||
-                          0}
-                      </strong>
-                    </div>
-                  </div>
-
-                  <div className="mini-stat">
-                    <AlertTriangle
-                      size={20}
-                    />
-
-                    <div>
-                      <span>
-                        Errores
-                      </span>
-
-                      <strong>
-                        {resultadoImportacion
-                          .resumen
-                          ?.filas_con_error ||
-                          0}
-                      </strong>
-                    </div>
-                  </div>
-                </div>
-
-                {resultadoImportacion
-                  .errores?.length >
-                  0 && (
-                  <div
-                    style={{
-                      marginTop:
-                        "18px"
-                    }}
-                  >
+                  <div>
                     <strong>
-                      Filas con error
+                      {
+                        archivoCsv.name
+                      }
                     </strong>
 
-                    <div
-                      className="table-container"
-                      style={{
-                        marginTop:
-                          "10px"
-                      }}
-                    >
-                      <table>
-                        <thead>
-                          <tr>
-                            <th>
-                              Fila
-                            </th>
-                            <th>
-                              Producto
-                            </th>
-                            <th>
-                              Error
-                            </th>
-                          </tr>
-                        </thead>
+                    <div>
+                      <small className="table-secondary">
+                        {(
+                          archivoCsv.size /
+                          1024
+                        ).toFixed(
+                          1
+                        )}{" "}
+                        KB
+                      </small>
+                    </div>
+                  </div>
+                </div>
+              )}
 
-                        <tbody>
+              {resultadoImportacion && (
+                <div
+                  style={{
+                    marginTop:
+                      "16px",
+                    padding:
+                      "14px",
+                    border:
+                      "1px solid #e2e8f0",
+                    borderRadius:
+                      "10px"
+                  }}
+                >
+                  <strong>
+                    Resultado de
+                    importación
+                  </strong>
+
+                  <div
+                    style={{
+                      display:
+                        "grid",
+                      gridTemplateColumns:
+                        "repeat(auto-fit, minmax(140px, 1fr))",
+                      gap: "10px",
+                      marginTop:
+                        "12px"
+                    }}
+                  >
+                    <div>
+                      <small>
+                        Total
+                      </small>
+
+                      <strong
+                        style={{
+                          display:
+                            "block"
+                        }}
+                      >
+                        {
+                          resultadoImportacion
+                            ?.resumen
+                            ?.total_filas ??
+                          0
+                        }
+                      </strong>
+                    </div>
+
+                    <div>
+                      <small>
+                        Agregados
+                      </small>
+
+                      <strong
+                        style={{
+                          display:
+                            "block"
+                        }}
+                      >
+                        {
+                          resultadoImportacion
+                            ?.resumen
+                            ?.agregados ??
+                          0
+                        }
+                      </strong>
+                    </div>
+
+                    <div>
+                      <small>
+                        Creados
+                      </small>
+
+                      <strong
+                        style={{
+                          display:
+                            "block"
+                        }}
+                      >
+                        {
+                          resultadoImportacion
+                            ?.resumen
+                            ?.productos_creados ??
+                          0
+                        }
+                      </strong>
+                    </div>
+
+                    <div>
+                      <small>
+                        Errores
+                      </small>
+
+                      <strong
+                        style={{
+                          display:
+                            "block"
+                        }}
+                      >
+                        {
+                          resultadoImportacion
+                            ?.resumen
+                            ?.filas_con_error ??
+                          0
+                        }
+                      </strong>
+                    </div>
+                  </div>
+
+                  {Array.isArray(
+                    resultadoImportacion.errores
+                  ) &&
+                    resultadoImportacion
+                      .errores.length >
+                      0 && (
+                      <div
+                        style={{
+                          marginTop:
+                            "14px"
+                        }}
+                      >
+                        <strong>
+                          Filas con
+                          error
+                        </strong>
+
+                        <ul
+                          style={{
+                            marginTop:
+                              "8px"
+                          }}
+                        >
                           {resultadoImportacion.errores.map(
                             (
                               item,
                               index
                             ) => (
-                              <tr
-                                key={`${item.fila}-${index}`}
+                              <li
+                                key={
+                                  index
+                                }
                               >
-                                <td>
-                                  {
-                                    item.fila
-                                  }
-                                </td>
-
-                                <td>
-                                  {item.nombre ||
-                                    item.sku ||
-                                    "-"}
-                                </td>
-
-                                <td>
-                                  {
-                                    item.error
-                                  }
-                                </td>
-                              </tr>
+                                Fila{" "}
+                                {
+                                  item.fila
+                                }
+                                :{" "}
+                                {
+                                  item.error
+                                }
+                              </li>
                             )
                           )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
+                        </ul>
+                      </div>
+                    )}
+                </div>
+              )}
+            </div>
 
-            <div
-              style={{
-                display: "flex",
-                justifyContent:
-                  "flex-end",
-                gap: "10px",
-                marginTop: "20px",
-                flexWrap: "wrap"
-              }}
-            >
+            <div className="modal-footer">
               <button
                 type="button"
-                className="secondary-button"
+                className="btn btn-secondary"
                 onClick={
                   cerrarImportacion
                 }
-                disabled={importando}
+                disabled={
+                  importando
+                }
               >
                 Cerrar
               </button>
 
               <button
                 type="button"
-                className="primary-button"
-                onClick={importarCsv}
+                className="btn btn-primary"
+                onClick={
+                  importarCsv
+                }
                 disabled={
                   importando ||
                   !archivoCsv
                 }
               >
-                <Upload size={18} />
-
-                {importando
-                  ? "Importando..."
-                  : "Importar CSV"}
+                {importando ? (
+                  <>
+                    <RefreshCw
+                      size={17}
+                      className="spin"
+                    />
+                    Procesando...
+                  </>
+                ) : (
+                  <>
+                    <Upload
+                      size={17}
+                    />
+                    Importar
+                  </>
+                )}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {mostrarModal && (
+      {mostrarDetalle && (
         <div
           className="modal-overlay"
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 999999,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "16px",
-            background:
-              "rgba(15, 23, 42, 0.65)",
-            overflowY: "auto"
-          }}
           onMouseDown={(event) => {
             if (
               event.target ===
               event.currentTarget
             ) {
-              cerrarModal();
+              cerrarDetalle();
             }
+          }}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 1000,
+            background:
+              "rgba(15, 23, 42, 0.55)",
+            display: "flex",
+            alignItems:
+              "center",
+            justifyContent:
+              "center",
+            padding: "16px"
           }}
         >
           <div
             className="modal-content"
             style={{
-              position: "relative",
-              maxWidth: "650px",
               width:
-                "calc(100% - 32px)",
-              maxHeight: "90vh",
-              overflowY: "auto",
-              background: "#ffffff",
-              borderRadius: "16px",
-              padding: "24px",
-              boxShadow:
-                "0 24px 70px rgba(15, 23, 42, 0.28)"
+                "min(900px, 100%)",
+              maxHeight:
+                "calc(100vh - 32px)",
+              overflowY:
+                "auto",
+              background:
+                "#fff",
+              borderRadius:
+                "14px"
             }}
           >
             <div className="modal-header">
               <div>
                 <h2>
-                  Agregar artículo
+                  {editandoDetalle
+                    ? "Editar producto"
+                    : "Detalle del producto"}
                 </h2>
 
                 <p>
-                  Agrega existencias al
-                  inventario.
+                  {editandoDetalle
+                    ? "Modifica la información del producto."
+                    : "Consulta la información del producto."}
                 </p>
               </div>
 
               <button
                 type="button"
-                className="text-button"
+                className="modal-close"
                 onClick={
-                  cerrarModal
+                  cerrarDetalle
                 }
-                disabled={guardando}
+                disabled={
+                  guardando
+                }
               >
-                <X size={22} />
+                <X size={20} />
               </button>
             </div>
 
-            {error && (
-              <div className="error-message page-error">
-                {error}
-              </div>
-            )}
-
-            <form
-              onSubmit={
-                guardarArticulo
-              }
-            >
-              <div className="form-group">
-                <label>
-                  Producto *
-                </label>
-
-                <select
-                  name="producto_id"
-                  value={
-                    formulario.producto_id
-                  }
-                  onChange={
-                    handleFormulario
-                  }
-                  required
-                >
-                  <option value="">
-                    Selecciona un producto
-                  </option>
-
-                  {productos.map(
-                    (producto) => (
-                      <option
-                        key={
-                          producto.id
-                        }
-                        value={
-                          producto.id
-                        }
-                      >
-                        {producto.nombre}
-                        {producto.sku
-                          ? ` - ${producto.sku}`
-                          : ""}
-                      </option>
-                    )
-                  )}
-                </select>
-              </div>
-
-              {esPrincipal && (
-                <div className="form-group">
-                  <label>
-                    Ubicación
-                  </label>
-
-                  <select
-                    name="ubicacion_id"
-                    value={
-                      formulario.ubicacion_id
-                    }
-                    onChange={
-                      handleFormulario
-                    }
-                  >
-                    <option value="">
-                      Almacén Central
-                    </option>
-
-                    {ubicaciones.map(
-                      (item) => (
-                        <option
-                          key={
-                            item.id
-                          }
-                          value={
-                            item.id
-                          }
-                        >
-                          {
-                            item.nombre
-                          }
-                        </option>
-                      )
-                    )}
-                  </select>
-                </div>
-              )}
-
-              <div className="form-group">
-                <label>
-                  Existencias *
-                </label>
-
-                <input
-                  type="number"
-                  min="0"
-                  step="any"
-                  name="cantidad"
-                  value={
-                    formulario.cantidad
-                  }
-                  onChange={
-                    handleFormulario
-                  }
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label>
-                  Motivo
-                </label>
-
-                <textarea
-                  name="motivo"
-                  rows="3"
-                  value={
-                    formulario.motivo
-                  }
-                  onChange={
-                    handleFormulario
-                  }
-                  placeholder="Opcional"
-                />
-              </div>
-
+            {cargandoDetalle ? (
               <div
+                className="empty-state"
                 style={{
-                  display: "flex",
-                  justifyContent:
-                    "flex-end",
-                  gap: "10px",
-                  marginTop: "24px",
-                  flexWrap: "wrap"
+                  padding:
+                    "50px 20px"
                 }}
               >
-                <button
-                  type="button"
-                  className="secondary-button"
-                  onClick={
-                    cerrarModal
-                  }
-                  disabled={guardando}
-                >
-                  Cancelar
-                </button>
+                <RefreshCw
+                  size={28}
+                  className="spin"
+                />
 
-                <button
-                  type="submit"
-                  className="primary-button"
-                  disabled={guardando}
-                >
-                  <PackagePlus
-                    size={18}
-                  />
-
-                  {guardando
-                    ? "Guardando..."
-                    : "Agregar artículo"}
-                </button>
+                <p>
+                  Cargando
+                  información del
+                  producto...
+                </p>
               </div>
-            </form>
+            ) : (
+              <form
+                onSubmit={
+                  guardarDetalle
+                }
+              >
+                <div className="modal-body">
+                  {!editandoDetalle ? (
+                    <>
+                      <div
+                        style={{
+                          marginBottom:
+                            "22px"
+                        }}
+                      >
+                        {tieneImagenDetalle &&
+                        imagenDetalleUrl ? (
+                          <div
+                            style={{
+                              display:
+                                "flex",
+                              justifyContent:
+                                "center",
+                              marginBottom:
+                                "16px"
+                            }}
+                          >
+                            <img
+                              src={
+                                imagenDetalleUrl
+                              }
+                              alt={
+                                formularioDetalle.nombre ||
+                                "Producto"
+                              }
+                              style={{
+                                maxWidth:
+                                  "280px",
+                                maxHeight:
+                                  "280px",
+                                objectFit:
+                                  "contain",
+                                borderRadius:
+                                  "12px",
+                                border:
+                                  "1px solid #e2e8f0"
+                              }}
+                            />
+                          </div>
+                        ) : (
+                          <div
+                            style={{
+                              display:
+                                "flex",
+                              justifyContent:
+                                "center",
+                              alignItems:
+                                "center",
+                              minHeight:
+                                "180px",
+                              border:
+                                "1px dashed #cbd5e1",
+                              borderRadius:
+                                "12px",
+                              color:
+                                "#64748b"
+                            }}
+                          >
+                            Sin imagen
+                          </div>
+                        )}
+                      </div>
+
+                      <div
+                        style={{
+                          display:
+                            "grid",
+                          gridTemplateColumns:
+                            "repeat(auto-fit, minmax(260px, 1fr))",
+                          gap: "16px"
+                        }}
+                      >
+                        <div className="form-group">
+                          <label>
+                            Nombre
+                          </label>
+
+                          <div className="readonly-field">
+                            {
+                              formularioDetalle.nombre ||
+                              "Sin nombre"
+                            }
+                          </div>
+                        </div>
+
+                        <div className="form-group">
+                          <label>
+                            Categoría
+                          </label>
+
+                          <div className="readonly-field">
+                            {obtenerNombreCategoria(
+                              formularioDetalle.categoria_id
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="form-group">
+                          <label>
+                            Existencias
+                          </label>
+
+                          <div className="readonly-field">
+                            {
+                              formularioDetalle.existencias
+                            }
+                          </div>
+                        </div>
+
+                        <div className="form-group">
+                          <label>
+                            Punto de
+                            reorden
+                          </label>
+
+                          <div className="readonly-field">
+                            {
+                              formularioDetalle.punto_reorden
+                            }
+                          </div>
+                        </div>
+
+                        <div className="form-group">
+                          <label>
+                            Proveedor
+                          </label>
+
+                          <div className="readonly-field">
+                            {obtenerNombreProveedor(
+                              formularioDetalle.proveedor_id
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="form-group">
+                          <label>
+                            SKU
+                          </label>
+
+                          <div className="readonly-field">
+                            {
+                              formularioDetalle.sku ||
+                              "Sin SKU"
+                            }
+                          </div>
+                        </div>
+
+                        <div className="form-group">
+                          <label>
+                            Unidad de
+                            medida
+                          </label>
+
+                          <div className="readonly-field">
+                            {
+                              formularioDetalle.unidad_medida ||
+                              "Sin unidad"
+                            }
+                          </div>
+                        </div>
+                      </div>
+
+                      <div
+                        className="form-group"
+                        style={{
+                          marginTop:
+                            "16px"
+                        }}
+                      >
+                        <label>
+                          Descripción
+                        </label>
+
+                        <div
+                          className="readonly-field"
+                          style={{
+                            minHeight:
+                              "80px",
+                            whiteSpace:
+                              "pre-wrap"
+                          }}
+                        >
+                          {formularioDetalle.descripcion ||
+                            "Sin descripción"}
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="form-group">
+                        <label>
+                          Imagen del
+                          producto
+                        </label>
+
+                        {previewImagenDetalle ? (
+                          <div
+                            style={{
+                              display:
+                                "flex",
+                              justifyContent:
+                                "center",
+                              marginBottom:
+                                "12px"
+                            }}
+                          >
+                            <img
+                              src={
+                                previewImagenDetalle
+                              }
+                              alt="Vista previa"
+                              style={{
+                                maxWidth:
+                                  "280px",
+                                maxHeight:
+                                  "280px",
+                                objectFit:
+                                  "contain",
+                                borderRadius:
+                                  "12px",
+                                border:
+                                  "1px solid #e2e8f0"
+                              }}
+                            />
+                          </div>
+                        ) : tieneImagenDetalle &&
+                          imagenDetalleUrl ? (
+                          <div
+                            style={{
+                              display:
+                                "flex",
+                              justifyContent:
+                                "center",
+                              marginBottom:
+                                "12px"
+                            }}
+                          >
+                            <img
+                              src={
+                                imagenDetalleUrl
+                              }
+                              alt={
+                                formularioDetalle.nombre ||
+                                "Producto"
+                              }
+                              style={{
+                                maxWidth:
+                                  "280px",
+                                maxHeight:
+                                  "280px",
+                                objectFit:
+                                  "contain",
+                                borderRadius:
+                                  "12px",
+                                border:
+                                  "1px solid #e2e8f0"
+                              }}
+                            />
+                          </div>
+                        ) : (
+                          <div
+                            style={{
+                              display:
+                                "flex",
+                              justifyContent:
+                                "center",
+                              alignItems:
+                                "center",
+                              minHeight:
+                                "150px",
+                              border:
+                                "1px dashed #cbd5e1",
+                              borderRadius:
+                                "12px",
+                              color:
+                                "#64748b",
+                              marginBottom:
+                                "12px"
+                            }}
+                          >
+                            Sin imagen
+                          </div>
+                        )}
+
+                        <input
+                          ref={
+                            inputImagenDetalleRef
+                          }
+                          type="file"
+                          accept=".png,.jpg,.jpeg,image/png,image/jpeg"
+                          onChange={
+                            seleccionarImagenDetalle
+                          }
+                        />
+
+                        <small className="table-secondary">
+                          Formatos permitidos:
+                          PNG, JPG y JPEG.
+                          Máximo 5 MB.
+                        </small>
+                      </div>
+
+                      <div className="form-group">
+                        <label>
+                          Nombre *
+                        </label>
+
+                        <input
+                          name="nombre"
+                          value={
+                            formularioDetalle.nombre
+                          }
+                          onChange={
+                            handleDetalle
+                          }
+                          required
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label>
+                          Descripción
+                        </label>
+
+                        <textarea
+                          name="descripcion"
+                          rows="3"
+                          value={
+                            formularioDetalle.descripcion
+                          }
+                          onChange={
+                            handleDetalle
+                          }
+                          placeholder="Descripción opcional"
+                        />
+                      </div>
+
+                      <div
+                        style={{
+                          display:
+                            "grid",
+                          gridTemplateColumns:
+                            "repeat(auto-fit, minmax(220px, 1fr))",
+                          gap: "16px"
+                        }}
+                      >
+                        <div className="form-group">
+                          <label>
+                            Existencias *
+                          </label>
+
+                          <input
+                            type="number"
+                            min="0"
+                            step="any"
+                            name="existencias"
+                            value={
+                              formularioDetalle.existencias
+                            }
+                            onChange={
+                              handleDetalle
+                            }
+                            required
+                          />
+                        </div>
+
+                        <div className="form-group">
+                          <label>
+                            Punto de
+                            reorden
+                          </label>
+
+                          <input
+                            type="number"
+                            min="0"
+                            step="any"
+                            name="punto_reorden"
+                            value={
+                              formularioDetalle.punto_reorden
+                            }
+                            onChange={
+                              handleDetalle
+                            }
+                          />
+                        </div>
+                      </div>
+
+                      {existenciasCambiaron &&
+                        editandoDetalle && (
+                          <div className="form-group">
+                            <label>
+                              Justificación
+                              del cambio
+                              de
+                              existencias
+                              *
+                            </label>
+
+                            <textarea
+                              rows="3"
+                              value={
+                                motivoExistencias
+                              }
+                              onChange={(
+                                event
+                              ) =>
+                                setMotivoExistencias(
+                                  event
+                                    .target
+                                    .value
+                                )
+                              }
+                              placeholder="Ej. Corrección después de conteo físico"
+                              required
+                            />
+
+                            <small className="table-secondary">
+                              La
+                              justificación
+                              solamente
+                              es
+                              obligatoria
+                              porque
+                              modificaste
+                              las
+                              existencias.
+                            </small>
+                          </div>
+                        )}
+
+                      <div
+                        style={{
+                          display:
+                            "grid",
+                          gridTemplateColumns:
+                            "repeat(auto-fit, minmax(220px, 1fr))",
+                          gap: "16px"
+                        }}
+                      >
+                        <div className="form-group">
+                          <label>
+                            Proveedor
+                          </label>
+
+                          <select
+                            name="proveedor_id"
+                            value={
+                              formularioDetalle.proveedor_id
+                            }
+                            onChange={
+                              handleDetalle
+                            }
+                          >
+                            <option value="">
+                              Sin
+                              proveedor
+                            </option>
+
+                            {proveedores.map(
+                              (
+                                proveedor
+                              ) => (
+                                <option
+                                  key={
+                                    proveedor.id
+                                  }
+                                  value={
+                                    proveedor.id
+                                  }
+                                >
+                                  {
+                                    proveedor.nombre
+                                  }
+                                </option>
+                              )
+                            )}
+                          </select>
+                        </div>
+
+                        <div className="form-group">
+                          <label>
+                            Categoría
+                          </label>
+
+                          <select
+                            name="categoria_id"
+                            value={
+                              formularioDetalle.categoria_id
+                            }
+                            onChange={
+                              handleDetalle
+                            }
+                          >
+                            <option value="">
+                              Sin
+                              categoría
+                            </option>
+
+                            {categorias.map(
+                              (
+                                categoriaItem
+                              ) => (
+                                <option
+                                  key={
+                                    categoriaItem.id
+                                  }
+                                  value={
+                                    categoriaItem.id
+                                  }
+                                >
+                                  {
+                                    categoriaItem.nombre
+                                  }
+                                </option>
+                              )
+                            )}
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="form-group">
+                        <label>
+                          SKU
+                        </label>
+
+                        <input
+                          name="sku"
+                          value={
+                            formularioDetalle.sku
+                          }
+                          onChange={
+                            handleDetalle
+                          }
+                          placeholder="Opcional"
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label>
+                          Unidad de
+                          medida *
+                        </label>
+
+                        <input
+                          name="unidad_medida"
+                          value={
+                            formularioDetalle.unidad_medida
+                          }
+                          onChange={
+                            handleDetalle
+                          }
+                          required
+                        />
+                      </div>
+
+                      <div
+                        style={{
+                          padding:
+                            "12px 14px",
+                          border:
+                            "1px solid #e2e8f0",
+                          borderRadius:
+                            "10px",
+                          marginTop:
+                            "8px"
+                        }}
+                      >
+                        <small className="table-secondary">
+                          Campos
+                          obligatorios:
+                          Nombre,
+                          Existencias
+                          y Unidad de
+                          medida.
+                          Descripción,
+                          Punto de
+                          reorden,
+                          Proveedor,
+                          Categoría y
+                          SKU son
+                          opcionales.
+                        </small>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <div className="modal-footer">
+                  {!editandoDetalle ? (
+                    <>
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={
+                          cerrarDetalle
+                        }
+                        disabled={
+                          guardando
+                        }
+                      >
+                        Cerrar
+                      </button>
+
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={
+                          activarEdicionDetalle
+                        }
+                        disabled={
+                          guardando
+                        }
+                      >
+                        <Pencil
+                          size={17}
+                        />
+                        Editar
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={
+                          cancelarEdicionDetalle
+                        }
+                        disabled={
+                          guardando
+                        }
+                      >
+                        Cancelar
+                      </button>
+
+                      <button
+                        type="submit"
+                        className="btn btn-primary"
+                        disabled={
+                          guardando
+                        }
+                      >
+                        {guardando ? (
+                          <>
+                            <RefreshCw
+                              size={
+                                17
+                              }
+                              className="spin"
+                            />
+                            Guardando...
+                          </>
+                        ) : (
+                          <>
+                            <Save
+                              size={
+                                17
+                              }
+                            />
+                            Guardar
+                            cambios
+                          </>
+                        )}
+                      </button>
+                    </>
+                  )}
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}

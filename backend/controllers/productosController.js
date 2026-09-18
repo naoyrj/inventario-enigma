@@ -128,8 +128,7 @@ const validarCategoriaParaUsuario = async (
 
     if (
       Number(
-        categoria
-          .ubicacion_propietaria_id
+        categoria.ubicacion_propietaria_id
       ) !==
       Number(usuario.ubicacion_id)
     ) {
@@ -228,6 +227,14 @@ const getProductos = async (
         p.punto_reorden,
         p.activo,
         p.created_at,
+
+        CASE
+          WHEN p.imagen IS NOT NULL
+          THEN TRUE
+          ELSE FALSE
+        END AS tiene_imagen,
+
+        p.imagen_tipo,
 
         c.id AS categoria_id,
         c.nombre AS categoria_nombre,
@@ -358,7 +365,10 @@ const getProductos = async (
 
 // =========================================================
 // OBTENER PRODUCTO POR ID
-// ENI-45: INCLUYE PROVEEDOR
+// ENI-45:
+// - INCLUYE PROVEEDOR
+// - INCLUYE CATEGORÍA
+// - INDICA SI TIENE IMAGEN
 // =========================================================
 
 const getProductoById = async (
@@ -389,6 +399,14 @@ const getProductoById = async (
             p.punto_reorden,
             p.activo,
             p.created_at,
+
+            CASE
+              WHEN p.imagen IS NOT NULL
+              THEN TRUE
+              ELSE FALSE
+            END AS tiene_imagen,
+
+            p.imagen_tipo,
 
             c.id AS categoria_id,
             c.nombre AS categoria_nombre,
@@ -488,8 +506,110 @@ const getProductoById = async (
 };
 
 // =========================================================
+// OBTENER IMAGEN DEL PRODUCTO
+// =========================================================
+
+const getImagenProducto = async (
+  req,
+  res
+) => {
+  try {
+    const { id } = req.params;
+
+    const usuario = req.usuario;
+
+    if (!usuario) {
+      return res.status(401).json({
+        message:
+          "Usuario no autenticado"
+      });
+    }
+
+    const result =
+      await pool.query(
+        `
+          SELECT
+            p.id,
+            p.imagen,
+            p.imagen_tipo,
+
+            c.tipo AS categoria_tipo,
+
+            c.ubicacion_propietaria_id
+              AS categoria_ubicacion_propietaria_id
+
+          FROM productos p
+
+          LEFT JOIN categorias c
+            ON p.categoria_id = c.id
+
+          WHERE p.id = $1
+        `,
+        [id]
+      );
+
+    if (
+      result.rows.length === 0
+    ) {
+      return res.status(404).json({
+        message:
+          "Producto no encontrado"
+      });
+    }
+
+    const producto =
+      result.rows[0];
+
+    if (
+      !puedeVerProducto(
+        producto,
+        usuario
+      )
+    ) {
+      return res.status(404).json({
+        message:
+          "Producto no encontrado"
+      });
+    }
+
+    if (!producto.imagen) {
+      return res.status(404).json({
+        message:
+          "El producto no tiene imagen"
+      });
+    }
+
+    res.set(
+      "Content-Type",
+      producto.imagen_tipo ||
+        "application/octet-stream"
+    );
+
+    res.set(
+      "Cache-Control",
+      "private, max-age=300"
+    );
+
+    return res.send(producto.imagen);
+  } catch (error) {
+    console.error(
+      "Error getImagenProducto:",
+      error
+    );
+
+    return res.status(500).json({
+      message:
+        "Error al obtener la imagen del producto",
+      error: error.message
+    });
+  }
+};
+
+// =========================================================
 // CREAR PRODUCTO
-// ENI-45: SKU OPCIONAL
+// ENI-45:
+// - SKU OPCIONAL
+// - IMAGEN OPCIONAL
 // =========================================================
 
 const createProducto = async (
@@ -550,10 +670,32 @@ const createProducto = async (
       });
     }
 
+    const categoriaIdFinal =
+      categoria_id === "" ||
+      categoria_id === null ||
+      categoria_id === undefined
+        ? null
+        : Number(categoria_id);
+
+    if (
+      categoriaIdFinal !== null &&
+      (
+        !Number.isInteger(
+          categoriaIdFinal
+        ) ||
+        categoriaIdFinal <= 0
+      )
+    ) {
+      return res.status(400).json({
+        message:
+          "La categoría seleccionada no es válida"
+      });
+    }
+
     const validacion =
       await validarCategoriaParaUsuario(
         client,
-        categoria_id,
+        categoriaIdFinal,
         usuario
       );
 
@@ -619,6 +761,12 @@ const createProducto = async (
     const skuFinal =
       sku?.trim() || generarSku();
 
+    const imagen =
+      req.file?.buffer || null;
+
+    const imagenTipo =
+      req.file?.mimetype || null;
+
     await client.query("BEGIN");
     transaccionIniciada = true;
 
@@ -631,7 +779,9 @@ const createProducto = async (
             sku,
             categoria_id,
             unidad_medida,
-            punto_reorden
+            punto_reorden,
+            imagen,
+            imagen_tipo
           )
           VALUES (
             $1,
@@ -639,7 +789,9 @@ const createProducto = async (
             $3,
             $4,
             $5,
-            $6
+            $6,
+            $7,
+            $8
           )
           RETURNING id
         `,
@@ -648,9 +800,11 @@ const createProducto = async (
           descripcion?.trim() ||
             null,
           skuFinal,
-          categoria_id || null,
+          categoriaIdFinal,
           unidad_medida.trim(),
-          puntoReordenNumero
+          puntoReordenNumero,
+          imagen,
+          imagenTipo
         ]
       );
 
@@ -685,7 +839,9 @@ const createProducto = async (
       message:
         "Producto creado correctamente",
       id: productoId,
-      sku: skuFinal
+      sku: skuFinal,
+      tiene_imagen:
+        Boolean(imagen)
     });
   } catch (error) {
     if (transaccionIniciada) {
@@ -730,6 +886,9 @@ const createProducto = async (
 // ENI-45:
 // - SKU OPCIONAL
 // - PROVEEDOR EDITABLE PARA CENTRAL
+// - CATEGORÍA EDITABLE
+// - LOS DATOS DEL PRODUCTO SE ACTUALIZAN COMO JSON
+// - LA IMAGEN SE ACTUALIZA EN SU ENDPOINT INDEPENDIENTE
 // =========================================================
 
 const updateProducto = async (
@@ -776,6 +935,12 @@ const updateProducto = async (
             p.punto_reorden,
             p.activo,
             p.categoria_id,
+
+            CASE
+              WHEN p.imagen IS NOT NULL
+              THEN TRUE
+              ELSE FALSE
+            END AS tiene_imagen,
 
             c.tipo AS categoria_tipo,
 
@@ -855,6 +1020,10 @@ const updateProducto = async (
       }
     }
 
+    // -----------------------------------------------------
+    // SUCURSAL
+    // -----------------------------------------------------
+
     if (esSucursal(usuario)) {
       return res.status(403).json({
         message:
@@ -895,10 +1064,32 @@ const updateProducto = async (
       });
     }
 
+    const categoriaIdFinal =
+      categoria_id === "" ||
+      categoria_id === null ||
+      categoria_id === undefined
+        ? null
+        : Number(categoria_id);
+
+    if (
+      categoriaIdFinal !== null &&
+      (
+        !Number.isInteger(
+          categoriaIdFinal
+        ) ||
+        categoriaIdFinal <= 0
+      )
+    ) {
+      return res.status(400).json({
+        message:
+          "La categoría seleccionada no es válida"
+      });
+    }
+
     const validacionCategoria =
       await validarCategoriaParaUsuario(
         client,
-        categoria_id,
+        categoriaIdFinal,
         usuario
       );
 
@@ -915,13 +1106,18 @@ const updateProducto = async (
         });
     }
 
-    // El campo es opcional para el usuario.
-    // Internamente conservamos un SKU porque la base
-    // y otras partes del sistema lo utilizan.
+    // -----------------------------------------------------
+    // SKU
+    // -----------------------------------------------------
+
     const skuFinal =
       sku?.trim() ||
       productoActual.sku ||
       generarSku();
+
+    // -----------------------------------------------------
+    // PROVEEDOR
+    // -----------------------------------------------------
 
     let proveedorIdFinal = null;
     let actualizarProveedor = false;
@@ -988,7 +1184,11 @@ const updateProducto = async (
     const activoFinal =
       typeof activo === "boolean"
         ? activo
-        : productoActual.activo;
+        : activo === "true"
+          ? true
+          : activo === "false"
+            ? false
+            : productoActual.activo;
 
     await client.query("BEGIN");
     transaccionIniciada = true;
@@ -1016,7 +1216,7 @@ const updateProducto = async (
           descripcion?.trim() ||
             null,
           skuFinal,
-          categoria_id || null,
+          categoriaIdFinal,
           unidad_medida.trim(),
           puntoReordenNumero,
           activoFinal,
@@ -1026,13 +1226,6 @@ const updateProducto = async (
 
     // -----------------------------------------------------
     // PROVEEDOR
-    //
-    // ENI-45 presenta "Proveedor" como una especificación
-    // individual. Si Central lo cambia, reemplazamos las
-    // asociaciones anteriores por la seleccionada.
-    //
-    // Si se selecciona "Sin proveedor", simplemente se
-    // eliminan las asociaciones existentes.
     // -----------------------------------------------------
 
     if (actualizarProveedor) {
@@ -1075,7 +1268,12 @@ const updateProducto = async (
         "Producto actualizado correctamente",
       id:
         result.rows[0].id,
-      sku: skuFinal
+      sku:
+        skuFinal,
+      tiene_imagen:
+        Boolean(
+          productoActual.tiene_imagen
+        )
     });
   } catch (error) {
     if (transaccionIniciada) {
@@ -1108,6 +1306,163 @@ const updateProducto = async (
     return res.status(500).json({
       message:
         "Error al actualizar el producto",
+      error: error.message
+    });
+  } finally {
+    client.release();
+  }
+};
+
+// =========================================================
+// ACTUALIZAR IMAGEN DEL PRODUCTO
+// =========================================================
+
+const updateImagenProducto = async (
+  req,
+  res
+) => {
+  const client =
+    await pool.connect();
+
+  try {
+    const { id } = req.params;
+
+    const usuario = req.usuario;
+
+    if (!usuario) {
+      return res.status(401).json({
+        message:
+          "Usuario no autenticado"
+      });
+    }
+
+    if (!req.file?.buffer) {
+      return res.status(400).json({
+        message:
+          "Debes seleccionar una imagen PNG, JPG o JPEG"
+      });
+    }
+
+    const productoResult =
+      await client.query(
+        `
+          SELECT
+            p.id,
+
+            c.tipo
+              AS categoria_tipo,
+
+            c.ubicacion_propietaria_id
+              AS categoria_ubicacion_propietaria_id
+
+          FROM productos p
+
+          LEFT JOIN categorias c
+            ON p.categoria_id = c.id
+
+          WHERE p.id = $1
+        `,
+        [id]
+      );
+
+    if (
+      productoResult.rows.length ===
+      0
+    ) {
+      return res.status(404).json({
+        message:
+          "Producto no encontrado"
+      });
+    }
+
+    const producto =
+      productoResult.rows[0];
+
+    if (
+      !puedeVerProducto(
+        producto,
+        usuario
+      )
+    ) {
+      return res.status(404).json({
+        message:
+          "Producto no encontrado"
+      });
+    }
+
+    if (
+      esPrincipal(usuario) &&
+      producto.categoria_tipo ===
+        "privada"
+    ) {
+      return res.status(403).json({
+        message:
+          "Central no puede administrar productos de categorías privadas de Equipos Internos"
+      });
+    }
+
+    if (esEquipoInterno(usuario)) {
+      if (
+        producto.categoria_tipo !==
+          "privada" ||
+        Number(
+          producto
+            .categoria_ubicacion_propietaria_id
+        ) !==
+          Number(
+            usuario.ubicacion_id
+          )
+      ) {
+        return res.status(403).json({
+          message:
+            "Solo puedes modificar productos de tus propias categorías privadas"
+        });
+      }
+    }
+
+    if (esSucursal(usuario)) {
+      return res.status(403).json({
+        message:
+          "Las sucursales no pueden modificar productos"
+      });
+    }
+
+    const result =
+      await client.query(
+        `
+          UPDATE productos
+
+          SET
+            imagen = $1,
+            imagen_tipo = $2
+
+          WHERE id = $3
+
+          RETURNING id
+        `,
+        [
+          req.file.buffer,
+          req.file.mimetype,
+          id
+        ]
+      );
+
+    return res.json({
+      message:
+        "Imagen del producto actualizada correctamente",
+      id:
+        result.rows[0].id,
+      tiene_imagen: true
+    });
+  } catch (error) {
+    console.error(
+      "Error updateImagenProducto:",
+      error
+    );
+
+    return res.status(500).json({
+      message:
+        "Error al actualizar la imagen del producto",
       error: error.message
     });
   } finally {
@@ -1278,9 +1633,15 @@ const deactivateProducto = async (
   }
 };
 
+// =========================================================
+// EXPORTACIONES
+// =========================================================
+
 module.exports = {
   getProductos,
   getProductoById,
+  getImagenProducto,
+  updateImagenProducto,
   createProducto,
   updateProducto,
   deactivateProducto
