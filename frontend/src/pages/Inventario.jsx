@@ -108,7 +108,6 @@ const Inventario = () => {
     "";
 
   const esPrincipal =
-    usuario?.rol === "principal" ||
     tipoUbicacion === "principal" ||
     usuario?.es_principal === true ||
     usuario?.es_principal === 1;
@@ -219,17 +218,20 @@ const Inventario = () => {
   };
 
   const cargarInventario = async () => {
-    let response;
+    try {
+      const response = await api.get("/inventario");
 
-    if (esPrincipal) {
-      response = await api.get("/reportes/inventario");
-    } else {
-      response = await api.get("/inventario");
+      setInventario(
+        normalizarInventario(response.data)
+      );
+    } catch (err) {
+      console.error(
+        "Error al cargar inventario:",
+        err
+      );
+
+      throw err;
     }
-
-    setInventario(
-      normalizarInventario(response.data)
-    );
   };
 
   const cargarCategorias = async () => {
@@ -1283,10 +1285,7 @@ const Inventario = () => {
         )
       );
 
-      await Promise.all([
-        cargarInventario(),
-        cargarProductos()
-      ]);
+      await cargarProductos();
     } catch (err) {
       console.error(
         "Error al guardar producto:",
@@ -1608,8 +1607,26 @@ const Inventario = () => {
                         </td>
 
                         <td>
-                          {item.proveedor_nombre ||
-                            "Sin proveedor"}
+                          {obtenerNombreProveedor(
+                            obtenerProveedorId(
+                              productos.find(
+                                (producto) =>
+                                  Number(producto.id) ===
+                                  Number(item.producto_id)
+                              )
+                            )
+                          ) !== "Sin proveedor"
+                            ? obtenerNombreProveedor(
+                                obtenerProveedorId(
+                                  productos.find(
+                                    (producto) =>
+                                      Number(producto.id) ===
+                                      Number(item.producto_id)
+                                  )
+                                )
+                              )
+                            : item.proveedor_nombre ||
+                              "Sin proveedor"}
                         </td>
 
                         <td>
@@ -2438,18 +2455,24 @@ const Inventario = () => {
                   display: "flex",
                   alignItems:
                     "center",
-                  gap: "10px"
+                  gap: "10px",
+                  marginBottom:
+                    "12px"
                 }}
               >
-                <FileText size={20} />
+                <FileText
+                  size={24}
+                />
 
                 <strong>
-                  Selecciona un archivo CSV
+                  Archivo CSV
                 </strong>
               </div>
 
               <input
-                ref={inputArchivoRef}
+                ref={
+                  inputArchivoRef
+                }
                 type="file"
                 accept=".csv,text/csv"
                 onChange={
@@ -2458,135 +2481,254 @@ const Inventario = () => {
                 disabled={
                   importando
                 }
-                style={{
-                  marginTop:
-                    "14px",
-                  width: "100%"
-                }}
               />
 
-              <small
-                className="table-secondary"
-                style={{
-                  display:
-                    "block",
-                  marginTop:
-                    "8px"
-                }}
-              >
-                El archivo debe contener
-                los datos requeridos para
-                registrar productos en el
-                inventario.
-              </small>
+              {archivoCsv && (
+                <div
+                  className="table-secondary"
+                  style={{
+                    marginTop:
+                      "12px"
+                  }}
+                >
+                  Archivo
+                  seleccionado:{" "}
+                  <strong>
+                    {
+                      archivoCsv.name
+                    }
+                  </strong>
+                </div>
+              )}
             </div>
 
-            {archivoCsv && (
-              <div
+            <div
+              style={{
+                marginBottom:
+                  "20px"
+              }}
+            >
+              <strong>
+                Formato esperado
+              </strong>
+
+              <p
+                className="table-secondary"
                 style={{
-                  padding: "12px 14px",
-                  border:
-                    "1px solid #e2e8f0",
-                  borderRadius:
-                    "10px",
-                  marginBottom:
-                    "16px"
+                  marginTop: "8px"
                 }}
               >
-                <strong>
-                  Archivo seleccionado:
-                </strong>{" "}
-                {archivoCsv.name}
+                Las columnas obligatorias son nombre,
+                unidad_medida y cantidad. SKU, descripción,
+                categoria_id y punto_reorden son opcionales.
+              </p>
+
+              <div
+                style={{
+                  overflowX:
+                    "auto",
+                  marginTop:
+                    "12px"
+                }}
+              >
+                <table>
+                  <thead>
+                    <tr>
+                      <th>
+                        nombre
+                      </th>
+                      <th>
+                        unidad_medida
+                      </th>
+                      <th>
+                        cantidad
+                      </th>
+                      <th>
+                        sku
+                      </th>
+                      <th>
+                        categoria_id
+                      </th>
+                      <th>
+                        punto_reorden
+                      </th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    <tr>
+                      <td>
+                        Mouse Logitech
+                      </td>
+                      <td>
+                        pieza
+                      </td>
+                      <td>
+                        10
+                      </td>
+                      <td>
+                        Opcional
+                      </td>
+                      <td>
+                        Opcional
+                      </td>
+                      <td>
+                        Opcional
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
-            )}
+            </div>
 
             {resultadoImportacion && (
               <div
                 style={{
-                  padding: "14px",
-                  border:
-                    "1px solid #e2e8f0",
-                  borderRadius:
-                    "10px",
+                  marginTop:
+                    "20px",
                   marginBottom:
-                    "16px"
+                    "20px"
                 }}
               >
-                <strong>
+                <h3>
                   Resultado de la importación
-                </strong>
+                </h3>
 
-                {resultadoImportacion.message && (
-                  <p>
-                    {
-                      resultadoImportacion.message
-                    }
-                  </p>
-                )}
+                <div
+                  className="inventory-summary"
+                  style={{
+                    marginTop:
+                      "14px"
+                  }}
+                >
+                  <div className="mini-stat">
+                    <FileText
+                      size={20}
+                    />
 
-                {resultadoImportacion.mensaje && (
-                  <p>
-                    {
-                      resultadoImportacion.mensaje
-                    }
-                  </p>
-                )}
-
-                {resultadoImportacion.insertados !==
-                  undefined && (
-                  <p>
-                    Insertados:{" "}
-                    {
-                      resultadoImportacion.insertados
-                    }
-                  </p>
-                )}
-
-                {resultadoImportacion.actualizados !==
-                  undefined && (
-                  <p>
-                    Actualizados:{" "}
-                    {
-                      resultadoImportacion.actualizados
-                    }
-                  </p>
-                )}
-
-                {Array.isArray(
-                  resultadoImportacion.errores
-                ) &&
-                  resultadoImportacion.errores.length >
-                    0 && (
                     <div>
-                      <strong>
-                        Errores:
-                      </strong>
+                      <span>
+                        Filas
+                      </span>
 
-                      <ul>
-                        {resultadoImportacion.errores.map(
-                          (
-                            item,
-                            index
-                          ) => (
-                            <li
-                              key={
-                                index
-                              }
-                            >
-                              {typeof item ===
-                              "string"
-                                ? item
-                                : item?.mensaje ||
-                                  item?.message ||
-                                  JSON.stringify(
-                                    item
-                                  )}
-                            </li>
-                          )
-                        )}
-                      </ul>
+                      <strong>
+                        {resultadoImportacion
+                          .resumen
+                          ?.total_filas ||
+                          0}
+                      </strong>
                     </div>
-                  )}
+                  </div>
+
+                  <div className="mini-stat">
+                    <PackagePlus
+                      size={20}
+                    />
+
+                    <div>
+                      <span>
+                        Agregadas
+                      </span>
+
+                      <strong>
+                        {resultadoImportacion
+                          .resumen
+                          ?.agregados ||
+                          0}
+                      </strong>
+                    </div>
+                  </div>
+
+                  <div className="mini-stat">
+                    <AlertTriangle
+                      size={20}
+                    />
+
+                    <div>
+                      <span>
+                        Errores
+                      </span>
+
+                      <strong>
+                        {resultadoImportacion
+                          .resumen
+                          ?.filas_con_error ||
+                          0}
+                      </strong>
+                    </div>
+                  </div>
+                </div>
+
+                {resultadoImportacion
+                  .errores
+                  ?.length >
+                  0 && (
+                  <div
+                    style={{
+                      marginTop:
+                        "18px"
+                    }}
+                  >
+                    <strong>
+                      Filas con error
+                    </strong>
+
+                    <div
+                      className="table-container"
+                      style={{
+                        marginTop:
+                          "10px"
+                      }}
+                    >
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>
+                              Fila
+                            </th>
+                            <th>
+                              Producto
+                            </th>
+                            <th>
+                              Error
+                            </th>
+                          </tr>
+                        </thead>
+
+                        <tbody>
+                          {resultadoImportacion.errores.map(
+                            (
+                              item,
+                              index
+                            ) => (
+                              <tr
+                                key={`${item.fila}-${index}`}
+                              >
+                                <td>
+                                  {
+                                    item.fila
+                                  }
+                                </td>
+
+                                <td>
+                                  {item.nombre ||
+                                    item.sku ||
+                                    "-"}
+                                </td>
+
+                                <td>
+                                  {
+                                    item.error
+                                  }
+                                </td>
+                              </tr>
+                            )
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -2596,7 +2738,10 @@ const Inventario = () => {
                 justifyContent:
                   "flex-end",
                 gap: "10px",
-                flexWrap: "wrap"
+                marginTop:
+                  "20px",
+                flexWrap:
+                  "wrap"
               }}
             >
               <button
@@ -2609,7 +2754,7 @@ const Inventario = () => {
                   importando
                 }
               >
-                Cancelar
+                Cerrar
               </button>
 
               <button
@@ -2623,7 +2768,9 @@ const Inventario = () => {
                   !archivoCsv
                 }
               >
-                <Upload size={18} />
+                <Upload
+                  size={18}
+                />
 
                 {importando
                   ? "Importando..."
@@ -2677,11 +2824,11 @@ const Inventario = () => {
             <div className="modal-header">
               <div>
                 <h2>
-                  Agregar artículo al inventario
+                  Agregar artículo
                 </h2>
 
                 <p>
-                  Registra existencias iniciales para un producto.
+                  Agrega existencias al inventario.
                 </p>
               </div>
 
@@ -2730,7 +2877,9 @@ const Inventario = () => {
                   </option>
 
                   {productos.map(
-                    (producto) => (
+                    (
+                      producto
+                    ) => (
                       <option
                         key={
                           producto.id
@@ -2744,7 +2893,7 @@ const Inventario = () => {
                         }
 
                         {producto.sku
-                          ? ` — ${producto.sku}`
+                          ? ` - ${producto.sku}`
                           : ""}
                       </option>
                     )
@@ -2752,72 +2901,63 @@ const Inventario = () => {
                 </select>
               </div>
 
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns:
-                    "repeat(auto-fit, minmax(220px, 1fr))",
-                  gap: "16px"
-                }}
-              >
+              {esPrincipal && (
                 <div className="form-group">
                   <label>
-                    Cantidad *
+                    Ubicación
                   </label>
 
-                  <input
-                    type="number"
-                    min="0"
-                    step="any"
-                    name="cantidad"
+                  <select
+                    name="ubicacion_id"
                     value={
-                      formulario.cantidad
+                      formulario.ubicacion_id
                     }
                     onChange={
                       handleFormulario
                     }
-                    required
-                  />
+                  >
+                    <option value="">
+                      Almacén Central
+                    </option>
+
+                    {ubicaciones.map(
+                      (item) => (
+                        <option
+                          key={
+                            item.id
+                          }
+                          value={
+                            item.id
+                          }
+                        >
+                          {
+                            item.nombre
+                          }
+                        </option>
+                      )
+                    )}
+                  </select>
                 </div>
+              )}
 
-                {esPrincipal && (
-                  <div className="form-group">
-                    <label>
-                      Ubicación
-                    </label>
+              <div className="form-group">
+                <label>
+                  Existencias *
+                </label>
 
-                    <select
-                      name="ubicacion_id"
-                      value={
-                        formulario.ubicacion_id
-                      }
-                      onChange={
-                        handleFormulario
-                      }
-                    >
-                      <option value="">
-                        Ubicación actual
-                      </option>
-
-                      {ubicaciones.map(
-                        (item) => (
-                          <option
-                            key={
-                              item.id
-                            }
-                            value={
-                              item.id
-                            }
-                          >
-                            {
-                              item.nombre
-                            }
-                          </option>
-                        )
-                      )}
-                    </select>
-                  </div>
-                )}
+                <input
+                  type="number"
+                  min="0"
+                  step="any"
+                  name="cantidad"
+                  value={
+                    formulario.cantidad
+                  }
+                  onChange={
+                    handleFormulario
+                  }
+                  required
+                />
               </div>
 
               <div className="form-group">
@@ -2834,7 +2974,7 @@ const Inventario = () => {
                   onChange={
                     handleFormulario
                   }
-                  placeholder="Motivo opcional del registro"
+                  placeholder="Opcional"
                 />
               </div>
 
@@ -2844,7 +2984,10 @@ const Inventario = () => {
                   justifyContent:
                     "flex-end",
                   gap: "10px",
-                  marginTop: "24px"
+                  marginTop:
+                    "24px",
+                  flexWrap:
+                    "wrap"
                 }}
               >
                 <button
@@ -2867,7 +3010,9 @@ const Inventario = () => {
                     guardando
                   }
                 >
-                  <PackagePlus size={18} />
+                  <PackagePlus
+                    size={18}
+                  />
 
                   {guardando
                     ? "Guardando..."
