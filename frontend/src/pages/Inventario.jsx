@@ -110,8 +110,7 @@ const Inventario = () => {
   const esPrincipal =
     tipoUbicacion === "principal" ||
     usuario?.es_principal === true ||
-    usuario?.es_principal === 1 ||
-    usuario?.rol === "principal";
+    usuario?.es_principal === 1;
 
   const normalizarInventario = (respuesta) => {
     if (Array.isArray(respuesta)) {
@@ -219,17 +218,20 @@ const Inventario = () => {
   };
 
   const cargarInventario = async () => {
-    let response;
+    try {
+      const response = await api.get("/inventario");
 
-    if (esPrincipal) {
-      response = await api.get("/reportes/inventario");
-    } else {
-      response = await api.get("/inventario");
+      setInventario(
+        normalizarInventario(response.data)
+      );
+    } catch (err) {
+      console.error(
+        "Error al cargar inventario:",
+        err
+      );
+
+      throw err;
     }
-
-    setInventario(
-      normalizarInventario(response.data)
-    );
   };
 
   const cargarCategorias = async () => {
@@ -1167,14 +1169,20 @@ const Inventario = () => {
       );
 
       if (existenciasCambiaron) {
+        const diferencia =
+          existencias -
+          Number(
+            detalleOriginal.existencias
+          );
+
         const payloadAjuste = {
           producto_id:
             Number(
               articuloDetalle.producto_id
             ),
 
-          cantidad_nueva:
-            existencias,
+          cantidad:
+            diferencia,
 
           motivo:
             motivoExistencias.trim()
@@ -1189,7 +1197,7 @@ const Inventario = () => {
             );
         }
 
-        await api.patch(
+        await api.post(
           "/inventario/ajuste",
           payloadAjuste
         );
@@ -1258,10 +1266,26 @@ const Inventario = () => {
         "Producto actualizado correctamente."
       );
 
-      await Promise.all([
-        cargarInventario(),
-        cargarProductos()
-      ]);
+      const nombreProveedorActualizado =
+        proveedorId
+          ? obtenerNombreProveedor(proveedorId)
+          : "Sin proveedor";
+
+      setInventario((inventarioActual) =>
+        inventarioActual.map((item) =>
+          Number(item.producto_id) ===
+          Number(articuloDetalle.producto_id)
+            ? {
+                ...item,
+                proveedor_id: proveedorId,
+                proveedor_nombre:
+                  nombreProveedorActualizado
+              }
+            : item
+        )
+      );
+
+      await cargarProductos();
     } catch (err) {
       console.error(
         "Error al guardar producto:",
@@ -1583,8 +1607,26 @@ const Inventario = () => {
                         </td>
 
                         <td>
-                          {item.proveedor_nombre ||
-                            "Sin proveedor"}
+                          {obtenerNombreProveedor(
+                            obtenerProveedorId(
+                              productos.find(
+                                (producto) =>
+                                  Number(producto.id) ===
+                                  Number(item.producto_id)
+                              )
+                            )
+                          ) !== "Sin proveedor"
+                            ? obtenerNombreProveedor(
+                                obtenerProveedorId(
+                                  productos.find(
+                                    (producto) =>
+                                      Number(producto.id) ===
+                                      Number(item.producto_id)
+                                  )
+                                )
+                              )
+                            : item.proveedor_nombre ||
+                              "Sin proveedor"}
                         </td>
 
                         <td>

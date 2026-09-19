@@ -17,61 +17,123 @@ const {
 const router = express.Router();
 
 // =========================================================
-// CONFIGURACIÓN PARA IMÁGENES DE PRODUCTOS
-// =========================================================
-//
-// Las imágenes se reciben directamente en memoria porque
-// el controlador guarda el contenido en PostgreSQL.
-//
-// Campo esperado desde el frontend:
-// "imagen"
-//
-// Tamaño máximo:
-// 5 MB
+// CONFIGURACIÓN DE MULTER PARA IMÁGENES DE PRODUCTOS
 // =========================================================
 
-const upload = multer({
-  storage: multer.memoryStorage(),
+const almacenamiento = multer.memoryStorage();
+
+const tiposPermitidos = [
+  "image/png",
+  "image/jpeg"
+];
+
+const filtroImagen = (
+  req,
+  file,
+  callback
+) => {
+  if (
+    tiposPermitidos.includes(
+      file.mimetype
+    )
+  ) {
+    callback(null, true);
+    return;
+  }
+
+  const error = new Error(
+    "Formato de imagen no permitido. Solo se aceptan archivos PNG, JPG y JPEG."
+  );
+
+  error.status = 400;
+
+  callback(error);
+};
+
+const subirImagen = multer({
+  storage: almacenamiento,
 
   limits: {
-    fileSize:
-      5 * 1024 * 1024
+    fileSize: 5 * 1024 * 1024
   },
 
-  fileFilter: (
-    req,
-    file,
-    cb
-  ) => {
-    const tiposPermitidos = [
-      "image/png",
-      "image/jpeg"
-    ];
-
-    if (
-      !tiposPermitidos.includes(
-        file.mimetype
-      )
-    ) {
-      return cb(
-        new Error(
-          "Solo se permiten imágenes PNG, JPG o JPEG"
-        )
-      );
-    }
-
-    cb(null, true);
-  }
+  fileFilter: filtroImagen
 });
 
 // =========================================================
-// OBTENER TODOS LOS PRODUCTOS
+// MIDDLEWARE PARA PROCESAR IMAGEN
+// =========================================================
+
+const procesarImagen = (
+  req,
+  res,
+  next
+) => {
+  subirImagen.single("imagen")(
+    req,
+    res,
+    (error) => {
+      if (!error) {
+        next();
+        return;
+      }
+
+      if (
+        error instanceof
+        multer.MulterError
+      ) {
+        if (
+          error.code ===
+          "LIMIT_FILE_SIZE"
+        ) {
+          return res.status(400).json({
+            message:
+              "La imagen no puede superar los 5 MB."
+          });
+        }
+
+        return res.status(400).json({
+          message:
+            "No fue posible procesar la imagen.",
+          error:
+            error.message
+        });
+      }
+
+      return res
+        .status(
+          error.status || 400
+        )
+        .json({
+          message:
+            error.message ||
+            "La imagen seleccionada no es válida."
+        });
+    }
+  );
+};
+
+// =========================================================
+// OBTENER PRODUCTOS
 // =========================================================
 
 router.get(
   "/",
   verifyToken,
   getProductos
+);
+
+// =========================================================
+// OBTENER IMAGEN DEL PRODUCTO
+//
+// IMPORTANTE:
+// Esta ruta debe estar antes de "/:id".
+// =========================================================
+
+router.get(
+  "/:id/imagen",
+  verifyToken,
+  getImagenProducto
 );
 
 // =========================================================
@@ -85,65 +147,33 @@ router.get(
 );
 
 // =========================================================
-// OBTENER IMAGEN DEL PRODUCTO
-// =========================================================
-
-router.get(
-  "/:id/imagen",
-  verifyToken,
-  getImagenProducto
-);
-
-// =========================================================
 // CREAR PRODUCTO
-// =========================================================
 //
-// upload.single("imagen") permite:
-//
-// - Crear producto sin imagen
-// - Crear producto con imagen
-//
-// Si no se envía imagen, req.file simplemente será undefined.
+// Acepta:
+// multipart/form-data
+// Campo del archivo: "imagen"
 // =========================================================
 
 router.post(
   "/",
   verifyToken,
-  upload.single("imagen"),
+  procesarImagen,
   createProducto
 );
 
 // =========================================================
 // ACTUALIZAR PRODUCTO
-// =========================================================
 //
-// Esta es la corrección importante.
-//
-// Inventario.jsx envía FormData cuando actualiza
-// las especificaciones del producto.
-//
-// Ahora multer procesa:
-//
-// nombre
-// descripcion
-// sku
-// categoria_id
-// unidad_medida
-// punto_reorden
-// proveedor_id
-// activo
-// imagen
-//
-// El controlador recibe:
-//
-// req.body
-// req.file
+// Acepta:
+// multipart/form-data
+// Campo del archivo: "imagen"
+// Si no se envía imagen, conserva la imagen existente.
 // =========================================================
 
 router.put(
   "/:id",
   verifyToken,
-  upload.single("imagen"),
+  procesarImagen,
   updateProducto
 );
 
@@ -155,53 +185,6 @@ router.patch(
   "/:id/desactivar",
   verifyToken,
   deactivateProducto
-);
-
-// =========================================================
-// MANEJO DE ERRORES DE MULTER
-// =========================================================
-
-router.use(
-  (
-    error,
-    req,
-    res,
-    next
-  ) => {
-    if (
-      error instanceof
-      multer.MulterError
-    ) {
-      if (
-        error.code ===
-        "LIMIT_FILE_SIZE"
-      ) {
-        return res.status(400).json({
-          message:
-            "La imagen no puede superar los 5 MB"
-        });
-      }
-
-      return res.status(400).json({
-        message:
-          "Error al procesar la imagen",
-        error:
-          error.message
-      });
-    }
-
-    if (
-      error?.message ===
-      "Solo se permiten imágenes PNG, JPG o JPEG"
-    ) {
-      return res.status(400).json({
-        message:
-          "Solo se permiten imágenes PNG, JPG o JPEG"
-      });
-    }
-
-    next(error);
-  }
 );
 
 module.exports = router;
