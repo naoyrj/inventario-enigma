@@ -888,21 +888,53 @@ const importarInventarioCsv = async (
 
   try {
     await new Promise((resolve, reject) => {
-      Readable.from([req.file.buffer])
-        .pipe(
-          csv({
-            mapHeaders: ({ header }) =>
-              header
-                .replace(/^\uFEFF/, "")
-                .trim()
-                .toLowerCase()
-          })
-        )
-        .on("data", (fila) => {
-          filas.push(fila);
-        })
-        .on("end", resolve)
-        .on("error", reject);
+      const bufferCsv = req.file.buffer;
+
+let contenidoCsv;
+
+const tieneBomUtf8 =
+  bufferCsv.length >= 3 &&
+  bufferCsv[0] === 0xef &&
+  bufferCsv[1] === 0xbb &&
+  bufferCsv[2] === 0xbf;
+
+if (tieneBomUtf8) {
+  contenidoCsv = iconv.decode(
+    bufferCsv,
+    "utf8"
+  );
+} else {
+  try {
+    const decoder = new TextDecoder(
+      "utf-8",
+      { fatal: true }
+    );
+
+    contenidoCsv =
+      decoder.decode(bufferCsv);
+  } catch {
+    contenidoCsv = iconv.decode(
+      bufferCsv,
+      "win1252"
+    );
+  }
+}
+
+Readable.from([contenidoCsv])
+  .pipe(
+    csv({
+      mapHeaders: ({ header }) =>
+        header
+          .replace(/^\uFEFF/, "")
+          .trim()
+          .toLowerCase()
+    })
+  )
+  .on("data", (fila) => {
+    filas.push(fila);
+  })
+  .on("end", resolve)
+  .on("error", reject);
     });
   } catch (error) {
     return res.status(400).json({
