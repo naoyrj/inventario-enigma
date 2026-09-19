@@ -1351,10 +1351,11 @@ const ajustarStock = async (req, res) => {
     }
 
     const {
-      producto_id,
-      cantidad_nueva,
-      motivo
-    } = req.body;
+        producto_id,
+        cantidad_nueva,
+        motivo,
+        ubicacion_id
+      } = req.body;
 
     if (!producto_id) {
       return res.status(400).json({
@@ -1382,8 +1383,8 @@ const ajustarStock = async (req, res) => {
     }
 
     const ubicacionObjetivo = Number(
-      req.usuario.ubicacion_id
-    );
+        ubicacion_id ?? req.usuario.ubicacion_id
+      );
 
     if (!Number.isFinite(ubicacionObjetivo)) {
       return res.status(400).json({
