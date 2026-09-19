@@ -1169,35 +1169,21 @@ const Inventario = () => {
       );
 
       if (existenciasCambiaron) {
-        const diferencia =
-          existencias -
-          Number(
-            detalleOriginal.existencias
-          );
-
         const payloadAjuste = {
-          producto_id:
-            Number(
-              articuloDetalle.producto_id
-            ),
-
-          cantidad:
-            diferencia,
-
-          motivo:
-            motivoExistencias.trim()
+          producto_id: Number(
+            articuloDetalle.producto_id
+          ),
+          cantidad_nueva: existencias,
+          motivo: motivoExistencias.trim()
         };
 
-        if (
-          articuloDetalle.ubicacion_id
-        ) {
-          payloadAjuste.ubicacion_id =
-            Number(
-              articuloDetalle.ubicacion_id
-            );
+        if (articuloDetalle.ubicacion_id) {
+          payloadAjuste.ubicacion_id = Number(
+            articuloDetalle.ubicacion_id
+          );
         }
 
-        await api.post(
+        await api.patch(
           "/inventario/ajuste",
           payloadAjuste
         );
