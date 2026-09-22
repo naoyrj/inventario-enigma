@@ -13,12 +13,31 @@ const Reportes = () => {
   const [solicitudes, setSolicitudes] = useState([]);
   const [kardex, setKardex] = useState([]);
 
-  const [productoId, setProductoId] = useState("");
+  // ==============================
+  // FILTROS DE CONSUMO
+  // ==============================
+
   const [desde, setDesde] = useState("");
   const [hasta, setHasta] = useState("");
 
+  // ==============================
+  // FILTROS DE KARDEX
+  // ==============================
+
+  const [kardexNombre, setKardexNombre] = useState("");
+  const [kardexSku, setKardexSku] = useState("");
+  const [kardexProveedor, setKardexProveedor] = useState("");
+  const [kardexDesde, setKardexDesde] = useState("");
+  const [kardexHasta, setKardexHasta] = useState("");
+
   const [loading, setLoading] = useState(true);
+  const [loadingKardex, setLoadingKardex] = useState(false);
+
   const [error, setError] = useState("");
+
+  // ==============================
+  // CARGAR REPORTES
+  // ==============================
 
   useEffect(() => {
     cargarReportes();
@@ -52,32 +71,28 @@ const Reportes = () => {
     }
   };
 
-  const buscarKardex = async () => {
-    if (!productoId) return;
-
-    try {
-      const response = await api.get(
-        `/reportes/kardex/${productoId}`
-      );
-
-      setKardex(response.data || []);
-    } catch (error) {
-      setError(
-        error.response?.data?.message ||
-          "No fue posible cargar el Kardex"
-      );
-    }
-  };
+  // ==============================
+  // FILTRAR CONSUMO
+  // ==============================
 
   const filtrarConsumo = async () => {
     try {
+      setError("");
+
       const params = new URLSearchParams();
 
-      if (desde) params.append("desde", desde);
-      if (hasta) params.append("hasta", hasta);
+      if (desde) {
+        params.append("desde", desde);
+      }
+
+      if (hasta) {
+        params.append("hasta", hasta);
+      }
+
+      const query = params.toString();
 
       const response = await api.get(
-        `/reportes/consumo?${params.toString()}`
+        `/reportes/consumo${query ? `?${query}` : ""}`
       );
 
       setConsumo(response.data.consumo || []);
@@ -89,6 +104,113 @@ const Reportes = () => {
     }
   };
 
+  // ==============================
+  // BUSCAR KARDEX
+  // ==============================
+
+  const buscarKardex = async () => {
+    try {
+      setLoadingKardex(true);
+      setError("");
+
+      const params = new URLSearchParams();
+
+      if (kardexNombre.trim()) {
+        params.append(
+          "nombre",
+          kardexNombre.trim()
+        );
+      }
+
+      if (kardexSku.trim()) {
+        params.append(
+          "sku",
+          kardexSku.trim()
+        );
+      }
+
+      if (kardexProveedor.trim()) {
+        params.append(
+          "proveedor",
+          kardexProveedor.trim()
+        );
+      }
+
+      if (kardexDesde) {
+        params.append(
+          "desde",
+          kardexDesde
+        );
+      }
+
+      if (kardexHasta) {
+        params.append(
+          "hasta",
+          kardexHasta
+        );
+      }
+
+      const query = params.toString();
+
+      const response = await api.get(
+        `/reportes/kardex${query ? `?${query}` : ""}`
+      );
+
+      setKardex(response.data || []);
+    } catch (error) {
+      setKardex([]);
+
+      setError(
+        error.response?.data?.message ||
+          "No fue posible cargar el Kardex"
+      );
+    } finally {
+      setLoadingKardex(false);
+    }
+  };
+
+  // ==============================
+  // LIMPIAR FILTROS KARDEX
+  // ==============================
+
+  const limpiarFiltrosKardex = () => {
+    setKardexNombre("");
+    setKardexSku("");
+    setKardexProveedor("");
+    setKardexDesde("");
+    setKardexHasta("");
+    setKardex([]);
+    setError("");
+  };
+
+  // ==============================
+  // FORMATO DE FECHA
+  // ==============================
+
+  const formatearFechaHora = (fecha) => {
+    if (!fecha) {
+      return "—";
+    }
+
+    return new Date(fecha).toLocaleString(
+      "es-MX"
+    );
+  };
+
+  const formatearFecha = (fecha) => {
+    if (!fecha) {
+      return "—";
+    }
+
+    return new Date(fecha).toLocaleDateString(
+      "es-MX"
+    );
+  };
+
+  // ==============================
+  // LOADING INICIAL
+  // ==============================
+
   if (loading) {
     return (
       <div className="page-loading">
@@ -97,13 +219,23 @@ const Reportes = () => {
     );
   }
 
+  // ==============================
+  // RENDER
+  // ==============================
+
   return (
     <div>
+      {/* =========================================
+          ENCABEZADO
+      ========================================= */}
+
       <header className="page-header">
         <div>
           <h1>Reportes</h1>
+
           <p>
-            Inventario, consumo, alertas y movimientos.
+            Inventario, consumo, alertas y
+            movimientos.
           </p>
         </div>
 
@@ -116,19 +248,34 @@ const Reportes = () => {
         </button>
       </header>
 
+      {/* =========================================
+          ERROR GENERAL
+      ========================================= */}
+
       {error && (
         <div className="error-message page-error">
           {error}
         </div>
       )}
 
+      {/* =========================================
+          ALERTAS + CONSUMO
+      ========================================= */}
+
       <section className="report-grid">
+
+        {/* =======================================
+            ALERTAS
+        ======================================= */}
+
         <div className="content-card">
           <div className="section-heading">
             <div>
               <h2>Alertas de stock</h2>
+
               <p>
-                Productos por debajo del punto de reorden.
+                Productos por debajo del punto
+                de reorden.
               </p>
             </div>
 
@@ -176,10 +323,15 @@ const Reportes = () => {
           )}
         </div>
 
+        {/* =======================================
+            CONSUMO
+        ======================================= */}
+
         <div className="content-card">
           <div className="section-heading">
             <div>
               <h2>Consumo por periodo</h2>
+
               <p>
                 Salidas registradas en inventario.
               </p>
@@ -255,46 +407,155 @@ const Reportes = () => {
         </div>
       </section>
 
+      {/* =========================================
+          KARDEX
+      ========================================= */}
+
       <section className="content-card report-section">
+
         <div className="section-heading">
           <div>
-            <h2>Kardex por producto</h2>
+            <h2>Kardex</h2>
+
             <p>
-              Historial completo de movimientos.
+              Consulta el historial de movimientos
+              del inventario por producto, SKU,
+              proveedor y periodo.
             </p>
           </div>
         </div>
 
-        <div className="kardex-search">
+        {/* =======================================
+            FILTROS KARDEX
+        ======================================= */}
+
+        <div className="report-filters">
+
+          {/* PRODUCTO */}
+
           <div className="search-box">
             <Search size={18} />
 
             <input
-              type="number"
-              min="1"
-              placeholder="ID del producto"
-              value={productoId}
+              type="text"
+              placeholder="Nombre del producto"
+              value={kardexNombre}
               onChange={(e) =>
-                setProductoId(e.target.value)
+                setKardexNombre(
+                  e.target.value
+                )
               }
             />
           </div>
 
+          {/* SKU */}
+
+          <div className="search-box">
+            <Search size={18} />
+
+            <input
+              type="text"
+              placeholder="SKU"
+              value={kardexSku}
+              onChange={(e) =>
+                setKardexSku(
+                  e.target.value
+                )
+              }
+            />
+          </div>
+
+          {/* PROVEEDOR */}
+
+          <div className="search-box">
+            <Search size={18} />
+
+            <input
+              type="text"
+              placeholder="Proveedor"
+              value={kardexProveedor}
+              onChange={(e) =>
+                setKardexProveedor(
+                  e.target.value
+                )
+              }
+            />
+          </div>
+
+          {/* FECHA DESDE */}
+
+          <input
+            type="date"
+            className="form-control"
+            value={kardexDesde}
+            onChange={(e) =>
+              setKardexDesde(
+                e.target.value
+              )
+            }
+          />
+
+          {/* FECHA HASTA */}
+
+          <input
+            type="date"
+            className="form-control"
+            value={kardexHasta}
+            onChange={(e) =>
+              setKardexHasta(
+                e.target.value
+              )
+            }
+          />
+
+          {/* BUSCAR */}
+
           <button
             className="primary-button"
             onClick={buscarKardex}
+            disabled={loadingKardex}
           >
-            Buscar Kardex
+            <Search size={18} />
+
+            {loadingKardex
+              ? "Buscando..."
+              : "Buscar"}
+          </button>
+
+          {/* LIMPIAR */}
+
+          <button
+            className="secondary-button"
+            onClick={limpiarFiltrosKardex}
+            type="button"
+          >
+            Limpiar
           </button>
         </div>
 
-        {kardex.length > 0 && (
+        {/* =======================================
+            ESTADO DEL KARDEX
+        ======================================= */}
+
+        {loadingKardex ? (
+          <div className="empty-state">
+            Consultando movimientos...
+          </div>
+        ) : kardex.length === 0 ? (
+          <div className="empty-state">
+            Utiliza los filtros y presiona
+            <strong> Buscar </strong>
+            para consultar el Kardex.
+          </div>
+        ) : (
           <div className="table-container report-table">
             <table>
               <thead>
                 <tr>
                   <th>Fecha</th>
                   <th>Producto</th>
+                  <th>SKU</th>
+                  <th>Proveedor</th>
                   <th>Ubicación</th>
                   <th>Tipo</th>
                   <th>Cantidad</th>
@@ -307,33 +568,45 @@ const Reportes = () => {
                 {kardex.map((item) => (
                   <tr key={item.id}>
                     <td>
-                      {new Date(
+                      {formatearFechaHora(
                         item.created_at
-                      ).toLocaleString("es-MX")}
+                      )}
                     </td>
 
                     <td>
-                      {item.producto_nombre}
+                      {item.producto_nombre ||
+                        "—"}
                     </td>
 
                     <td>
-                      {item.ubicacion_nombre}
+                      {item.sku || "—"}
                     </td>
 
                     <td>
-                      {item.tipo}
+                      {item.proveedor_nombre ||
+                        "Sin proveedor"}
                     </td>
 
                     <td>
-                      {item.cantidad}
+                      {item.ubicacion_nombre ||
+                        "—"}
                     </td>
 
                     <td>
-                      {item.motivo}
+                      {item.tipo || "—"}
                     </td>
 
                     <td>
-                      {item.usuario_nombre}
+                      {item.cantidad ?? "—"}
+                    </td>
+
+                    <td>
+                      {item.motivo || "—"}
+                    </td>
+
+                    <td>
+                      {item.usuario_nombre ||
+                        "—"}
                     </td>
                   </tr>
                 ))}
@@ -343,63 +616,75 @@ const Reportes = () => {
         )}
       </section>
 
+      {/* =========================================
+          HISTORIAL DE SOLICITUDES
+      ========================================= */}
+
       <section className="content-card report-section">
+
         <div className="section-heading">
           <div>
             <h2>Historial de solicitudes</h2>
+
             <p>
               Estados y ubicaciones relacionadas.
             </p>
           </div>
         </div>
 
-        <div className="table-container">
-          <table>
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Solicitante</th>
-                <th>Destino</th>
-                <th>Estado</th>
-                <th>Fecha</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {solicitudes.map((item) => (
-                <tr key={item.id}>
-                  <td>#{item.id}</td>
-
-                  <td>
-                    {
-                      item.solicitante_ubicacion_nombre
-                    }
-                  </td>
-
-                  <td>
-                    {
-                      item.destino_ubicacion_nombre
-                    }
-                  </td>
-
-                  <td>
-                    <span className="status neutral">
-                      {item.estado}
-                    </span>
-                  </td>
-
-                  <td>
-                    {new Date(
-                      item.created_at
-                    ).toLocaleDateString(
-                      "es-MX"
-                    )}
-                  </td>
+        {solicitudes.length === 0 ? (
+          <div className="empty-state">
+            No hay solicitudes registradas.
+          </div>
+        ) : (
+          <div className="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Solicitante</th>
+                  <th>Destino</th>
+                  <th>Estado</th>
+                  <th>Fecha</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+
+              <tbody>
+                {solicitudes.map((item) => (
+                  <tr key={item.id}>
+                    <td>
+                      #{item.id}
+                    </td>
+
+                    <td>
+                      {
+                        item.solicitante_ubicacion_nombre
+                      }
+                    </td>
+
+                    <td>
+                      {
+                        item.destino_ubicacion_nombre
+                      }
+                    </td>
+
+                    <td>
+                      <span className="status neutral">
+                        {item.estado}
+                      </span>
+                    </td>
+
+                    <td>
+                      {formatearFecha(
+                        item.created_at
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
     </div>
   );

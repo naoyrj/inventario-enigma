@@ -4,6 +4,7 @@ const {
   getInventario,
   getAlertas,
   getKardexProducto,
+  getKardex,
   getConsumo,
   getSolicitudesReporte,
   getResumen
@@ -26,6 +27,22 @@ router.get(
   verifyToken,
   getAlertas
 );
+
+// =========================================================
+// KARDEX GENERAL
+// Debe ir antes de /kardex/:producto_id
+// =========================================================
+
+router.get(
+  "/kardex",
+  verifyToken,
+  getKardex
+);
+
+// =========================================================
+// KARDEX POR PRODUCTO
+// Ruta anterior conservada para compatibilidad
+// =========================================================
 
 router.get(
   "/kardex/:producto_id",

@@ -172,7 +172,7 @@ const getInventario = async (
       INNER JOIN productos p
         ON i.producto_id = p.id
 
-LEFT JOIN categorias c
+      LEFT JOIN categorias c
         ON p.categoria_id = c.id
 
       WHERE
@@ -379,7 +379,7 @@ const getAlertas = async (
 };
 
 // =========================================================
-// KARDEX
+// KARDEX POR PRODUCTO
 // Solo movimientos del producto dentro de la ubicación
 // autenticada.
 // =========================================================
@@ -541,6 +541,281 @@ const getKardexProducto =
       });
     }
   };
+
+// =========================================================
+// KARDEX GENERAL
+// Permite buscar por:
+// nombre, SKU, proveedor y rango de fechas.
+// =========================================================
+
+const getKardex = async (
+  req,
+  res
+) => {
+  try {
+    if (!req.usuario) {
+      return res.status(401).json({
+        message:
+          "Usuario no autenticado"
+      });
+    }
+
+    const ubicacionUsuario =
+      obtenerUbicacionUsuario(req);
+
+    if (!ubicacionUsuario) {
+      return res.status(400).json({
+        message:
+          "El usuario no tiene una ubicación válida"
+      });
+    }
+
+    const {
+      nombre,
+      sku,
+      proveedor,
+      desde,
+      hasta
+    } = req.query;
+
+    const params = [
+      ubicacionUsuario
+    ];
+
+    let sql = `
+      SELECT
+        m.id,
+
+        m.producto_id,
+
+        p.nombre
+          AS producto_nombre,
+
+        p.sku,
+
+        p.unidad_medida,
+
+        COALESCE(
+          (
+            SELECT STRING_AGG(
+              DISTINCT pr.nombre,
+              ', '
+              ORDER BY pr.nombre
+            )
+            FROM proveedor_productos pp
+            INNER JOIN proveedores pr
+              ON pr.id =
+                 pp.proveedor_id
+            WHERE
+              pp.producto_id =
+                p.id
+              AND pr.activo = TRUE
+          ),
+          'Sin proveedor'
+        )
+          AS proveedor_nombre,
+
+        c.id
+          AS categoria_id,
+
+        c.nombre
+          AS categoria_nombre,
+
+        c.tipo
+          AS categoria_tipo,
+
+        c.ubicacion_propietaria_id
+          AS categoria_ubicacion_propietaria_id,
+
+        m.ubicacion_id,
+
+        u.nombre
+          AS ubicacion_nombre,
+
+        u.tipo
+          AS ubicacion_tipo,
+
+        m.tipo,
+
+        m.cantidad,
+
+        m.motivo,
+
+        m.referencia_tipo,
+
+        m.referencia_id,
+
+        m.usuario_id,
+
+        us.nombre
+          AS usuario_nombre,
+
+        m.created_at
+
+      FROM movimientos m
+
+      INNER JOIN productos p
+        ON m.producto_id =
+           p.id
+
+      INNER JOIN ubicaciones u
+        ON m.ubicacion_id =
+           u.id
+
+      INNER JOIN usuarios us
+        ON m.usuario_id =
+           us.id
+
+      LEFT JOIN categorias c
+        ON p.categoria_id =
+           c.id
+
+      WHERE
+        m.ubicacion_id =
+          $1
+
+        AND p.activo = TRUE
+
+        AND u.activo = TRUE
+    `;
+
+    sql =
+      agregarFiltroCategoriaVisible(
+        sql,
+        params,
+        req,
+        "c"
+      );
+
+    // =====================================================
+    // FILTRO POR NOMBRE
+    // =====================================================
+
+    if (nombre?.trim()) {
+      params.push(
+        `%${nombre.trim()}%`
+      );
+
+      sql += `
+        AND LOWER(
+          p.nombre
+        ) LIKE LOWER(
+          $${params.length}
+        )
+      `;
+    }
+
+    // =====================================================
+    // FILTRO POR SKU
+    // =====================================================
+
+    if (sku?.trim()) {
+      params.push(
+        `%${sku.trim()}%`
+      );
+
+      sql += `
+        AND LOWER(
+          p.sku
+        ) LIKE LOWER(
+          $${params.length}
+        )
+      `;
+    }
+
+    // =====================================================
+    // FILTRO POR PROVEEDOR
+    // =====================================================
+
+    if (proveedor?.trim()) {
+      params.push(
+        `%${proveedor.trim()}%`
+      );
+
+      sql += `
+        AND EXISTS (
+          SELECT 1
+
+          FROM proveedor_productos pp_filtro
+
+          INNER JOIN proveedores pr_filtro
+            ON pr_filtro.id =
+               pp_filtro.proveedor_id
+
+          WHERE
+            pp_filtro.producto_id =
+              p.id
+
+            AND pr_filtro.activo =
+              TRUE
+
+            AND LOWER(
+              pr_filtro.nombre
+            ) LIKE LOWER(
+              $${params.length}
+            )
+        )
+      `;
+    }
+
+    // =====================================================
+    // FILTRO DESDE
+    // =====================================================
+
+    if (desde) {
+      params.push(
+        desde
+      );
+
+      sql += `
+        AND DATE(
+          m.created_at
+        ) >=
+          $${params.length}
+      `;
+    }
+
+    // =====================================================
+    // FILTRO HASTA
+    // =====================================================
+
+    if (hasta) {
+      params.push(
+        hasta
+      );
+
+      sql += `
+        AND DATE(
+          m.created_at
+        ) <=
+          $${params.length}
+      `;
+    }
+
+    sql += `
+      ORDER BY
+        m.created_at DESC
+    `;
+
+    const result =
+      await pool.query(
+        sql,
+        params
+      );
+
+    return res.json(
+      result.rows
+    );
+  } catch (error) {
+    return res.status(500).json({
+      message:
+        "Error al obtener el Kardex",
+
+      error:
+        error.message
+    });
+  }
+};
 
 // =========================================================
 // CONSUMO
@@ -1016,6 +1291,7 @@ module.exports = {
   getInventario,
   getAlertas,
   getKardexProducto,
+  getKardex,
   getConsumo,
   getSolicitudesReporte,
   getResumen
