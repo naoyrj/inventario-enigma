@@ -3,8 +3,8 @@ const express = require("express");
 const {
   getInventario,
   getAlertas,
-  getKardexProducto,
   getKardex,
+  getKardexProducto,
   getConsumo,
   getSolicitudesReporte,
   getResumen
@@ -14,13 +14,22 @@ const {
   verifyToken
 } = require("../middlewares/authMiddleware");
 
-const router = express.Router();
+const router =
+  express.Router();
+
+// =========================================================
+// INVENTARIO
+// =========================================================
 
 router.get(
   "/inventario",
   verifyToken,
   getInventario
 );
+
+// =========================================================
+// ALERTAS
+// =========================================================
 
 router.get(
   "/alertas",
@@ -30,7 +39,6 @@ router.get(
 
 // =========================================================
 // KARDEX GENERAL
-// Debe ir antes de /kardex/:producto_id
 // =========================================================
 
 router.get(
@@ -41,7 +49,6 @@ router.get(
 
 // =========================================================
 // KARDEX POR PRODUCTO
-// Ruta anterior conservada para compatibilidad
 // =========================================================
 
 router.get(
@@ -50,17 +57,29 @@ router.get(
   getKardexProducto
 );
 
+// =========================================================
+// CONSUMO
+// =========================================================
+
 router.get(
   "/consumo",
   verifyToken,
   getConsumo
 );
 
+// =========================================================
+// SOLICITUDES
+// =========================================================
+
 router.get(
   "/solicitudes",
   verifyToken,
   getSolicitudesReporte
 );
+
+// =========================================================
+// RESUMEN
+// =========================================================
 
 router.get(
   "/resumen",

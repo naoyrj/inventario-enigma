@@ -25,81 +25,120 @@ import api from "../services/api";
 import "../App.css";
 
 const Inventario = () => {
-  const [inventario, setInventario] = useState([]);
-  const [categorias, setCategorias] = useState([]);
-  const [ubicaciones, setUbicaciones] = useState([]);
-  const [productos, setProductos] = useState([]);
-  const [proveedores, setProveedores] = useState([]);
+  const [inventario, setInventario] =
+    useState([]);
 
-  const [loading, setLoading] = useState(true);
-  const [guardando, setGuardando] = useState(false);
-  const [importando, setImportando] = useState(false);
-  const [cargandoDetalle, setCargandoDetalle] = useState(false);
+  const [categorias, setCategorias] =
+    useState([]);
 
-  const [error, setError] = useState("");
-  const [mensaje, setMensaje] = useState("");
+  const [ubicaciones, setUbicaciones] =
+    useState([]);
 
-  const [busqueda, setBusqueda] = useState("");
-  const [categoria, setCategoria] = useState("");
-  const [ubicacion, setUbicacion] = useState("");
-  const [soloBajoStock, setSoloBajoStock] = useState(false);
+  const [productos, setProductos] =
+    useState([]);
 
-  const [mostrarModal, setMostrarModal] = useState(false);
-  const [mostrarImportacion, setMostrarImportacion] = useState(false);
-  const [mostrarDetalle, setMostrarDetalle] = useState(false);
+  const [proveedores, setProveedores] =
+    useState([]);
 
-  const [articuloDetalle, setArticuloDetalle] = useState(null);
-  const [editandoDetalle, setEditandoDetalle] = useState(false);
+  const [loading, setLoading] =
+    useState(true);
 
-  const [archivoCsv, setArchivoCsv] = useState(null);
-  const [resultadoImportacion, setResultadoImportacion] = useState(null);
+  const [guardando, setGuardando] =
+    useState(false);
 
-  const [imagenDetalleUrl, setImagenDetalleUrl] = useState("");
-  const [archivoImagenDetalle, setArchivoImagenDetalle] = useState(null);
-  const [previewImagenDetalle, setPreviewImagenDetalle] = useState("");
-  const [tieneImagenDetalle, setTieneImagenDetalle] = useState(false);
+  const [importando, setImportando] =
+    useState(false);
 
-  const inputArchivoRef = useRef(null);
-  const inputImagenDetalleRef = useRef(null);
+  const [error, setError] =
+    useState("");
 
-  const [nuevoProducto, setNuevoProducto] = useState({
-    nombre: "",
-    descripcion: "",
-    sku: "",
-    categoria_id: "",
-    unidad_medida: "pieza",
-    punto_reorden: "0",
-    cantidad: ""
-  });
+  const [mensaje, setMensaje] =
+    useState("");
 
-  const [formularioDetalle, setFormularioDetalle] = useState({
-    nombre: "",
-    descripcion: "",
-    existencias: "",
-    punto_reorden: "",
-    proveedor_id: "",
-    categoria_id: "",
-    sku: "",
-    unidad_medida: ""
-  });
+  const [busqueda, setBusqueda] =
+    useState("");
 
-  const [detalleOriginal, setDetalleOriginal] = useState({
-    nombre: "",
-    descripcion: "",
-    existencias: "",
-    punto_reorden: "",
-    proveedor_id: "",
-    categoria_id: "",
-    sku: "",
-    unidad_medida: ""
-  });
+  const [categoria, setCategoria] =
+    useState("");
 
-  const [motivoExistencias, setMotivoExistencias] = useState("");
+  const [ubicacion, setUbicacion] =
+    useState("");
+
+  const [soloBajoStock, setSoloBajoStock] =
+    useState(false);
+
+  const [mostrarModal, setMostrarModal] =
+    useState(false);
+
+  const [mostrarImportacion, setMostrarImportacion] =
+    useState(false);
+
+  const [mostrarDetalle, setMostrarDetalle] =
+    useState(false);
+
+  const [cargandoDetalle, setCargandoDetalle] =
+    useState(false);
+
+  const [articuloDetalle, setArticuloDetalle] =
+    useState(null);
+
+  const [editandoDetalle, setEditandoDetalle] =
+    useState(false);
+
+  const [archivoCsv, setArchivoCsv] =
+    useState(null);
+
+  const [resultadoImportacion, setResultadoImportacion] =
+    useState(null);
+
+  const inputArchivoRef =
+    useRef(null);
+
+  const [formulario, setFormulario] =
+    useState({
+      producto_id: "",
+      cantidad: "",
+      ubicacion_id: "",
+      motivo: ""
+    });
+
+  const [formularioDetalle, setFormularioDetalle] =
+    useState({
+      nombre: "",
+      descripcion: "",
+      existencias: "",
+      punto_reorden: "",
+      proveedor_id: "",
+      categoria_id: "",
+      sku: "",
+      unidad_medida: ""
+    });
+
+  const [detalleOriginal, setDetalleOriginal] =
+    useState({
+      nombre: "",
+      descripcion: "",
+      existencias: "",
+      punto_reorden: "",
+      proveedor_id: "",
+      categoria_id: "",
+      sku: "",
+      unidad_medida: ""
+    });
+
+  const [motivoExistencias, setMotivoExistencias] =
+    useState("");
 
   const usuario = useMemo(() => {
     try {
-      const datos = localStorage.getItem("usuario");
-      return datos ? JSON.parse(datos) : null;
+      const datos =
+        localStorage.getItem(
+          "usuario"
+        );
+
+      return datos
+        ? JSON.parse(datos)
+        : null;
     } catch {
       return null;
     }
@@ -111,60 +150,37 @@ const Inventario = () => {
     "";
 
   const esPrincipal =
-    tipoUbicacion === "principal" ||
-    usuario?.rol === "principal" ||
-    usuario?.es_principal === true ||
-    usuario?.es_principal === 1;
+    tipoUbicacion ===
+      "principal" ||
+    usuario?.es_principal ===
+      true ||
+    usuario?.es_principal ===
+      1;
 
-  const normalizarInventario = (respuesta) => {
-    if (Array.isArray(respuesta)) {
-      return respuesta;
-    }
-
-    if (Array.isArray(respuesta?.inventario)) {
-      return respuesta.inventario;
-    }
-
-    if (Array.isArray(respuesta?.data)) {
-      return respuesta.data;
-    }
-
-    return [];
-  };
-
-  const normalizarLista = (respuesta, propiedad) => {
-    if (Array.isArray(respuesta)) {
-      return respuesta;
-    }
-
-    if (
-      propiedad &&
-      Array.isArray(respuesta?.[propiedad])
-    ) {
-      return respuesta[propiedad];
-    }
-
-    if (Array.isArray(respuesta?.data)) {
-      return respuesta.data;
-    }
-
-    return [];
-  };
-
-  const obtenerProveedorId = (producto) => {
+  const obtenerProveedorId = (
+    producto
+  ) => {
     if (!producto) {
       return "";
     }
 
-    if (producto.proveedor_id) {
-      return String(producto.proveedor_id);
+    if (
+      producto.proveedor_id
+    ) {
+      return String(
+        producto.proveedor_id
+      );
     }
 
     if (
-      Array.isArray(producto.proveedores) &&
-      producto.proveedores.length > 0
+      Array.isArray(
+        producto.proveedores
+      ) &&
+      producto.proveedores
+        .length > 0
     ) {
-      const proveedor = producto.proveedores[0];
+      const proveedor =
+        producto.proveedores[0];
 
       return String(
         proveedor?.id ||
@@ -174,16 +190,23 @@ const Inventario = () => {
     }
 
     if (
-      Array.isArray(producto.proveedor_ids) &&
-      producto.proveedor_ids.length > 0
+      Array.isArray(
+        producto.proveedor_ids
+      ) &&
+      producto.proveedor_ids
+        .length > 0
     ) {
-      return String(producto.proveedor_ids[0]);
+      return String(
+        producto.proveedor_ids[0]
+      );
     }
 
     return "";
   };
 
-  const obtenerCategoriaId = (producto) => {
+  const obtenerCategoriaId = (
+    producto
+  ) => {
     if (!producto) {
       return "";
     }
@@ -195,263 +218,406 @@ const Inventario = () => {
     );
   };
 
-  const obtenerNombreProveedor = (proveedorId) => {
+  const obtenerNombreProveedor = (
+    proveedorId
+  ) => {
     if (!proveedorId) {
       return "Sin proveedor";
     }
 
-    const proveedor = proveedores.find(
-      (item) =>
-        Number(item.id) === Number(proveedorId)
+    const proveedor =
+      proveedores.find(
+        (item) =>
+          Number(item.id) ===
+          Number(proveedorId)
+      );
+
+    return (
+      proveedor?.nombre ||
+      "Sin proveedor"
     );
-
-    return proveedor?.nombre || "Sin proveedor";
   };
 
-  const cargarInventario = async () => {
-    try {
-      const response = await api.get("/inventario");
-
-      setInventario(
-        normalizarInventario(response.data)
-      );
-    } catch (err) {
-      console.error(
-        "Error al cargar inventario:",
-        err
-      );
-
-      throw err;
+  const obtenerNombreCategoria = (
+    categoriaId
+  ) => {
+    if (!categoriaId) {
+      return "Sin categoría";
     }
+
+    const categoriaEncontrada =
+      categorias.find(
+        (item) =>
+          Number(item.id) ===
+          Number(categoriaId)
+      );
+
+    return (
+      categoriaEncontrada?.nombre ||
+      "Sin categoría"
+    );
   };
 
-  const cargarCategorias = async () => {
-    try {
-      const response = await api.get("/categorias");
-
-      setCategorias(
-        normalizarLista(
-          response.data,
-          "categorias"
-        )
-      );
-    } catch (err) {
-      console.error(
-        "Error al cargar categorías:",
-        err
-      );
-
-      setCategorias([]);
+  const normalizarInventario = (
+    respuesta
+  ) => {
+    if (
+      Array.isArray(
+        respuesta
+      )
+    ) {
+      return respuesta;
     }
-  };
 
-  const cargarUbicaciones = async () => {
-    try {
-      const response = await api.get("/ubicaciones");
-
-      setUbicaciones(
-        normalizarLista(
-          response.data,
-          "ubicaciones"
-        )
-      );
-    } catch (err) {
-      console.error(
-        "Error al cargar ubicaciones:",
-        err
-      );
-
-      setUbicaciones([]);
+    if (
+      Array.isArray(
+        respuesta?.inventario
+      )
+    ) {
+      return respuesta.inventario;
     }
-  };
 
-  const cargarProductos = async () => {
-    try {
-      const response = await api.get("/productos");
-
-      setProductos(
-        normalizarLista(
-          response.data,
-          "productos"
-        )
-      );
-    } catch (err) {
-      console.error(
-        "Error al cargar productos:",
-        err
-      );
-
-      setProductos([]);
+    if (
+      Array.isArray(
+        respuesta?.data
+      )
+    ) {
+      return respuesta.data;
     }
+
+    return [];
   };
 
-  const cargarProveedores = async () => {
-    try {
-      const response = await api.get("/proveedores");
-
-      setProveedores(
-        normalizarLista(
-          response.data,
-          "proveedores"
-        )
-      );
-    } catch (err) {
-      console.error(
-        "Error al cargar proveedores:",
-        err
-      );
-
-      setProveedores([]);
+  const normalizarLista = (
+    respuesta,
+    propiedad
+  ) => {
+    if (
+      Array.isArray(
+        respuesta
+      )
+    ) {
+      return respuesta;
     }
-  };
 
-  const cargarDatos = async () => {
-    setLoading(true);
-    setError("");
-
-    try {
-      await Promise.all([
-        cargarInventario(),
-        cargarCategorias(),
-        cargarUbicaciones(),
-        cargarProductos(),
-        cargarProveedores()
-      ]);
-    } catch (err) {
-      console.error(
-        "Error al cargar inventario:",
-        err
-      );
-
-      setError(
-        err.response?.data?.message ||
-          err.response?.data?.mensaje ||
-          "No fue posible cargar el inventario."
-      );
-    } finally {
-      setLoading(false);
+    if (
+      propiedad &&
+      Array.isArray(
+        respuesta?.[propiedad]
+      )
+    ) {
+      return respuesta[propiedad];
     }
+
+    if (
+      Array.isArray(
+        respuesta?.data
+      )
+    ) {
+      return respuesta.data;
+    }
+
+    return [];
   };
+
+  const cargarInventario =
+    async () => {
+      try {
+        let response;
+
+        if (esPrincipal) {
+          response =
+            await api.get(
+              "/reportes/inventario"
+            );
+        } else {
+          response =
+            await api.get(
+              "/inventario"
+            );
+        }
+
+        setInventario(
+          normalizarInventario(
+            response.data
+          )
+        );
+      } catch (err) {
+        console.error(
+          "Error al cargar inventario:",
+          err
+        );
+
+        throw err;
+      }
+    };
+
+  const cargarCategorias =
+    async () => {
+      try {
+        const response =
+          await api.get(
+            "/categorias"
+          );
+
+        setCategorias(
+          normalizarLista(
+            response.data,
+            "categorias"
+          )
+        );
+      } catch (err) {
+        console.error(
+          "Error al cargar categorías:",
+          err
+        );
+
+        setCategorias([]);
+      }
+    };
+
+  const cargarUbicaciones =
+    async () => {
+      try {
+        const response =
+          await api.get(
+            "/ubicaciones"
+          );
+
+        setUbicaciones(
+          normalizarLista(
+            response.data,
+            "ubicaciones"
+          )
+        );
+      } catch (err) {
+        console.error(
+          "Error al cargar ubicaciones:",
+          err
+        );
+
+        setUbicaciones([]);
+      }
+    };
+
+  const cargarProductos =
+    async () => {
+      try {
+        const response =
+          await api.get(
+            "/productos"
+          );
+
+        setProductos(
+          normalizarLista(
+            response.data,
+            "productos"
+          )
+        );
+      } catch (err) {
+        console.error(
+          "Error al cargar productos:",
+          err
+        );
+
+        setProductos([]);
+      }
+    };
+
+  const cargarProveedores =
+    async () => {
+      try {
+        const response =
+          await api.get(
+            "/proveedores"
+          );
+
+        setProveedores(
+          normalizarLista(
+            response.data,
+            "proveedores"
+          )
+        );
+      } catch (err) {
+        console.error(
+          "Error al cargar proveedores:",
+          err
+        );
+
+        setProveedores([]);
+      }
+    };
+
+  const cargarDatos =
+    async () => {
+      setLoading(true);
+      setError("");
+
+      try {
+        await Promise.all([
+          cargarInventario(),
+          cargarCategorias(),
+          cargarUbicaciones(),
+          cargarProductos(),
+          cargarProveedores()
+        ]);
+      } catch (err) {
+        setError(
+          err.response?.data?.message ||
+            err.response?.data?.mensaje ||
+            "No fue posible cargar el inventario."
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
 
   useEffect(() => {
     cargarDatos();
   }, []);
 
-  useEffect(() => {
-    return () => {
-      if (
-        imagenDetalleUrl &&
-        imagenDetalleUrl.startsWith("blob:")
-      ) {
-        URL.revokeObjectURL(imagenDetalleUrl);
-      }
+  const inventarioFiltrado =
+    useMemo(() => {
+      const termino =
+        busqueda
+          .trim()
+          .toLowerCase();
 
-      if (
-        previewImagenDetalle &&
-        previewImagenDetalle.startsWith("blob:")
-      ) {
-        URL.revokeObjectURL(previewImagenDetalle);
-      }
-    };
-  }, [imagenDetalleUrl, previewImagenDetalle]);
+      return inventario.filter(
+        (item) => {
+          const nombre =
+            String(
+              item.producto_nombre ||
+                item.nombre ||
+                ""
+            ).toLowerCase();
 
-  const inventarioFiltrado = useMemo(() => {
-    const termino =
-      busqueda.trim().toLowerCase();
+          const sku =
+            String(
+              item.sku || ""
+            ).toLowerCase();
 
-    return inventario.filter((item) => {
-      const nombre = String(
-        item.producto_nombre ||
-          item.nombre ||
-          ""
-      ).toLowerCase();
+          const proveedor =
+            String(
+              item.proveedor_nombre ||
+                item.proveedor ||
+                ""
+            ).toLowerCase();
 
-      const sku = String(
-        item.sku || ""
-      ).toLowerCase();
+          const coincideBusqueda =
+            !termino ||
+            nombre.includes(
+              termino
+            ) ||
+            sku.includes(
+              termino
+            ) ||
+            proveedor.includes(
+              termino
+            );
 
-      const proveedor = String(
-        item.proveedor_nombre ||
-          item.proveedor ||
-          ""
-      ).toLowerCase();
+          const coincideCategoria =
+            !categoria ||
+            String(
+              item.categoria_id
+            ) ===
+              String(
+                categoria
+              );
 
-      const coincideBusqueda =
-        !termino ||
-        nombre.includes(termino) ||
-        sku.includes(termino) ||
-        proveedor.includes(termino);
+          const coincideUbicacion =
+            !ubicacion ||
+            String(
+              item.ubicacion_id
+            ) ===
+              String(
+                ubicacion
+              );
 
-      const coincideCategoria =
-        !categoria ||
-        String(item.categoria_id) ===
-          String(categoria);
+          const stockBajo =
+            Number(
+              item.stock_bajo
+            ) === 1 ||
+            Number(
+              item.cantidad || 0
+            ) <=
+              Number(
+                item.punto_reorden ||
+                  0
+              );
 
-      const coincideUbicacion =
-        !ubicacion ||
-        String(item.ubicacion_id) ===
-          String(ubicacion);
+          const coincideStock =
+            !soloBajoStock ||
+            stockBajo;
 
-      const stockBajo =
-        Number(item.stock_bajo) === 1 ||
-        Number(item.cantidad || 0) <=
-          Number(item.punto_reorden || 0);
-
-      const coincideStock =
-        !soloBajoStock || stockBajo;
-
-      return (
-        coincideBusqueda &&
-        coincideCategoria &&
-        coincideUbicacion &&
-        coincideStock
+          return (
+            coincideBusqueda &&
+            coincideCategoria &&
+            coincideUbicacion &&
+            coincideStock
+          );
+        }
       );
-    });
-  }, [
-    inventario,
-    busqueda,
-    categoria,
-    ubicacion,
-    soloBajoStock
-  ]);
+    }, [
+      inventario,
+      busqueda,
+      categoria,
+      ubicacion,
+      soloBajoStock
+    ]);
 
   const totalProductos =
     inventarioFiltrado.length;
 
   const totalUnidades =
     inventarioFiltrado.reduce(
-      (total, item) =>
-        total + Number(item.cantidad || 0),
+      (
+        total,
+        item
+      ) =>
+        total +
+        Number(
+          item.cantidad ||
+            0
+        ),
       0
     );
 
   const totalAlertas =
     inventarioFiltrado.filter(
       (item) =>
-        Number(item.stock_bajo) === 1 ||
-        Number(item.cantidad || 0) <=
-          Number(item.punto_reorden || 0)
+        Number(
+          item.stock_bajo
+        ) === 1 ||
+        Number(
+          item.cantidad ||
+            0
+        ) <=
+          Number(
+            item.punto_reorden ||
+              0
+          )
     ).length;
 
-  const limpiarFiltros = () => {
-    setBusqueda("");
-    setCategoria("");
-    setUbicacion("");
-    setSoloBajoStock(false);
-  };
+  const limpiarFiltros =
+    () => {
+      setBusqueda("");
+      setCategoria("");
+      setUbicacion("");
+      setSoloBajoStock(
+        false
+      );
+    };
 
   const abrirModal = () => {
     setError("");
     setMensaje("");
 
-    setNuevoProducto({
-      nombre: "",
-      descripcion: "",
-      sku: "",
-      categoria_id: "",
-      unidad_medida: "pieza",
-      punto_reorden: "0",
-      cantidad: ""
+    setFormulario({
+      producto_id: "",
+      cantidad: "",
+      ubicacion_id: "",
+      motivo: ""
     });
 
     setMostrarModal(true);
@@ -462,398 +628,289 @@ const Inventario = () => {
       return;
     }
 
-    setMostrarModal(false);
+    setMostrarModal(
+      false
+    );
+
     setError("");
   };
 
-  const handleNuevoProducto = (event) => {
+  const handleFormulario = (
+    event
+  ) => {
     const {
       name,
       value
     } = event.target;
 
-    setNuevoProducto((actual) => ({
-      ...actual,
-      [name]: value
-    }));
+    setFormulario(
+      (actual) => ({
+        ...actual,
+        [name]: value
+      })
+    );
   };
 
-  const guardarArticulo = async (event) => {
-    event.preventDefault();
+  const guardarArticulo =
+    async (event) => {
+      event.preventDefault();
 
-    setError("");
-    setMensaje("");
+      setError("");
+      setMensaje("");
 
-    const nombre =
-      nuevoProducto.nombre.trim();
-
-    const sku =
-      nuevoProducto.sku.trim();
-
-    const unidadMedida =
-      nuevoProducto.unidad_medida.trim();
-
-    const cantidad =
-      Number(nuevoProducto.cantidad);
-
-    const puntoReorden =
-      nuevoProducto.punto_reorden === ""
-        ? 0
-        : Number(
-            nuevoProducto.punto_reorden
-          );
-
-    if (!nombre) {
-      setError(
-        "El nombre del artículo es obligatorio."
-      );
-      return;
-    }
-
-    if (!sku) {
-      setError("El SKU es obligatorio.");
-      return;
-    }
-
-    if (!nuevoProducto.categoria_id) {
-      setError("La categoría es obligatoria.");
-      return;
-    }
-
-    if (!unidadMedida) {
-      setError(
-        "La unidad de medida es obligatoria."
-      );
-      return;
-    }
-
-    if (
-      nuevoProducto.cantidad === "" ||
-      Number.isNaN(cantidad) ||
-      cantidad <= 0
-    ) {
-      setError(
-        "La cantidad inicial debe ser mayor que cero."
-      );
-      return;
-    }
-
-    if (
-      Number.isNaN(puntoReorden) ||
-      puntoReorden < 0
-    ) {
-      setError(
-        "El punto de reorden debe ser un número válido."
-      );
-      return;
-    }
-
-    setGuardando(true);
-
-    try {
-      await api.post(
-        "/inventario/propio/nuevo",
-        {
-          nombre,
-          descripcion:
-            nuevoProducto.descripcion.trim(),
-          sku,
-          categoria_id:
-            Number(
-              nuevoProducto.categoria_id
-            ),
-          unidad_medida:
-            unidadMedida,
-          punto_reorden:
-            puntoReorden,
-          cantidad
-        }
-      );
-
-      setMensaje(
-        "Artículo creado y agregado correctamente al inventario."
-      );
-
-      setMostrarModal(false);
-
-      await Promise.all([
-        cargarInventario(),
-        cargarProductos()
-      ]);
-    } catch (err) {
-      console.error(
-        "Error al crear artículo:",
-        err
-      );
-
-      setError(
-        err.response?.data?.message ||
-          err.response?.data?.mensaje ||
-          "No fue posible crear el artículo."
-      );
-    } finally {
-      setGuardando(false);
-    }
-  };
-
-  const abrirImportacion = () => {
-    setError("");
-    setMensaje("");
-    setArchivoCsv(null);
-    setResultadoImportacion(null);
-
-    if (inputArchivoRef.current) {
-      inputArchivoRef.current.value = "";
-    }
-
-    setMostrarImportacion(true);
-  };
-
-  const cerrarImportacion = () => {
-    if (importando) {
-      return;
-    }
-
-    setMostrarImportacion(false);
-    setArchivoCsv(null);
-    setResultadoImportacion(null);
-    setError("");
-  };
-
-  const seleccionarArchivoCsv = (event) => {
-    const archivo =
-      event.target.files?.[0] || null;
-
-    setArchivoCsv(archivo);
-    setResultadoImportacion(null);
-    setError("");
-    setMensaje("");
-  };
-
-  const importarCsv = async () => {
-    if (!archivoCsv) {
-      setError(
-        "Selecciona un archivo CSV."
-      );
-      return;
-    }
-
-    setImportando(true);
-    setError("");
-    setMensaje("");
-    setResultadoImportacion(null);
-
-    try {
-      const formData =
-        new FormData();
-
-      formData.append(
-        "archivo",
-        archivoCsv
-      );
-
-      const response =
-        await api.post(
-          "/inventario/importar-csv",
-          formData
+      if (
+        !formulario.producto_id
+      ) {
+        setError(
+          "Selecciona un producto."
         );
+
+        return;
+      }
+
+      const cantidad =
+        Number(
+          formulario.cantidad
+        );
+
+      if (
+        Number.isNaN(
+          cantidad
+        ) ||
+        cantidad < 0
+      ) {
+        setError(
+          "La cantidad debe ser un número válido."
+        );
+
+        return;
+      }
+
+      setGuardando(true);
+
+      try {
+        const payload = {
+          producto_id:
+            Number(
+              formulario.producto_id
+            ),
+
+          cantidad
+        };
+
+        if (
+          formulario.ubicacion_id
+        ) {
+          payload.ubicacion_id =
+            Number(
+              formulario.ubicacion_id
+            );
+        }
+
+        if (
+          formulario.motivo.trim()
+        ) {
+          payload.motivo =
+            formulario.motivo.trim();
+        }
+
+        await api.post(
+          "/inventario/stock-inicial",
+          payload
+        );
+
+        setMensaje(
+          "Artículo agregado correctamente al inventario."
+        );
+
+        setMostrarModal(
+          false
+        );
+
+        await cargarInventario();
+      } catch (err) {
+        console.error(
+          "Error al agregar artículo:",
+          err
+        );
+
+        setError(
+          err.response?.data
+            ?.message ||
+            err.response?.data
+              ?.mensaje ||
+            "No fue posible agregar el artículo."
+        );
+      } finally {
+        setGuardando(false);
+      }
+    };
+
+  const abrirImportacion =
+    () => {
+      setError("");
+      setMensaje("");
+      setArchivoCsv(null);
+      setResultadoImportacion(
+        null
+      );
+
+      if (
+        inputArchivoRef.current
+      ) {
+        inputArchivoRef.current.value =
+          "";
+      }
+
+      setMostrarImportacion(
+        true
+      );
+    };
+
+  const cerrarImportacion =
+    () => {
+      if (importando) {
+        return;
+      }
+
+      setMostrarImportacion(
+        false
+      );
+
+      setArchivoCsv(null);
 
       setResultadoImportacion(
-        response.data
+        null
       );
 
-      setMensaje(
-        response.data?.message ||
-          response.data?.mensaje ||
-          "Archivo procesado correctamente."
+      setError("");
+    };
+
+  const seleccionarArchivoCsv =
+    (event) => {
+      const archivo =
+        event.target.files?.[0] ||
+        null;
+
+      setArchivoCsv(
+        archivo
       );
 
-      await Promise.all([
-        cargarInventario(),
-        cargarProductos()
-      ]);
-    } catch (err) {
-      console.error(
-        "Error al importar CSV:",
-        err
+      setResultadoImportacion(
+        null
       );
 
-      setError(
-        err.response?.data?.message ||
-          err.response?.data?.mensaje ||
-          "No fue posible importar el archivo CSV."
+      setError("");
+      setMensaje("");
+    };
+
+  const importarCsv =
+    async () => {
+      if (!archivoCsv) {
+        setError(
+          "Selecciona un archivo CSV."
+        );
+
+        return;
+      }
+
+      setImportando(true);
+      setError("");
+      setMensaje("");
+      setResultadoImportacion(
+        null
       );
 
-      if (err.response?.data) {
+      try {
+        const formData =
+          new FormData();
+
+        formData.append(
+          "archivo",
+          archivoCsv
+        );
+
+        const response =
+          await api.post(
+            "/inventario/importar-csv",
+            formData,
+            {
+              headers: {
+                "Content-Type":
+                  "multipart/form-data"
+              }
+            }
+          );
+
         setResultadoImportacion(
-          err.response.data
-        );
-      }
-    } finally {
-      setImportando(false);
-    }
-  };
-
-  const liberarUrlImagen = (url) => {
-    if (
-      url &&
-      url.startsWith("blob:")
-    ) {
-      URL.revokeObjectURL(url);
-    }
-  };
-
-  const limpiarSeleccionImagen = () => {
-    setArchivoImagenDetalle(null);
-
-    setPreviewImagenDetalle(
-      (urlActual) => {
-        liberarUrlImagen(urlActual);
-        return "";
-      }
-    );
-
-    if (inputImagenDetalleRef.current) {
-      inputImagenDetalleRef.current.value =
-        "";
-    }
-  };
-
-  const limpiarImagenActual = () => {
-    setImagenDetalleUrl(
-      (urlActual) => {
-        liberarUrlImagen(urlActual);
-        return "";
-      }
-    );
-
-    setTieneImagenDetalle(false);
-  };
-
-  const cargarImagenProducto = async (
-    productoId,
-    tieneImagen
-  ) => {
-    limpiarImagenActual();
-
-    if (!tieneImagen) {
-      return;
-    }
-
-    setTieneImagenDetalle(true);
-
-    try {
-      const response =
-        await api.get(
-          `/productos/${productoId}/imagen`,
-          {
-            responseType: "blob"
-          }
-        );
-
-      const url =
-        URL.createObjectURL(
           response.data
         );
 
-      setImagenDetalleUrl(url);
-    } catch (err) {
-      console.error(
-        "No fue posible cargar la imagen del producto:",
-        err
-      );
-
-      setTieneImagenDetalle(false);
-    }
-  };
-
-  const seleccionarImagenDetalle = (
-    event
-  ) => {
-    const archivo =
-      event.target.files?.[0] ||
-      null;
-
-    setError("");
-    setMensaje("");
-
-    if (!archivo) {
-      limpiarSeleccionImagen();
-      return;
-    }
-
-    const tiposPermitidos = [
-      "image/png",
-      "image/jpeg"
-    ];
-
-    if (
-      !tiposPermitidos.includes(
-        archivo.type
-      )
-    ) {
-      setError(
-        "Formato de imagen no permitido. Solo se aceptan PNG, JPG y JPEG."
-      );
-
-      if (
-        inputImagenDetalleRef.current
-      ) {
-        inputImagenDetalleRef.current.value =
-          "";
-      }
-
-      return;
-    }
-
-    if (
-      archivo.size >
-      5 * 1024 * 1024
-    ) {
-      setError(
-        "La imagen no puede superar los 5 MB."
-      );
-
-      if (
-        inputImagenDetalleRef.current
-      ) {
-        inputImagenDetalleRef.current.value =
-          "";
-      }
-
-      return;
-    }
-
-    setArchivoImagenDetalle(
-      archivo
-    );
-
-    setPreviewImagenDetalle(
-      (urlActual) => {
-        liberarUrlImagen(urlActual);
-
-        return URL.createObjectURL(
-          archivo
+        setMensaje(
+          response.data
+            ?.message ||
+            response.data
+              ?.mensaje ||
+            "Archivo procesado correctamente."
         );
-      }
-    );
-  };
 
-  const abrirDetalle = (item) => {
+        await Promise.all([
+          cargarInventario(),
+          cargarProductos()
+        ]);
+      } catch (err) {
+        console.error(
+          "Error al importar CSV:",
+          err
+        );
+
+        setError(
+          err.response?.data
+            ?.message ||
+            err.response?.data
+              ?.mensaje ||
+            "No fue posible importar el archivo CSV."
+        );
+
+        if (
+          err.response?.data
+        ) {
+          setResultadoImportacion(
+            err.response.data
+          );
+        }
+      } finally {
+        setImportando(false);
+      }
+    };
+
+  const abrirDetalle = (
+    item
+  ) => {
     setError("");
     setMensaje("");
-    setArticuloDetalle(item);
-    setMotivoExistencias("");
-    setEditandoDetalle(false);
 
-    limpiarSeleccionImagen();
-    limpiarImagenActual();
+    setArticuloDetalle(
+      item
+    );
+
+    setMotivoExistencias(
+      ""
+    );
+
+    setEditandoDetalle(
+      false
+    );
 
     const productoLocal =
       productos.find(
         (producto) =>
-          Number(producto.id) ===
-          Number(item.producto_id)
+          Number(
+            producto.id
+          ) ===
+          Number(
+            item.producto_id
+          )
       ) || {};
 
     const datosIniciales = {
@@ -869,7 +926,10 @@ const Inventario = () => {
         "",
 
       existencias:
-        String(item.cantidad ?? 0),
+        String(
+          item.cantidad ??
+            0
+        ),
 
       punto_reorden:
         String(
@@ -882,14 +942,17 @@ const Inventario = () => {
         obtenerProveedorId(
           productoLocal
         ) ||
-        obtenerProveedorId(item),
+        obtenerProveedorId(
+          item
+        ),
 
       categoria_id:
         obtenerCategoriaId(
           productoLocal
         ) ||
         String(
-          item.categoria_id || ""
+          item.categoria_id ||
+            ""
         ),
 
       sku:
@@ -911,7 +974,9 @@ const Inventario = () => {
       datosIniciales
     );
 
-    setMostrarDetalle(true);
+    setMostrarDetalle(
+      true
+    );
 
     cargarDetalleProducto(
       item,
@@ -919,126 +984,148 @@ const Inventario = () => {
     );
   };
 
-  const cargarDetalleProducto = async (
-    item,
-    datosIniciales
-  ) => {
-    setCargandoDetalle(true);
+  const cargarDetalleProducto =
+    async (
+      item,
+      datosIniciales
+    ) => {
+      setCargandoDetalle(
+        true
+      );
 
-    try {
-      const response =
-        await api.get(
-          `/productos/${item.producto_id}`
+      try {
+        const response =
+          await api.get(
+            `/productos/${item.producto_id}`
+          );
+
+        const producto =
+          response.data
+            ?.producto ||
+          response.data ||
+          {};
+
+        const datosFormulario = {
+          nombre:
+            producto.nombre ||
+            datosIniciales.nombre,
+
+          descripcion:
+            producto.descripcion ??
+            datosIniciales.descripcion,
+
+          existencias:
+            datosIniciales.existencias,
+
+          punto_reorden:
+            String(
+              producto.punto_reorden ??
+                datosIniciales.punto_reorden
+            ),
+
+          proveedor_id:
+            obtenerProveedorId(
+              producto
+            ) ||
+            datosIniciales.proveedor_id,
+
+          categoria_id:
+            obtenerCategoriaId(
+              producto
+            ) ||
+            datosIniciales.categoria_id,
+
+          sku:
+            producto.sku ||
+            datosIniciales.sku,
+
+          unidad_medida:
+            producto.unidad_medida ||
+            datosIniciales.unidad_medida
+        };
+
+        setFormularioDetalle(
+          datosFormulario
         );
 
-      const producto =
-        response.data?.producto ||
-        response.data ||
-        {};
+        setDetalleOriginal(
+          datosFormulario
+        );
+      } catch (err) {
+        console.error(
+          "No fue posible obtener el detalle completo del producto:",
+          err
+        );
+      } finally {
+        setCargandoDetalle(
+          false
+        );
+      }
+    };
 
-      const datosFormulario = {
-        nombre:
-          producto.nombre ||
-          datosIniciales.nombre,
+  const cerrarDetalle =
+    () => {
+      if (guardando) {
+        return;
+      }
 
-        descripcion:
-          producto.descripcion ??
-          datosIniciales.descripcion,
-
-        existencias:
-          datosIniciales.existencias,
-
-        punto_reorden:
-          String(
-            producto.punto_reorden ??
-              datosIniciales.punto_reorden
-          ),
-
-        proveedor_id:
-          obtenerProveedorId(
-            producto
-          ) ||
-          datosIniciales.proveedor_id,
-
-        categoria_id:
-          obtenerCategoriaId(
-            producto
-          ) ||
-          datosIniciales.categoria_id,
-
-        sku:
-          producto.sku ||
-          datosIniciales.sku,
-
-        unidad_medida:
-          producto.unidad_medida ||
-          datosIniciales.unidad_medida
-      };
-
-      setFormularioDetalle(
-        datosFormulario
+      setMostrarDetalle(
+        false
       );
 
-      setDetalleOriginal(
-        datosFormulario
+      setArticuloDetalle(
+        null
       );
 
-      await cargarImagenProducto(
-        item.producto_id,
-        producto.tiene_imagen
+      setEditandoDetalle(
+        false
       );
-    } catch (err) {
-      console.error(
-        "No fue posible obtener el detalle completo del producto:",
-        err
+
+      setMotivoExistencias(
+        ""
       );
-    } finally {
-      setCargandoDetalle(false);
-    }
-  };
 
-  const cerrarDetalle = () => {
-    if (guardando) {
-      return;
-    }
+      setError("");
+    };
 
-    setMostrarDetalle(false);
-    setArticuloDetalle(null);
-    setEditandoDetalle(false);
-    setMotivoExistencias("");
-    limpiarSeleccionImagen();
-    limpiarImagenActual();
-    setError("");
-    setMensaje("");
-  };
+  const activarEdicionDetalle =
+    () => {
+      setError("");
+      setMensaje("");
+      setMotivoExistencias(
+        ""
+      );
 
-  const activarEdicionDetalle = () => {
-    setError("");
-    setMensaje("");
-    setMotivoExistencias("");
+      setDetalleOriginal({
+        ...formularioDetalle
+      });
 
-    setDetalleOriginal({
-      ...formularioDetalle
-    });
+      setEditandoDetalle(
+        true
+      );
+    };
 
-    limpiarSeleccionImagen();
+  const cancelarEdicionDetalle =
+    () => {
+      setFormularioDetalle({
+        ...detalleOriginal
+      });
 
-    setEditandoDetalle(true);
-  };
+      setMotivoExistencias(
+        ""
+      );
 
-  const cancelarEdicionDetalle = () => {
-    setFormularioDetalle({
-      ...detalleOriginal
-    });
+      setError("");
+      setMensaje("");
 
-    setMotivoExistencias("");
-    limpiarSeleccionImagen();
-    setError("");
-    setMensaje("");
-    setEditandoDetalle(false);
-  };
+      setEditandoDetalle(
+        false
+      );
+    };
 
-  const handleDetalle = (event) => {
+  const handleDetalle = (
+    event
+  ) => {
     const {
       name,
       value
@@ -1054,325 +1141,329 @@ const Inventario = () => {
 
   const existenciasCambiaron =
     Number(
-      formularioDetalle.existencias
+      formularioDetalle
+        .existencias
     ) !==
     Number(
-      detalleOriginal.existencias
+      detalleOriginal
+        .existencias
     );
 
-  const guardarDetalle = async (
-    event
-  ) => {
-    event.preventDefault();
+  const guardarDetalle =
+    async (event) => {
+      event.preventDefault();
 
-    setError("");
-    setMensaje("");
+      setError("");
+      setMensaje("");
 
-    const nombre =
-      formularioDetalle.nombre.trim();
+      const nombre =
+        formularioDetalle
+          .nombre
+          .trim();
 
-    const unidadMedida =
-      formularioDetalle.unidad_medida.trim();
+      const unidadMedida =
+        formularioDetalle
+          .unidad_medida
+          .trim();
 
-    const existencias =
-      Number(
-        formularioDetalle.existencias
-      );
-
-    const puntoReorden =
-      formularioDetalle.punto_reorden ===
-      ""
-        ? 0
-        : Number(
-            formularioDetalle.punto_reorden
-          );
-
-    if (!nombre) {
-      setError(
-        "El nombre es obligatorio."
-      );
-      return;
-    }
-
-    if (
-      formularioDetalle.existencias ===
-        "" ||
-      Number.isNaN(existencias) ||
-      existencias < 0
-    ) {
-      setError(
-        "Las existencias son obligatorias y deben ser un número válido."
-      );
-      return;
-    }
-
-    if (!unidadMedida) {
-      setError(
-        "La unidad de medida es obligatoria."
-      );
-      return;
-    }
-
-    if (
-      Number.isNaN(puntoReorden) ||
-      puntoReorden < 0
-    ) {
-      setError(
-        "El punto de reorden debe ser un número válido."
-      );
-      return;
-    }
-
-    if (
-      existenciasCambiaron &&
-      !motivoExistencias.trim()
-    ) {
-      setError(
-        "Debes escribir una justificación para modificar las existencias."
-      );
-      return;
-    }
-
-    if (
-      !articuloDetalle?.producto_id
-    ) {
-      setError(
-        "No se encontró el producto seleccionado."
-      );
-      return;
-    }
-
-    setGuardando(true);
-
-    try {
-      const proveedorId =
-        formularioDetalle.proveedor_id
-          ? Number(
-              formularioDetalle.proveedor_id
-            )
-          : null;
-
-      const categoriaId =
-        formularioDetalle.categoria_id
-          ? Number(
-              formularioDetalle.categoria_id
-            )
-          : null;
-
-      const formDataProducto =
-        new FormData();
-
-      formDataProducto.append(
-        "nombre",
-        nombre
-      );
-
-      formDataProducto.append(
-        "descripcion",
-        formularioDetalle.descripcion.trim()
-      );
-
-      formDataProducto.append(
-        "punto_reorden",
-        String(puntoReorden)
-      );
-
-      formDataProducto.append(
-        "sku",
-        formularioDetalle.sku.trim()
-      );
-
-      formDataProducto.append(
-        "unidad_medida",
-        unidadMedida
-      );
-
-      formDataProducto.append(
-        "proveedor_id",
-        proveedorId
-          ? String(proveedorId)
-          : ""
-      );
-
-      formDataProducto.append(
-        "categoria_id",
-        categoriaId
-          ? String(categoriaId)
-          : ""
-      );
-
-      if (archivoImagenDetalle) {
-        formDataProducto.append(
-          "imagen",
-          archivoImagenDetalle
+      const existencias =
+        Number(
+          formularioDetalle
+            .existencias
         );
-      }
 
-      await api.put(
-        `/productos/${articuloDetalle.producto_id}`,
-        formDataProducto
-      );
-
-      if (existenciasCambiaron) {
-        const payloadAjuste = {
-          producto_id: Number(
-            articuloDetalle.producto_id
-          ),
-          cantidad_nueva: existencias,
-          motivo: motivoExistencias.trim()
-        };
-
-        if (articuloDetalle.ubicacion_id) {
-          payloadAjuste.ubicacion_id =
-            Number(
-              articuloDetalle.ubicacion_id
+      const puntoReorden =
+        formularioDetalle
+          .punto_reorden ===
+        ""
+          ? 0
+          : Number(
+              formularioDetalle
+                .punto_reorden
             );
-        }
 
-        await api.patch(
-          "/inventario/ajuste",
-          payloadAjuste
+      if (!nombre) {
+        setError(
+          "El nombre es obligatorio."
         );
+
+        return;
       }
-
-      const datosGuardados = {
-        ...formularioDetalle,
-
-        nombre,
-
-        descripcion:
-          formularioDetalle.descripcion.trim(),
-
-        existencias:
-          String(existencias),
-
-        punto_reorden:
-          String(puntoReorden),
-
-        proveedor_id:
-          proveedorId
-            ? String(proveedorId)
-            : "",
-
-        categoria_id:
-          categoriaId
-            ? String(categoriaId)
-            : "",
-
-        sku:
-          formularioDetalle.sku.trim(),
-
-        unidad_medida:
-          unidadMedida
-      };
-
-      setFormularioDetalle(
-        datosGuardados
-      );
-
-      setDetalleOriginal(
-        datosGuardados
-      );
-
-      const habiaNuevaImagen =
-        Boolean(
-          archivoImagenDetalle
-        );
-
-      limpiarSeleccionImagen();
 
       if (
-        habiaNuevaImagen ||
-        tieneImagenDetalle
+        formularioDetalle
+          .existencias ===
+          "" ||
+        Number.isNaN(
+          existencias
+        ) ||
+        existencias < 0
       ) {
-        await cargarImagenProducto(
-          articuloDetalle.producto_id,
-          true
+        setError(
+          "Las existencias son obligatorias y deben ser un número válido."
         );
+
+        return;
       }
 
-      setMotivoExistencias("");
-      setEditandoDetalle(false);
+      if (!unidadMedida) {
+        setError(
+          "La unidad de medida es obligatoria."
+        );
 
-      setMensaje(
-        "Producto actualizado correctamente."
-      );
+        return;
+      }
 
-      const nombreProveedorActualizado =
-        proveedorId
-          ? obtenerNombreProveedor(
-              proveedorId
-            )
-          : "Sin proveedor";
+      if (
+        Number.isNaN(
+          puntoReorden
+        ) ||
+        puntoReorden < 0
+      ) {
+        setError(
+          "El punto de reorden debe ser un número válido."
+        );
 
-      setInventario(
-        (inventarioActual) =>
-          inventarioActual.map(
-            (item) =>
-              Number(item.producto_id) ===
-              Number(
-                articuloDetalle.producto_id
+        return;
+      }
+
+      if (
+        existenciasCambiaron &&
+        !motivoExistencias.trim()
+      ) {
+        setError(
+          "Debes escribir una justificación para modificar las existencias."
+        );
+
+        return;
+      }
+
+      if (
+        !articuloDetalle
+          ?.producto_id
+      ) {
+        setError(
+          "No se encontró el producto seleccionado."
+        );
+
+        return;
+      }
+
+      setGuardando(true);
+
+      try {
+        const proveedorId =
+          formularioDetalle
+            .proveedor_id
+            ? Number(
+                formularioDetalle
+                  .proveedor_id
               )
-                ? {
-                    ...item,
-                    proveedor_id:
-                      proveedorId,
-                    proveedor_nombre:
-                      nombreProveedorActualizado
-                  }
-                : item
-          )
-      );
+            : null;
 
-      await cargarProductos();
-    } catch (err) {
-      console.error(
-        "Error al guardar producto:",
-        err
-      );
+        const categoriaId =
+          formularioDetalle
+            .categoria_id
+            ? Number(
+                formularioDetalle
+                  .categoria_id
+              )
+            : null;
 
-      setError(
-        err.response?.data?.message ||
-          err.response?.data?.mensaje ||
-          "No fue posible guardar los cambios."
-      );
-    } finally {
-      setGuardando(false);
-    }
-  };
+        const payloadProducto = {
+          nombre,
+
+          descripcion:
+            formularioDetalle
+              .descripcion
+              .trim(),
+
+          punto_reorden:
+            puntoReorden,
+
+          sku:
+            formularioDetalle
+              .sku
+              .trim() ||
+            null,
+
+          unidad_medida:
+            unidadMedida,
+
+          proveedor_id:
+            proveedorId,
+
+          proveedor_ids:
+            proveedorId
+              ? [
+                  proveedorId
+                ]
+              : [],
+
+          categoria_id:
+            categoriaId,
+
+          activo: true
+        };
+
+        await api.put(
+          `/productos/${articuloDetalle.producto_id}`,
+          payloadProducto
+        );
+
+        if (
+          existenciasCambiaron
+        ) {
+          /*
+            IMPORTANTE:
+            El backend recibe la existencia FINAL,
+            no la diferencia.
+          */
+          const payloadAjuste = {
+            producto_id:
+              Number(
+                articuloDetalle
+                  .producto_id
+              ),
+
+            cantidad_nueva:
+              existencias,
+
+            motivo:
+              motivoExistencias
+                .trim()
+          };
+
+          if (
+            articuloDetalle
+              .ubicacion_id
+          ) {
+            payloadAjuste
+              .ubicacion_id =
+              Number(
+                articuloDetalle
+                  .ubicacion_id
+              );
+          }
+
+          await api.post(
+            "/inventario/ajuste",
+            payloadAjuste
+          );
+        }
+
+        const datosGuardados = {
+          ...formularioDetalle,
+
+          nombre,
+
+          descripcion:
+            formularioDetalle
+              .descripcion
+              .trim(),
+
+          existencias:
+            String(
+              existencias
+            ),
+
+          punto_reorden:
+            String(
+              puntoReorden
+            ),
+
+          proveedor_id:
+            proveedorId
+              ? String(
+                  proveedorId
+                )
+              : "",
+
+          categoria_id:
+            categoriaId
+              ? String(
+                  categoriaId
+                )
+              : "",
+
+          sku:
+            formularioDetalle
+              .sku
+              .trim(),
+
+          unidad_medida:
+            unidadMedida
+        };
+
+        setFormularioDetalle(
+          datosGuardados
+        );
+
+        setDetalleOriginal(
+          datosGuardados
+        );
+
+        setMotivoExistencias(
+          ""
+        );
+
+        setEditandoDetalle(
+          false
+        );
+
+        setMensaje(
+          "Producto actualizado correctamente."
+        );
+
+        await Promise.all([
+          cargarInventario(),
+          cargarProductos()
+        ]);
+      } catch (err) {
+        console.error(
+          "Error al guardar producto:",
+          err
+        );
+
+        setError(
+          err.response?.data
+            ?.message ||
+            err.response?.data
+              ?.mensaje ||
+            "No fue posible guardar los cambios."
+        );
+      } finally {
+        setGuardando(false);
+      }
+    };
 
   const estiloDatoConsulta = {
-    padding: "11px 13px",
+    padding:
+      "11px 13px",
+
     border:
       "1px solid #e2e8f0",
-    borderRadius: "9px",
-    background: "#f8fafc",
-    minHeight: "44px",
-    display: "flex",
-    alignItems: "center",
-    color: "#1e293b",
-    wordBreak: "break-word"
-  };
 
-  const estiloImagen = {
-    border:
-      "1px solid #e2e8f0",
-    borderRadius: "12px",
-    background: "#f8fafc",
-    minHeight: "190px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-    padding: "12px"
-  };
+    borderRadius:
+      "9px",
 
-  const estiloImg = {
-    display: "block",
-    maxWidth: "100%",
-    maxHeight: "280px",
-    objectFit: "contain",
-    borderRadius: "8px"
+    background:
+      "#f8fafc",
+
+    minHeight:
+      "44px",
+
+    display:
+      "flex",
+
+    alignItems:
+      "center",
+
+    color:
+      "#1e293b",
+
+    wordBreak:
+      "break-word"
   };
 
   if (loading) {
@@ -1387,45 +1478,68 @@ const Inventario = () => {
     <div>
       <header className="page-header">
         <div>
-          <h1>Inventario</h1>
+          <h1>
+            Inventario
+          </h1>
 
           <p>
-            Consulta existencias, agrega artículos y administra
-            las especificaciones de los productos.
+            Consulta existencias,
+            agrega artículos y
+            administra las
+            especificaciones de
+            los productos.
           </p>
         </div>
 
         <div
           style={{
-            display: "flex",
-            gap: "10px",
-            flexWrap: "wrap"
+            display:
+              "flex",
+            gap:
+              "10px",
+            flexWrap:
+              "wrap"
           }}
         >
           <button
             type="button"
             className="secondary-button"
-            onClick={cargarDatos}
+            onClick={
+              cargarDatos
+            }
           >
-            <RefreshCw size={18} />
+            <RefreshCw
+              size={18}
+            />
+
             Actualizar
           </button>
 
           <button
             type="button"
             className="secondary-button"
-            onClick={abrirImportacion}
+            onClick={
+              abrirImportacion
+            }
           >
-            <Upload size={18} />
+            <Upload
+              size={18}
+            />
+
             Importar CSV
           </button>
 
           <button
             type="button"
             className="primary-button"
-            onClick={abrirModal}
+            onClick={
+              abrirModal
+            }
           >
-            <Plus size={18} />
+            <Plus
+              size={18}
+            />
+
             Agregar artículo
           </button>
         </div>
@@ -1451,10 +1565,15 @@ const Inventario = () => {
 
       <section className="inventory-summary">
         <div className="mini-stat">
-          <Package size={21} />
+          <Package
+            size={21}
+          />
 
           <div>
-            <span>Productos</span>
+            <span>
+              Productos
+            </span>
+
             <strong>
               {totalProductos}
             </strong>
@@ -1462,7 +1581,9 @@ const Inventario = () => {
         </div>
 
         <div className="mini-stat">
-          <Boxes size={21} />
+          <Boxes
+            size={21}
+          />
 
           <div>
             <span>
@@ -1478,10 +1599,14 @@ const Inventario = () => {
         </div>
 
         <div className="mini-stat">
-          <AlertTriangle size={21} />
+          <AlertTriangle
+            size={21}
+          />
 
           <div>
-            <span>Alertas</span>
+            <span>
+              Alertas
+            </span>
 
             <strong>
               {totalAlertas}
@@ -1493,25 +1618,37 @@ const Inventario = () => {
       <section className="content-card">
         <div className="filters-row">
           <div className="search-box">
-            <Search size={18} />
+            <Search
+              size={18}
+            />
 
             <input
               type="text"
               placeholder="Buscar producto, SKU o proveedor..."
-              value={busqueda}
-              onChange={(event) =>
+              value={
+                busqueda
+              }
+              onChange={(
+                event
+              ) =>
                 setBusqueda(
-                  event.target.value
+                  event.target
+                    .value
                 )
               }
             />
           </div>
 
           <select
-            value={categoria}
-            onChange={(event) =>
+            value={
+              categoria
+            }
+            onChange={(
+              event
+            ) =>
               setCategoria(
-                event.target.value
+                event.target
+                  .value
               )
             }
           >
@@ -1522,8 +1659,12 @@ const Inventario = () => {
             {categorias.map(
               (item) => (
                 <option
-                  key={item.id}
-                  value={item.id}
+                  key={
+                    item.id
+                  }
+                  value={
+                    item.id
+                  }
                 >
                   {item.nombre}
 
@@ -1538,10 +1679,15 @@ const Inventario = () => {
 
           {esPrincipal && (
             <select
-              value={ubicacion}
-              onChange={(event) =>
+              value={
+                ubicacion
+              }
+              onChange={(
+                event
+              ) =>
                 setUbicacion(
-                  event.target.value
+                  event.target
+                    .value
                 )
               }
             >
@@ -1552,8 +1698,12 @@ const Inventario = () => {
               {ubicaciones.map(
                 (item) => (
                   <option
-                    key={item.id}
-                    value={item.id}
+                    key={
+                      item.id
+                    }
+                    value={
+                      item.id
+                    }
                   >
                     {item.nombre}
                   </option>
@@ -1565,10 +1715,15 @@ const Inventario = () => {
           <label className="stock-filter">
             <input
               type="checkbox"
-              checked={soloBajoStock}
-              onChange={(event) =>
+              checked={
+                soloBajoStock
+              }
+              onChange={(
+                event
+              ) =>
                 setSoloBajoStock(
-                  event.target.checked
+                  event.target
+                    .checked
                 )
               }
             />
@@ -1579,7 +1734,9 @@ const Inventario = () => {
           <button
             type="button"
             className="text-button"
-            onClick={limpiarFiltros}
+            onClick={
+              limpiarFiltros
+            }
           >
             Limpiar
           </button>
@@ -1588,7 +1745,9 @@ const Inventario = () => {
         <div className="results-info">
           Mostrando{" "}
           <strong>
-            {inventarioFiltrado.length}
+            {
+              inventarioFiltrado.length
+            }
           </strong>{" "}
           registros
         </div>
@@ -1596,32 +1755,57 @@ const Inventario = () => {
         {inventarioFiltrado.length ===
         0 ? (
           <div className="empty-state">
-            No hay productos que coincidan con los filtros.
+            No hay productos que
+            coincidan con los
+            filtros.
           </div>
         ) : (
           <div className="table-container">
             <table>
               <thead>
                 <tr>
-                  <th>Producto</th>
-                  <th>Proveedor</th>
-                  <th>Categoría</th>
-                  <th>Ubicación</th>
-                  <th>Existencias</th>
-                  <th>Estado</th>
-                  <th>Acción</th>
+                  <th>
+                    Producto
+                  </th>
+
+                  <th>
+                    Proveedor
+                  </th>
+
+                  <th>
+                    Categoría
+                  </th>
+
+                  <th>
+                    Ubicación
+                  </th>
+
+                  <th>
+                    Existencias
+                  </th>
+
+                  <th>
+                    Estado
+                  </th>
+
+                  <th>
+                    Acción
+                  </th>
                 </tr>
               </thead>
 
               <tbody>
                 {inventarioFiltrado.map(
-                  (item) => {
+                  (
+                    item
+                  ) => {
                     const bajoStock =
                       Number(
                         item.stock_bajo
                       ) === 1 ||
                       Number(
-                        item.cantidad || 0
+                        item.cantidad ||
+                          0
                       ) <=
                         Number(
                           item.punto_reorden ||
@@ -1634,8 +1818,9 @@ const Inventario = () => {
                       >
                         <td>
                           <strong>
-                            {item.producto_nombre ||
-                              item.nombre}
+                            {
+                              item.producto_nombre
+                            }
                           </strong>
 
                           <small className="table-secondary">
@@ -1646,30 +1831,36 @@ const Inventario = () => {
                         </td>
 
                         <td>
-                          {item.proveedor_nombre ||
-                            "Sin proveedor"}
+                          {
+                            item.proveedor_nombre ||
+                              "Sin proveedor"
+                          }
                         </td>
 
                         <td>
-                          {item.categoria_nombre ||
-                            "Sin categoría"}
+                          {
+                            item.categoria_nombre ||
+                              "Sin categoría"
+                          }
                         </td>
 
                         <td>
-                          {item.ubicacion_nombre ||
-                            "Sin ubicación"}
+                          {
+                            item.ubicacion_nombre
+                          }
                         </td>
 
                         <td>
                           <strong>
                             {Number(
-                              item.cantidad ||
-                                0
+                              item.cantidad
                             ).toLocaleString(
                               "es-MX"
                             )}
                           </strong>{" "}
-                          {item.unidad_medida}
+                          {
+                            item.unidad_medida
+                          }
                         </td>
 
                         <td>
@@ -1694,7 +1885,10 @@ const Inventario = () => {
                               )
                             }
                           >
-                            <Eye size={16} />
+                            <Eye
+                              size={16}
+                            />
+
                             Ver
                           </button>
                         </td>
@@ -1713,18 +1907,35 @@ const Inventario = () => {
           <div
             className="modal-overlay"
             style={{
-              position: "fixed",
+              position:
+                "fixed",
+
               inset: 0,
-              zIndex: 999999,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: "16px",
+
+              zIndex:
+                999999,
+
+              display:
+                "flex",
+
+              alignItems:
+                "center",
+
+              justifyContent:
+                "center",
+
+              padding:
+                "16px",
+
               background:
                 "rgba(15, 23, 42, 0.65)",
-              overflowY: "auto"
+
+              overflowY:
+                "auto"
             }}
-            onMouseDown={(event) => {
+            onMouseDown={(
+              event
+            ) => {
               if (
                 event.target ===
                 event.currentTarget
@@ -1736,16 +1947,33 @@ const Inventario = () => {
             <div
               className="modal-content"
               style={{
-                position: "relative",
-                zIndex: 1000000,
-                maxWidth: "760px",
+                position:
+                  "relative",
+
+                zIndex:
+                  1000000,
+
+                maxWidth:
+                  "760px",
+
                 width:
                   "calc(100% - 32px)",
-                maxHeight: "90vh",
-                overflowY: "auto",
-                background: "#ffffff",
-                borderRadius: "16px",
-                padding: "24px",
+
+                maxHeight:
+                  "90vh",
+
+                overflowY:
+                  "auto",
+
+                background:
+                  "#ffffff",
+
+                borderRadius:
+                  "16px",
+
+                padding:
+                  "24px",
+
                 boxShadow:
                   "0 24px 70px rgba(15, 23, 42, 0.28)"
               }}
@@ -1766,10 +1994,16 @@ const Inventario = () => {
                 <button
                   type="button"
                   className="text-button"
-                  onClick={cerrarDetalle}
-                  disabled={guardando}
+                  onClick={
+                    cerrarDetalle
+                  }
+                  disabled={
+                    guardando
+                  }
                 >
-                  <X size={22} />
+                  <X
+                    size={22}
+                  />
                 </button>
               </div>
 
@@ -1801,124 +2035,194 @@ const Inventario = () => {
                 <>
                   <div
                     style={{
-                      display: "grid",
+                      display:
+                        "grid",
+
                       gridTemplateColumns:
                         "repeat(auto-fit, minmax(220px, 1fr))",
-                      gap: "14px"
+
+                      gap:
+                        "18px"
                     }}
                   >
-                    <div>
-                      <label>Nombre</label>
-                      <div style={estiloDatoConsulta}>
-                        {formularioDetalle.nombre ||
-                          "Sin nombre"}
+                    <div className="form-group">
+                      <label>
+                        Nombre
+                      </label>
+
+                      <div
+                        style={
+                          estiloDatoConsulta
+                        }
+                      >
+                        {
+                          formularioDetalle.nombre ||
+                            "Sin nombre"
+                        }
                       </div>
                     </div>
 
-                    <div>
-                      <label>SKU</label>
-                      <div style={estiloDatoConsulta}>
-                        {formularioDetalle.sku ||
-                          "Sin SKU"}
+                    <div className="form-group">
+                      <label>
+                        Categoría
+                      </label>
+
+                      <div
+                        style={
+                          estiloDatoConsulta
+                        }
+                      >
+                        {
+                          obtenerNombreCategoria(
+                            formularioDetalle.categoria_id
+                          )
+                        }
                       </div>
                     </div>
+                  </div>
 
-                    <div>
-                      <label>Categoría</label>
-                      <div style={estiloDatoConsulta}>
-                        {formularioDetalle.categoria_id
-                          ? categorias.find(
-                              (item) =>
-                                Number(item.id) ===
-                                Number(
-                                  formularioDetalle.categoria_id
-                                )
-                            )?.nombre ||
-                            "Sin categoría"
-                          : "Sin categoría"}
-                      </div>
+                  <div className="form-group">
+                    <label>
+                      Descripción
+                    </label>
+
+                    <div
+                      style={{
+                        ...estiloDatoConsulta,
+
+                        minHeight:
+                          "72px",
+
+                        alignItems:
+                          "flex-start",
+
+                        whiteSpace:
+                          "pre-wrap"
+                      }}
+                    >
+                      {
+                        formularioDetalle.descripcion ||
+                          "Sin descripción"
+                      }
                     </div>
+                  </div>
 
-                    <div>
-                      <label>Proveedor</label>
-                      <div style={estiloDatoConsulta}>
-                        {obtenerNombreProveedor(
-                          formularioDetalle.proveedor_id
+                  <div
+                    style={{
+                      display:
+                        "grid",
+
+                      gridTemplateColumns:
+                        "repeat(auto-fit, minmax(220px, 1fr))",
+
+                      gap:
+                        "18px"
+                    }}
+                  >
+                    <div className="form-group">
+                      <label>
+                        Existencias
+                      </label>
+
+                      <div
+                        style={
+                          estiloDatoConsulta
+                        }
+                      >
+                        {Number(
+                          formularioDetalle
+                            .existencias ||
+                            0
+                        ).toLocaleString(
+                          "es-MX"
                         )}
                       </div>
                     </div>
 
-                    <div>
-                      <label>Unidad de medida</label>
-                      <div style={estiloDatoConsulta}>
-                        {formularioDetalle.unidad_medida ||
-                          "Sin unidad"}
+                    <div className="form-group">
+                      <label>
+                        Punto de reorden
+                      </label>
+
+                      <div
+                        style={
+                          estiloDatoConsulta
+                        }
+                      >
+                        {Number(
+                          formularioDetalle
+                            .punto_reorden ||
+                            0
+                        ).toLocaleString(
+                          "es-MX"
+                        )}
                       </div>
                     </div>
 
-                    <div>
-                      <label>Existencias</label>
-                      <div style={estiloDatoConsulta}>
-                        {formularioDetalle.existencias ||
-                          "0"}
+                    <div className="form-group">
+                      <label>
+                        Proveedor
+                      </label>
+
+                      <div
+                        style={
+                          estiloDatoConsulta
+                        }
+                      >
+                        {
+                          obtenerNombreProveedor(
+                            formularioDetalle
+                              .proveedor_id
+                          )
+                        }
                       </div>
                     </div>
 
-                    <div>
-                      <label>Punto de reorden</label>
-                      <div style={estiloDatoConsulta}>
-                        {formularioDetalle.punto_reorden ||
-                          "0"}
+                    <div className="form-group">
+                      <label>
+                        SKU
+                      </label>
+
+                      <div
+                        style={
+                          estiloDatoConsulta
+                        }
+                      >
+                        {
+                          formularioDetalle.sku ||
+                            "Sin SKU"
+                        }
                       </div>
                     </div>
 
-                    <div
-                      style={{
-                        gridColumn:
-                          "1 / -1"
-                      }}
-                    >
-                      <label>Descripción</label>
-                      <div style={estiloDatoConsulta}>
-                        {formularioDetalle.descripcion ||
-                          "Sin descripción"}
+                    <div className="form-group">
+                      <label>
+                        Unidad de medida
+                      </label>
+
+                      <div
+                        style={
+                          estiloDatoConsulta
+                        }
+                      >
+                        {
+                          formularioDetalle.unidad_medida ||
+                            "Sin unidad de medida"
+                        }
                       </div>
                     </div>
                   </div>
 
                   <div
                     style={{
-                      marginTop: "18px"
-                    }}
-                  >
-                    <label>Imagen</label>
+                      display:
+                        "flex",
 
-                    <div style={estiloImagen}>
-                      {imagenDetalleUrl ? (
-                        <img
-                          src={
-                            imagenDetalleUrl
-                          }
-                          alt={
-                            formularioDetalle.nombre ||
-                            "Producto"
-                          }
-                          style={estiloImg}
-                        />
-                      ) : (
-                        <span className="table-secondary">
-                          No hay imagen disponible.
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div
-                    style={{
-                      display: "flex",
                       justifyContent:
                         "flex-end",
-                      marginTop: "20px"
+
+                      marginTop:
+                        "24px"
                     }}
                   >
                     <button
@@ -1927,8 +2231,14 @@ const Inventario = () => {
                       onClick={
                         activarEdicionDetalle
                       }
+                      disabled={
+                        cargandoDetalle
+                      }
                     >
-                      <Pencil size={18} />
+                      <Pencil
+                        size={18}
+                      />
+
                       Editar
                     </button>
                   </div>
@@ -1939,44 +2249,110 @@ const Inventario = () => {
                     guardarDetalle
                   }
                 >
-                  <div className="form-group">
-                    <label>Nombre *</label>
+                  <div
+                    style={{
+                      display:
+                        "grid",
 
-                    <input
-                      type="text"
-                      name="nombre"
-                      value={
-                        formularioDetalle.nombre
-                      }
-                      onChange={
-                        handleDetalle
-                      }
-                      required
-                    />
+                      gridTemplateColumns:
+                        "repeat(auto-fit, minmax(220px, 1fr))",
+
+                      gap:
+                        "16px"
+                    }}
+                  >
+                    <div className="form-group">
+                      <label>
+                        Nombre *
+                      </label>
+
+                      <input
+                        name="nombre"
+                        value={
+                          formularioDetalle.nombre
+                        }
+                        onChange={
+                          handleDetalle
+                        }
+                        required
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label>
+                        Categoría
+                      </label>
+
+                      <select
+                        name="categoria_id"
+                        value={
+                          formularioDetalle
+                            .categoria_id
+                        }
+                        onChange={
+                          handleDetalle
+                        }
+                      >
+                        <option value="">
+                          Sin categoría
+                        </option>
+
+                        {categorias.map(
+                          (
+                            item
+                          ) => (
+                            <option
+                              key={
+                                item.id
+                              }
+                              value={
+                                item.id
+                              }
+                            >
+                              {
+                                item.nombre
+                              }
+
+                              {item.tipo ===
+                              "privada"
+                                ? " (Privada)"
+                                : ""}
+                            </option>
+                          )
+                        )}
+                      </select>
+                    </div>
                   </div>
 
                   <div className="form-group">
-                    <label>Descripción</label>
+                    <label>
+                      Descripción
+                    </label>
 
                     <textarea
                       name="descripcion"
-                      rows="4"
+                      rows="3"
                       value={
-                        formularioDetalle.descripcion
+                        formularioDetalle
+                          .descripcion
                       }
                       onChange={
                         handleDetalle
                       }
-                      placeholder="Opcional"
+                      placeholder="Descripción opcional"
                     />
                   </div>
 
                   <div
                     style={{
-                      display: "grid",
+                      display:
+                        "grid",
+
                       gridTemplateColumns:
                         "repeat(auto-fit, minmax(220px, 1fr))",
-                      gap: "14px"
+
+                      gap:
+                        "16px"
                     }}
                   >
                     <div className="form-group">
@@ -1990,7 +2366,8 @@ const Inventario = () => {
                         step="any"
                         name="existencias"
                         value={
-                          formularioDetalle.existencias
+                          formularioDetalle
+                            .existencias
                         }
                         onChange={
                           handleDetalle
@@ -2010,148 +2387,14 @@ const Inventario = () => {
                         step="any"
                         name="punto_reorden"
                         value={
-                          formularioDetalle.punto_reorden
+                          formularioDetalle
+                            .punto_reorden
                         }
                         onChange={
                           handleDetalle
                         }
                       />
                     </div>
-
-                    <div className="form-group">
-                      <label>
-                        Proveedor
-                      </label>
-
-                      <select
-                        name="proveedor_id"
-                        value={
-                          formularioDetalle.proveedor_id
-                        }
-                        onChange={
-                          handleDetalle
-                        }
-                      >
-                        <option value="">
-                          Sin proveedor
-                        </option>
-
-                        {proveedores.map(
-                          (item) => (
-                            <option
-                              key={item.id}
-                              value={item.id}
-                            >
-                              {item.nombre}
-                            </option>
-                          )
-                        )}
-                      </select>
-                    </div>
-
-                    <div className="form-group">
-                      <label>
-                        Categoría
-                      </label>
-
-                      <select
-                        name="categoria_id"
-                        value={
-                          formularioDetalle.categoria_id
-                        }
-                        onChange={
-                          handleDetalle
-                        }
-                      >
-                        <option value="">
-                          Sin categoría
-                        </option>
-
-                        {categorias.map(
-                          (item) => (
-                            <option
-                              key={item.id}
-                              value={item.id}
-                            >
-                              {item.nombre}
-                            </option>
-                          )
-                        )}
-                      </select>
-                    </div>
-
-                    <div className="form-group">
-                      <label>SKU</label>
-
-                      <input
-                        type="text"
-                        name="sku"
-                        value={
-                          formularioDetalle.sku
-                        }
-                        onChange={
-                          handleDetalle
-                        }
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label>
-                        Unidad de medida *
-                      </label>
-
-                      <input
-                        type="text"
-                        name="unidad_medida"
-                        value={
-                          formularioDetalle.unidad_medida
-                        }
-                        onChange={
-                          handleDetalle
-                        }
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div
-                    style={{
-                      marginTop: "10px"
-                    }}
-                  >
-                    <label>
-                      Imagen
-                    </label>
-
-                    <input
-                      ref={
-                        inputImagenDetalleRef
-                      }
-                      type="file"
-                      accept="image/png,image/jpeg"
-                      onChange={
-                        seleccionarImagenDetalle
-                      }
-                    />
-
-                    {previewImagenDetalle && (
-                      <div
-                        style={{
-                          ...estiloImagen,
-                          marginTop: "12px"
-                        }}
-                      >
-                        <img
-                          src={
-                            previewImagenDetalle
-                          }
-                          alt="Vista previa"
-                          style={
-                            estiloImg
-                          }
-                        />
-                      </div>
-                    )}
                   </div>
 
                   {existenciasCambiaron && (
@@ -2165,25 +2408,149 @@ const Inventario = () => {
                         value={
                           motivoExistencias
                         }
-                        onChange={(event) =>
+                        onChange={(
+                          event
+                        ) =>
                           setMotivoExistencias(
-                            event.target.value
+                            event.target
+                              .value
                           )
                         }
-                        placeholder="Explica por qué cambias las existencias"
+                        placeholder="Ej. Corrección después de conteo físico"
                         required
                       />
+
+                      <small className="table-secondary">
+                        La justificación solamente es obligatoria porque modificaste las existencias.
+                      </small>
                     </div>
                   )}
 
                   <div
                     style={{
-                      display: "flex",
+                      display:
+                        "grid",
+
+                      gridTemplateColumns:
+                        "repeat(auto-fit, minmax(220px, 1fr))",
+
+                      gap:
+                        "16px"
+                    }}
+                  >
+                    <div className="form-group">
+                      <label>
+                        Proveedor
+                      </label>
+
+                      <select
+                        name="proveedor_id"
+                        value={
+                          formularioDetalle
+                            .proveedor_id
+                        }
+                        onChange={
+                          handleDetalle
+                        }
+                      >
+                        <option value="">
+                          Sin proveedor
+                        </option>
+
+                        {proveedores.map(
+                          (
+                            proveedor
+                          ) => (
+                            <option
+                              key={
+                                proveedor.id
+                              }
+                              value={
+                                proveedor.id
+                              }
+                            >
+                              {
+                                proveedor.nombre
+                              }
+                            </option>
+                          )
+                        )}
+                      </select>
+                    </div>
+
+                    <div className="form-group">
+                      <label>
+                        SKU
+                      </label>
+
+                      <input
+                        name="sku"
+                        value={
+                          formularioDetalle
+                            .sku
+                        }
+                        onChange={
+                          handleDetalle
+                        }
+                        placeholder="Opcional"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label>
+                      Unidad de medida *
+                    </label>
+
+                    <input
+                      name="unidad_medida"
+                      value={
+                        formularioDetalle
+                          .unidad_medida
+                      }
+                      onChange={
+                        handleDetalle
+                      }
+                      required
+                    />
+                  </div>
+
+                  <div
+                    style={{
+                      padding:
+                        "12px 14px",
+
+                      border:
+                        "1px solid #e2e8f0",
+
+                      borderRadius:
+                        "10px",
+
+                      marginTop:
+                        "8px"
+                    }}
+                  >
+                    <small className="table-secondary">
+                      Campos obligatorios: Nombre, Existencias y Unidad de medida. Descripción, Categoría, Punto de reorden, Proveedor y SKU son opcionales.
+                    </small>
+                  </div>
+
+                  <div
+                    style={{
+                      display:
+                        "flex",
+
                       justifyContent:
                         "flex-end",
-                      gap: "10px",
-                      marginTop: "24px",
-                      flexWrap: "wrap"
+
+                      gap:
+                        "10px",
+
+                      marginTop:
+                        "24px",
+
+                      flexWrap:
+                        "wrap"
                     }}
                   >
                     <button
@@ -2206,7 +2573,9 @@ const Inventario = () => {
                         guardando
                       }
                     >
-                      <Save size={18} />
+                      <Save
+                        size={18}
+                      />
 
                       {guardando
                         ? "Guardando..."
@@ -2223,18 +2592,35 @@ const Inventario = () => {
         <div
           className="modal-overlay"
           style={{
-            position: "fixed",
+            position:
+              "fixed",
+
             inset: 0,
-            zIndex: 999999,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "16px",
+
+            zIndex:
+              999999,
+
+            display:
+              "flex",
+
+            alignItems:
+              "center",
+
+            justifyContent:
+              "center",
+
+            padding:
+              "16px",
+
             background:
               "rgba(15, 23, 42, 0.65)",
-            overflowY: "auto"
+
+            overflowY:
+              "auto"
           }}
-          onMouseDown={(event) => {
+          onMouseDown={(
+            event
+          ) => {
             if (
               event.target ===
               event.currentTarget
@@ -2246,15 +2632,30 @@ const Inventario = () => {
           <div
             className="modal-content"
             style={{
-              position: "relative",
-              maxWidth: "760px",
+              position:
+                "relative",
+
+              maxWidth:
+                "650px",
+
               width:
                 "calc(100% - 32px)",
-              maxHeight: "90vh",
-              overflowY: "auto",
-              background: "#ffffff",
-              borderRadius: "16px",
-              padding: "24px",
+
+              maxHeight:
+                "90vh",
+
+              overflowY:
+                "auto",
+
+              background:
+                "#ffffff",
+
+              borderRadius:
+                "16px",
+
+              padding:
+                "24px",
+
               boxShadow:
                 "0 24px 70px rgba(15, 23, 42, 0.28)"
             }}
@@ -2262,11 +2663,11 @@ const Inventario = () => {
             <div className="modal-header">
               <div>
                 <h2>
-                  Importar inventario
+                  Importar inventario CSV
                 </h2>
 
                 <p>
-                  Carga un archivo CSV con los artículos.
+                  Agrega varios productos directamente al inventario de tu ubicación.
                 </p>
               </div>
 
@@ -2280,7 +2681,9 @@ const Inventario = () => {
                   importando
                 }
               >
-                <X size={22} />
+                <X
+                  size={22}
+                />
               </button>
             </div>
 
@@ -2290,80 +2693,359 @@ const Inventario = () => {
               </div>
             )}
 
-            <div className="form-group">
-              <label>
-                Archivo CSV
-              </label>
-
-              <input
-                ref={inputArchivoRef}
-                type="file"
-                accept=".csv,text/csv"
-                onChange={
-                  seleccionarArchivoCsv
-                }
-              />
-            </div>
-
-            <div
-              className="table-secondary"
-              style={{
-                marginTop: "12px",
-                lineHeight: "1.6"
-              }}
-            >
-              <strong>
-                Columnas obligatorias:
-              </strong>{" "}
-              nombre, sku, categoria_id,
-              unidad_medida y cantidad.
-              <br />
-              <strong>
-                Columnas opcionales:
-              </strong>{" "}
-              descripcion y punto_reorden.
-            </div>
-
-            {resultadoImportacion && (
-              <div
-                style={{
-                  marginTop: "18px"
-                }}
-              >
-                <h3>
-                  Resultado de importación
-                </h3>
-
-                <pre
-                  style={{
-                    background:
-                      "#f8fafc",
-                    padding: "14px",
-                    borderRadius:
-                      "10px",
-                    overflowX:
-                      "auto",
-                    whiteSpace:
-                      "pre-wrap"
-                  }}
-                >
-                  {JSON.stringify(
-                    resultadoImportacion,
-                    null,
-                    2
-                  )}
-                </pre>
+            {mensaje && (
+              <div className="success-message page-error">
+                {mensaje}
               </div>
             )}
 
             <div
               style={{
-                display: "flex",
+                padding:
+                  "16px",
+
+                border:
+                  "1px dashed #cbd5e1",
+
+                borderRadius:
+                  "10px",
+
+                marginBottom:
+                  "20px"
+              }}
+            >
+              <div
+                style={{
+                  display:
+                    "flex",
+
+                  alignItems:
+                    "center",
+
+                  gap:
+                    "10px",
+
+                  marginBottom:
+                    "12px"
+                }}
+              >
+                <FileText
+                  size={24}
+                />
+
+                <strong>
+                  Archivo CSV
+                </strong>
+              </div>
+
+              <input
+                ref={
+                  inputArchivoRef
+                }
+                type="file"
+                accept=".csv,text/csv"
+                onChange={
+                  seleccionarArchivoCsv
+                }
+                disabled={
+                  importando
+                }
+              />
+
+              {archivoCsv && (
+                <div
+                  className="table-secondary"
+                  style={{
+                    marginTop:
+                      "12px"
+                  }}
+                >
+                  Archivo seleccionado:{" "}
+                  <strong>
+                    {
+                      archivoCsv.name
+                    }
+                  </strong>
+                </div>
+              )}
+            </div>
+
+            <div
+              style={{
+                marginBottom:
+                  "20px"
+              }}
+            >
+              <strong>
+                Formato esperado
+              </strong>
+
+              <p
+                className="table-secondary"
+                style={{
+                  marginTop:
+                    "8px"
+                }}
+              >
+                Las columnas obligatorias son nombre, unidad_medida y cantidad. SKU, descripción, categoria, categoria_nombre, categoria_id, punto_reorden y proveedor_id son opcionales. La categoría puede escribirse por nombre; si no existe, se crea como categoría global.
+              </p>
+
+              <div
+                style={{
+                  overflowX:
+                    "auto",
+
+                  marginTop:
+                    "12px"
+                }}
+              >
+                <table>
+                  <thead>
+                    <tr>
+                      <th>
+                        nombre
+                      </th>
+
+                      <th>
+                        sku
+                      </th>
+
+                      <th>
+                        unidad_medida
+                      </th>
+
+                      <th>
+                        cantidad
+                      </th>
+
+                      <th>
+                        categoria
+                      </th>
+
+                      <th>
+                        punto_reorden
+                      </th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    <tr>
+                      <td>
+                        Mouse Logitech
+                      </td>
+
+                      <td>
+                        MOU-001
+                      </td>
+
+                      <td>
+                        pieza
+                      </td>
+
+                      <td>
+                        10
+                      </td>
+
+                      <td>
+                        Electrónica
+                      </td>
+
+                      <td>
+                        Opcional
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {resultadoImportacion && (
+              <div
+                style={{
+                  marginTop:
+                    "20px",
+
+                  marginBottom:
+                    "20px"
+                }}
+              >
+                <h3>
+                  Resultado de la importación
+                </h3>
+
+                <div
+                  className="inventory-summary"
+                  style={{
+                    marginTop:
+                      "14px"
+                  }}
+                >
+                  <div className="mini-stat">
+                    <FileText
+                      size={20}
+                    />
+
+                    <div>
+                      <span>
+                        Filas
+                      </span>
+
+                      <strong>
+                        {
+                          resultadoImportacion
+                            .resumen
+                            ?.total_filas ||
+                          0
+                        }
+                      </strong>
+                    </div>
+                  </div>
+
+                  <div className="mini-stat">
+                    <PackagePlus
+                      size={20}
+                    />
+
+                    <div>
+                      <span>
+                        Procesadas
+                      </span>
+
+                      <strong>
+                        {
+                          resultadoImportacion
+                            .resumen
+                            ?.filas_procesadas ||
+                          0
+                        }
+                      </strong>
+                    </div>
+                  </div>
+
+                  <div className="mini-stat">
+                    <AlertTriangle
+                      size={20}
+                    />
+
+                    <div>
+                      <span>
+                        Errores
+                      </span>
+
+                      <strong>
+                        {
+                          resultadoImportacion
+                            .resumen
+                            ?.filas_con_error ||
+                          0
+                        }
+                      </strong>
+                    </div>
+                  </div>
+                </div>
+
+                {resultadoImportacion
+                  .errores?.length >
+                  0 && (
+                  <div
+                    style={{
+                      marginTop:
+                        "18px"
+                    }}
+                  >
+                    <strong>
+                      Filas con error
+                    </strong>
+
+                    <div
+                      className="table-container"
+                      style={{
+                        marginTop:
+                          "10px"
+                      }}
+                    >
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>
+                              Fila
+                            </th>
+
+                            <th>
+                              Producto
+                            </th>
+
+                            <th>
+                              SKU
+                            </th>
+
+                            <th>
+                              Error
+                            </th>
+                          </tr>
+                        </thead>
+
+                        <tbody>
+                          {resultadoImportacion.errores.map(
+                            (
+                              item,
+                              index
+                            ) => (
+                              <tr
+                                key={`${item.fila}-${index}`}
+                              >
+                                <td>
+                                  {
+                                    item.fila
+                                  }
+                                </td>
+
+                                <td>
+                                  {
+                                    item.nombre ||
+                                      "-"
+                                  }
+                                </td>
+
+                                <td>
+                                  {
+                                    item.sku ||
+                                      "-"
+                                  }
+                                </td>
+
+                                <td>
+                                  {
+                                    item.error
+                                  }
+                                </td>
+                              </tr>
+                            )
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div
+              style={{
+                display:
+                  "flex",
+
                 justifyContent:
                   "flex-end",
-                gap: "10px",
-                marginTop: "20px",
-                flexWrap: "wrap"
+
+                gap:
+                  "10px",
+
+                marginTop:
+                  "20px",
+
+                flexWrap:
+                  "wrap"
               }}
             >
               <button
@@ -2390,7 +3072,9 @@ const Inventario = () => {
                   !archivoCsv
                 }
               >
-                <Upload size={18} />
+                <Upload
+                  size={18}
+                />
 
                 {importando
                   ? "Importando..."
@@ -2405,18 +3089,35 @@ const Inventario = () => {
         <div
           className="modal-overlay"
           style={{
-            position: "fixed",
+            position:
+              "fixed",
+
             inset: 0,
-            zIndex: 999999,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "16px",
+
+            zIndex:
+              999999,
+
+            display:
+              "flex",
+
+            alignItems:
+              "center",
+
+            justifyContent:
+              "center",
+
+            padding:
+              "16px",
+
             background:
               "rgba(15, 23, 42, 0.65)",
-            overflowY: "auto"
+
+            overflowY:
+              "auto"
           }}
-          onMouseDown={(event) => {
+          onMouseDown={(
+            event
+          ) => {
             if (
               event.target ===
               event.currentTarget
@@ -2428,15 +3129,30 @@ const Inventario = () => {
           <div
             className="modal-content"
             style={{
-              position: "relative",
-              maxWidth: "650px",
+              position:
+                "relative",
+
+              maxWidth:
+                "650px",
+
               width:
                 "calc(100% - 32px)",
-              maxHeight: "90vh",
-              overflowY: "auto",
-              background: "#ffffff",
-              borderRadius: "16px",
-              padding: "24px",
+
+              maxHeight:
+                "90vh",
+
+              overflowY:
+                "auto",
+
+              background:
+                "#ffffff",
+
+              borderRadius:
+                "16px",
+
+              padding:
+                "24px",
+
               boxShadow:
                 "0 24px 70px rgba(15, 23, 42, 0.28)"
             }}
@@ -2444,11 +3160,11 @@ const Inventario = () => {
             <div className="modal-header">
               <div>
                 <h2>
-                  Nuevo artículo
+                  Agregar artículo
                 </h2>
 
                 <p>
-                  Registra un producto que todavía no existe en el inventario.
+                  Agrega existencias al inventario.
                 </p>
               </div>
 
@@ -2462,7 +3178,9 @@ const Inventario = () => {
                   guardando
                 }
               >
-                <X size={22} />
+                <X
+                  size={22}
+                />
               </button>
             </div>
 
@@ -2479,72 +3197,42 @@ const Inventario = () => {
             >
               <div className="form-group">
                 <label>
-                  Nombre *
-                </label>
-
-                <input
-                  type="text"
-                  name="nombre"
-                  value={
-                    nuevoProducto.nombre
-                  }
-                  onChange={
-                    handleNuevoProducto
-                  }
-                  placeholder="Nombre del artículo"
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label>
-                  SKU *
-                </label>
-
-                <input
-                  type="text"
-                  name="sku"
-                  value={
-                    nuevoProducto.sku
-                  }
-                  onChange={
-                    handleNuevoProducto
-                  }
-                  placeholder="SKU del artículo"
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label>
-                  Categoría *
+                  Producto *
                 </label>
 
                 <select
-                  name="categoria_id"
+                  name="producto_id"
                   value={
-                    nuevoProducto.categoria_id
+                    formulario
+                      .producto_id
                   }
                   onChange={
-                    handleNuevoProducto
+                    handleFormulario
                   }
                   required
                 >
                   <option value="">
-                    Selecciona una categoría
+                    Selecciona un producto
                   </option>
 
-                  {categorias.map(
-                    (item) => (
+                  {productos.map(
+                    (
+                      producto
+                    ) => (
                       <option
-                        key={item.id}
-                        value={item.id}
+                        key={
+                          producto.id
+                        }
+                        value={
+                          producto.id
+                        }
                       >
-                        {item.nombre}
+                        {
+                          producto.nombre
+                        }
 
-                        {item.tipo ===
-                        "privada"
-                          ? " (Privada)"
+                        {producto.sku
+                          ? ` - ${producto.sku}`
                           : ""}
                       </option>
                     )
@@ -2552,92 +3240,102 @@ const Inventario = () => {
                 </select>
               </div>
 
+              {esPrincipal && (
+                <div className="form-group">
+                  <label>
+                    Ubicación
+                  </label>
+
+                  <select
+                    name="ubicacion_id"
+                    value={
+                      formulario
+                        .ubicacion_id
+                    }
+                    onChange={
+                      handleFormulario
+                    }
+                  >
+                    <option value="">
+                      Almacén Central
+                    </option>
+
+                    {ubicaciones.map(
+                      (
+                        item
+                      ) => (
+                        <option
+                          key={
+                            item.id
+                          }
+                          value={
+                            item.id
+                          }
+                        >
+                          {
+                            item.nombre
+                          }
+                        </option>
+                      )
+                    )}
+                  </select>
+                </div>
+              )}
+
               <div className="form-group">
                 <label>
-                  Unidad de medida *
-                </label>
-
-                <input
-                  type="text"
-                  name="unidad_medida"
-                  value={
-                    nuevoProducto.unidad_medida
-                  }
-                  onChange={
-                    handleNuevoProducto
-                  }
-                  placeholder="pieza, caja, kg, litro..."
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label>
-                  Existencias iniciales *
-                </label>
-
-                <input
-                  type="number"
-                  min="0.01"
-                  step="any"
-                  name="cantidad"
-                  value={
-                    nuevoProducto.cantidad
-                  }
-                  onChange={
-                    handleNuevoProducto
-                  }
-                  placeholder="0"
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label>
-                  Punto de reorden
+                  Existencias *
                 </label>
 
                 <input
                   type="number"
                   min="0"
                   step="any"
-                  name="punto_reorden"
+                  name="cantidad"
                   value={
-                    nuevoProducto.punto_reorden
+                    formulario
+                      .cantidad
                   }
                   onChange={
-                    handleNuevoProducto
+                    handleFormulario
                   }
-                  placeholder="0"
+                  required
                 />
               </div>
 
               <div className="form-group">
                 <label>
-                  Descripción
+                  Motivo
                 </label>
 
                 <textarea
-                  name="descripcion"
-                  rows="4"
+                  name="motivo"
+                  rows="3"
                   value={
-                    nuevoProducto.descripcion
+                    formulario
+                      .motivo
                   }
                   onChange={
-                    handleNuevoProducto
+                    handleFormulario
                   }
-                  placeholder="Descripción opcional del artículo"
+                  placeholder="Opcional"
                 />
               </div>
 
               <div
                 style={{
-                  display: "flex",
+                  display:
+                    "flex",
+
                   justifyContent:
                     "flex-end",
-                  gap: "10px",
+
+                  gap:
+                    "10px",
+
                   marginTop:
                     "24px",
+
                   flexWrap:
                     "wrap"
                 }}
@@ -2668,7 +3366,7 @@ const Inventario = () => {
 
                   {guardando
                     ? "Guardando..."
-                    : "Crear artículo"}
+                    : "Agregar artículo"}
                 </button>
               </div>
             </form>

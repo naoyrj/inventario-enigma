@@ -19,12 +19,21 @@ const obtenerUbicacionUsuario = (req) => {
   return ubicacionId;
 };
 
+const esPrincipal = (req) => {
+  return req.usuario?.rol === "principal";
+};
+
 const agregarFiltroCategoriaVisible = (
   sql,
   params,
   req,
   aliasCategoria = "c"
 ) => {
+  // Central puede consultar todas las categorías.
+  if (esPrincipal(req)) {
+    return sql;
+  }
+
   const ubicacionId =
     obtenerUbicacionUsuario(req);
 
@@ -39,13 +48,17 @@ const agregarFiltroCategoriaVisible = (
 
     AND (
       ${aliasCategoria}.id IS NULL
+
       OR
       ${aliasCategoria}.tipo IS NULL
+
       OR
       ${aliasCategoria}.tipo = 'global'
+
       OR (
         ${aliasCategoria}.tipo = 'privada'
-        AND ${aliasCategoria}.ubicacion_propietaria_id =
+        AND
+        ${aliasCategoria}.ubicacion_propietaria_id =
           $${params.length}
       )
     )
@@ -53,8 +66,15 @@ const agregarFiltroCategoriaVisible = (
 };
 
 // =========================================================
-// REPORTE DE INVENTARIO
-// Cada usuario consulta exclusivamente su ubicación.
+// INVENTARIO
+// =========================================================
+// Principal:
+//   - Ve inventario de todas las ubicaciones.
+//
+// Sucursal / Equipo Interno:
+//   - Ve únicamente su ubicación.
+//
+// También permite que Central filtre por una ubicación.
 // =========================================================
 
 const getInventario = async (
@@ -69,35 +89,12 @@ const getInventario = async (
       });
     }
 
-    const ubicacionUsuario =
-      obtenerUbicacionUsuario(req);
-
-    if (!ubicacionUsuario) {
-      return res.status(400).json({
-        message:
-          "El usuario no tiene una ubicación válida"
-      });
-    }
-
     const {
       categoria_id,
       ubicacion_id
     } = req.query;
 
-    if (
-      ubicacion_id &&
-      Number(ubicacion_id) !==
-        ubicacionUsuario
-    ) {
-      return res.status(403).json({
-        message:
-          "Solo puedes consultar el inventario de tu propia ubicación"
-      });
-    }
-
-    const params = [
-      ubicacionUsuario
-    ];
+    const params = [];
 
     let sql = `
       SELECT
@@ -125,18 +122,37 @@ const getInventario = async (
 
         COALESCE(
           (
+            SELECT pp.proveedor_id
+            FROM proveedor_productos pp
+            INNER JOIN proveedores pr
+              ON pr.id = pp.proveedor_id
+            WHERE
+              pp.producto_id = p.id
+              AND pr.activo = TRUE
+            ORDER BY pr.nombre
+            LIMIT 1
+          ),
+          NULL
+        )
+          AS proveedor_id,
+
+        COALESCE(
+          (
             SELECT STRING_AGG(
               DISTINCT pr.nombre,
-              ', ' ORDER BY pr.nombre
+              ', '
+              ORDER BY pr.nombre
             )
             FROM proveedor_productos pp
             INNER JOIN proveedores pr
               ON pr.id = pp.proveedor_id
-            WHERE pp.producto_id = p.id
+            WHERE
+              pp.producto_id = p.id
               AND pr.activo = TRUE
           ),
           'Sin proveedor'
-        ) AS proveedor_nombre,
+        )
+          AS proveedor_nombre,
 
         c.id
           AS categoria_id,
@@ -157,10 +173,8 @@ const getInventario = async (
             p.punto_reorden IS NOT NULL
             AND
             i.cantidad < p.punto_reorden
-
-          THEN 1
-
-          ELSE 0
+          THEN TRUE
+          ELSE FALSE
         END
           AS stock_bajo
 
@@ -176,12 +190,66 @@ const getInventario = async (
         ON p.categoria_id = c.id
 
       WHERE
-        i.ubicacion_id = $1
-
-        AND u.activo = TRUE
+        u.activo = TRUE
 
         AND p.activo = TRUE
     `;
+
+    // =====================================================
+    // UBICACIÓN
+    // =====================================================
+
+    if (esPrincipal(req)) {
+      // Central puede consultar todo.
+      if (ubicacion_id) {
+        const ubicacionId =
+          Number(ubicacion_id);
+
+        if (
+          !Number.isFinite(
+            ubicacionId
+          ) ||
+          ubicacionId <= 0
+        ) {
+          return res.status(400).json({
+            message:
+              "Ubicación inválida"
+          });
+        }
+
+        params.push(
+          ubicacionId
+        );
+
+        sql += `
+          AND i.ubicacion_id =
+            $${params.length}
+        `;
+      }
+    } else {
+      const ubicacionUsuario =
+        obtenerUbicacionUsuario(req);
+
+      if (!ubicacionUsuario) {
+        return res.status(400).json({
+          message:
+            "El usuario no tiene una ubicación válida"
+        });
+      }
+
+      params.push(
+        ubicacionUsuario
+      );
+
+      sql += `
+        AND i.ubicacion_id =
+          $${params.length}
+      `;
+    }
+
+    // =====================================================
+    // CATEGORÍAS VISIBLES
+    // =====================================================
 
     sql =
       agregarFiltroCategoriaVisible(
@@ -190,6 +258,10 @@ const getInventario = async (
         req,
         "c"
       );
+
+    // =====================================================
+    // FILTRO CATEGORÍA
+    // =====================================================
 
     if (categoria_id) {
       const categoriaId =
@@ -218,6 +290,7 @@ const getInventario = async (
 
     sql += `
       ORDER BY
+        u.nombre,
         c.nombre NULLS LAST,
         p.nombre
     `;
@@ -232,10 +305,14 @@ const getInventario = async (
       result.rows
     );
   } catch (error) {
+    console.error(
+      "Error getInventario:",
+      error
+    );
+
     return res.status(500).json({
       message:
-        "Error al obtener el reporte de inventario",
-
+        "Error al obtener el inventario",
       error:
         error.message
     });
@@ -243,8 +320,7 @@ const getInventario = async (
 };
 
 // =========================================================
-// ALERTAS DE STOCK
-// Solo de la ubicación autenticada.
+// ALERTAS
 // =========================================================
 
 const getAlertas = async (
@@ -259,19 +335,7 @@ const getAlertas = async (
       });
     }
 
-    const ubicacionUsuario =
-      obtenerUbicacionUsuario(req);
-
-    if (!ubicacionUsuario) {
-      return res.status(400).json({
-        message:
-          "El usuario no tiene una ubicación válida"
-      });
-    }
-
-    const params = [
-      ubicacionUsuario
-    ];
+    const params = [];
 
     let sql = `
       SELECT
@@ -328,17 +392,38 @@ const getAlertas = async (
         ON p.categoria_id = c.id
 
       WHERE
-        i.ubicacion_id = $1
+        u.activo = TRUE
 
         AND p.activo = TRUE
-
-        AND u.activo = TRUE
 
         AND p.punto_reorden IS NOT NULL
 
         AND i.cantidad <
           p.punto_reorden
     `;
+
+    if (esPrincipal(req)) {
+      // Central ve alertas de todas las ubicaciones.
+    } else {
+      const ubicacionUsuario =
+        obtenerUbicacionUsuario(req);
+
+      if (!ubicacionUsuario) {
+        return res.status(400).json({
+          message:
+            "El usuario no tiene una ubicación válida"
+        });
+      }
+
+      params.push(
+        ubicacionUsuario
+      );
+
+      sql += `
+        AND i.ubicacion_id =
+          $${params.length}
+      `;
+    }
 
     sql =
       agregarFiltroCategoriaVisible(
@@ -351,6 +436,7 @@ const getAlertas = async (
     sql += `
       ORDER BY
         faltante_para_reorden DESC,
+        u.nombre,
         p.nombre
     `;
 
@@ -368,10 +454,14 @@ const getAlertas = async (
         result.rows
     });
   } catch (error) {
+    console.error(
+      "Error getAlertas:",
+      error
+    );
+
     return res.status(500).json({
       message:
         "Error al obtener alertas de stock",
-
       error:
         error.message
     });
@@ -379,173 +469,25 @@ const getAlertas = async (
 };
 
 // =========================================================
-// KARDEX POR PRODUCTO
-// Solo movimientos del producto dentro de la ubicación
-// autenticada.
-// =========================================================
-
-const getKardexProducto =
-  async (
-    req,
-    res
-  ) => {
-    try {
-      if (!req.usuario) {
-        return res.status(401).json({
-          message:
-            "Usuario no autenticado"
-        });
-      }
-
-      const ubicacionUsuario =
-        obtenerUbicacionUsuario(
-          req
-        );
-
-      if (!ubicacionUsuario) {
-        return res.status(400).json({
-          message:
-            "El usuario no tiene una ubicación válida"
-        });
-      }
-
-      const productoId =
-        Number(
-          req.params.producto_id
-        );
-
-      if (
-        !Number.isFinite(
-          productoId
-        ) ||
-        productoId <= 0
-      ) {
-        return res.status(400).json({
-          message:
-            "Producto inválido"
-        });
-      }
-
-      const params = [
-        productoId,
-        ubicacionUsuario
-      ];
-
-      let sql = `
-        SELECT
-          m.id,
-
-          m.producto_id,
-
-          p.nombre
-            AS producto_nombre,
-
-          p.sku,
-
-          p.unidad_medida,
-
-          c.id
-            AS categoria_id,
-
-          c.nombre
-            AS categoria_nombre,
-
-          c.tipo
-            AS categoria_tipo,
-
-          c.ubicacion_propietaria_id
-            AS categoria_ubicacion_propietaria_id,
-
-          m.ubicacion_id,
-
-          u.nombre
-            AS ubicacion_nombre,
-
-          u.tipo
-            AS ubicacion_tipo,
-
-          m.tipo,
-
-          m.cantidad,
-
-          m.motivo,
-
-          m.referencia_tipo,
-
-          m.referencia_id,
-
-          m.usuario_id,
-
-          us.nombre
-            AS usuario_nombre,
-
-          m.created_at
-
-        FROM movimientos m
-
-        INNER JOIN productos p
-          ON m.producto_id =
-             p.id
-
-        INNER JOIN ubicaciones u
-          ON m.ubicacion_id =
-             u.id
-
-        INNER JOIN usuarios us
-          ON m.usuario_id =
-             us.id
-
-        LEFT JOIN categorias c
-          ON p.categoria_id =
-             c.id
-
-        WHERE
-          m.producto_id = $1
-
-          AND m.ubicacion_id = $2
-
-          AND p.activo = TRUE
-
-          AND u.activo = TRUE
-      `;
-
-      sql =
-        agregarFiltroCategoriaVisible(
-          sql,
-          params,
-          req,
-          "c"
-        );
-
-      sql += `
-        ORDER BY
-          m.created_at DESC
-      `;
-
-      const result =
-        await pool.query(
-          sql,
-          params
-        );
-
-      return res.json(
-        result.rows
-      );
-    } catch (error) {
-      return res.status(500).json({
-        message:
-          "Error al obtener el Kardex",
-
-        error:
-          error.message
-      });
-    }
-  };
-
-// =========================================================
 // KARDEX GENERAL
-// Permite buscar por:
-// nombre, SKU, proveedor y rango de fechas.
+// =========================================================
+//
+// Central:
+//   Todos los movimientos.
+//
+// Sucursal / Equipo Interno:
+//   Central + su propia ubicación.
+//
+// Filtros:
+//   nombre
+//   sku
+//   proveedor
+//   desde
+//   hasta
+//
+// IMPORTANTE:
+// Los proveedores se relacionan mediante
+// proveedor_productos.
 // =========================================================
 
 const getKardex = async (
@@ -560,16 +502,6 @@ const getKardex = async (
       });
     }
 
-    const ubicacionUsuario =
-      obtenerUbicacionUsuario(req);
-
-    if (!ubicacionUsuario) {
-      return res.status(400).json({
-        message:
-          "El usuario no tiene una ubicación válida"
-      });
-    }
-
     const {
       nombre,
       sku,
@@ -578,9 +510,7 @@ const getKardex = async (
       hasta
     } = req.query;
 
-    const params = [
-      ubicacionUsuario
-    ];
+    const params = [];
 
     let sql = `
       SELECT
@@ -595,21 +525,51 @@ const getKardex = async (
 
         p.unidad_medida,
 
+        (
+          SELECT
+            pp.proveedor_id
+
+          FROM proveedor_productos pp
+
+          INNER JOIN proveedores pr
+            ON pr.id =
+               pp.proveedor_id
+
+          WHERE
+            pp.producto_id =
+              p.id
+
+            AND pr.activo =
+              TRUE
+
+          ORDER BY
+            pr.nombre
+
+          LIMIT 1
+        )
+          AS proveedor_id,
+
         COALESCE(
           (
-            SELECT STRING_AGG(
-              DISTINCT pr.nombre,
-              ', '
-              ORDER BY pr.nombre
-            )
+            SELECT
+              STRING_AGG(
+                DISTINCT pr.nombre,
+                ', '
+                ORDER BY pr.nombre
+              )
+
             FROM proveedor_productos pp
+
             INNER JOIN proveedores pr
               ON pr.id =
                  pp.proveedor_id
+
             WHERE
               pp.producto_id =
                 p.id
-              AND pr.activo = TRUE
+
+              AND pr.activo =
+                TRUE
           ),
           'Sin proveedor'
         )
@@ -671,13 +631,60 @@ const getKardex = async (
            c.id
 
       WHERE
-        m.ubicacion_id =
-          $1
+        p.activo =
+          TRUE
 
-        AND p.activo = TRUE
-
-        AND u.activo = TRUE
+        AND u.activo =
+          TRUE
     `;
+
+    // =====================================================
+    // UBICACIONES VISIBLES
+    // =====================================================
+
+    if (!esPrincipal(req)) {
+      const ubicacionUsuario =
+        obtenerUbicacionUsuario(req);
+
+      if (!ubicacionUsuario) {
+        return res.status(400).json({
+          message:
+            "El usuario no tiene una ubicación válida"
+        });
+      }
+
+      // 1 = Almacén Central
+      // + ubicación del usuario
+
+      if (
+        ubicacionUsuario === 1
+      ) {
+        params.push(
+          1
+        );
+
+        sql += `
+          AND m.ubicacion_id =
+            $${params.length}
+        `;
+      } else {
+        params.push(
+          1,
+          ubicacionUsuario
+        );
+
+        sql += `
+          AND m.ubicacion_id IN (
+            $${params.length - 1},
+            $${params.length}
+          )
+        `;
+      }
+    }
+
+    // =====================================================
+    // CATEGORÍAS
+    // =====================================================
 
     sql =
       agregarFiltroCategoriaVisible(
@@ -688,46 +695,49 @@ const getKardex = async (
       );
 
     // =====================================================
-    // FILTRO POR NOMBRE
+    // PRODUCTO
     // =====================================================
 
-    if (nombre?.trim()) {
+    if (
+      nombre &&
+      nombre.trim()
+    ) {
       params.push(
         `%${nombre.trim()}%`
       );
 
       sql += `
-        AND LOWER(
-          p.nombre
-        ) LIKE LOWER(
+        AND p.nombre ILIKE
           $${params.length}
-        )
       `;
     }
 
     // =====================================================
-    // FILTRO POR SKU
+    // SKU
     // =====================================================
 
-    if (sku?.trim()) {
+    if (
+      sku &&
+      sku.trim()
+    ) {
       params.push(
         `%${sku.trim()}%`
       );
 
       sql += `
-        AND LOWER(
-          p.sku
-        ) LIKE LOWER(
+        AND p.sku ILIKE
           $${params.length}
-        )
       `;
     }
 
     // =====================================================
-    // FILTRO POR PROVEEDOR
+    // PROVEEDOR
     // =====================================================
 
-    if (proveedor?.trim()) {
+    if (
+      proveedor &&
+      proveedor.trim()
+    ) {
       params.push(
         `%${proveedor.trim()}%`
       );
@@ -749,17 +759,14 @@ const getKardex = async (
             AND pr_filtro.activo =
               TRUE
 
-            AND LOWER(
-              pr_filtro.nombre
-            ) LIKE LOWER(
+            AND pr_filtro.nombre ILIKE
               $${params.length}
-            )
         )
       `;
     }
 
     // =====================================================
-    // FILTRO DESDE
+    // FECHA DESDE
     // =====================================================
 
     if (desde) {
@@ -776,7 +783,7 @@ const getKardex = async (
     }
 
     // =====================================================
-    // FILTRO HASTA
+    // FECHA HASTA
     // =====================================================
 
     if (hasta) {
@@ -792,9 +799,14 @@ const getKardex = async (
       `;
     }
 
+    // =====================================================
+    // ORDEN
+    // =====================================================
+
     sql += `
       ORDER BY
-        m.created_at DESC
+        m.created_at DESC,
+        m.id DESC
     `;
 
     const result =
@@ -807,10 +819,14 @@ const getKardex = async (
       result.rows
     );
   } catch (error) {
+    console.error(
+      "Error getKardex:",
+      error
+    );
+
     return res.status(500).json({
       message:
-        "Error al obtener el Kardex",
-
+        "No fue posible consultar el Kardex",
       error:
         error.message
     });
@@ -818,8 +834,225 @@ const getKardex = async (
 };
 
 // =========================================================
+// KARDEX POR PRODUCTO
+// =========================================================
+
+const getKardexProducto =
+  async (
+    req,
+    res
+  ) => {
+    try {
+      if (!req.usuario) {
+        return res.status(401).json({
+          message:
+            "Usuario no autenticado"
+        });
+      }
+
+      const productoId =
+        Number(
+          req.params.producto_id
+        );
+
+      if (
+        !Number.isFinite(
+          productoId
+        ) ||
+        productoId <= 0
+      ) {
+        return res.status(400).json({
+          message:
+            "Producto inválido"
+        });
+      }
+
+      const params = [
+        productoId
+      ];
+
+      let sql = `
+        SELECT
+          m.id,
+
+          m.producto_id,
+
+          p.nombre
+            AS producto_nombre,
+
+          p.sku,
+
+          p.unidad_medida,
+
+          (
+            SELECT
+              STRING_AGG(
+                DISTINCT pr.nombre,
+                ', '
+                ORDER BY pr.nombre
+              )
+
+            FROM proveedor_productos pp
+
+            INNER JOIN proveedores pr
+              ON pr.id =
+                 pp.proveedor_id
+
+            WHERE
+              pp.producto_id =
+                p.id
+
+              AND pr.activo =
+                TRUE
+          )
+            AS proveedor_nombre,
+
+          c.id
+            AS categoria_id,
+
+          c.nombre
+            AS categoria_nombre,
+
+          c.tipo
+            AS categoria_tipo,
+
+          c.ubicacion_propietaria_id
+            AS categoria_ubicacion_propietaria_id,
+
+          m.ubicacion_id,
+
+          u.nombre
+            AS ubicacion_nombre,
+
+          u.tipo
+            AS ubicacion_tipo,
+
+          m.tipo,
+
+          m.cantidad,
+
+          m.motivo,
+
+          m.referencia_tipo,
+
+          m.referencia_id,
+
+          m.usuario_id,
+
+          us.nombre
+            AS usuario_nombre,
+
+          m.created_at
+
+        FROM movimientos m
+
+        INNER JOIN productos p
+          ON m.producto_id =
+             p.id
+
+        INNER JOIN ubicaciones u
+          ON m.ubicacion_id =
+             u.id
+
+        INNER JOIN usuarios us
+          ON m.usuario_id =
+             us.id
+
+        LEFT JOIN categorias c
+          ON p.categoria_id =
+             c.id
+
+        WHERE
+          m.producto_id =
+            $1
+
+          AND p.activo =
+            TRUE
+
+          AND u.activo =
+            TRUE
+      `;
+
+      // ===================================================
+      // UBICACIONES
+      // ===================================================
+
+      if (!esPrincipal(req)) {
+        const ubicacionUsuario =
+          obtenerUbicacionUsuario(req);
+
+        if (!ubicacionUsuario) {
+          return res.status(400).json({
+            message:
+              "El usuario no tiene una ubicación válida"
+          });
+        }
+
+        params.push(
+          ubicacionUsuario
+        );
+
+        if (
+          ubicacionUsuario === 1
+        ) {
+          sql += `
+            AND m.ubicacion_id =
+              $${params.length}
+          `;
+        } else {
+          params.push(
+            1
+          );
+
+          sql += `
+            AND m.ubicacion_id IN (
+              $${params.length - 1},
+              $${params.length}
+            )
+          `;
+        }
+      }
+
+      sql =
+        agregarFiltroCategoriaVisible(
+          sql,
+          params,
+          req,
+          "c"
+        );
+
+      sql += `
+        ORDER BY
+          m.created_at DESC,
+          m.id DESC
+      `;
+
+      const result =
+        await pool.query(
+          sql,
+          params
+        );
+
+      return res.json(
+        result.rows
+      );
+    } catch (error) {
+      console.error(
+        "Error getKardexProducto:",
+        error
+      );
+
+      return res.status(500).json({
+        message:
+          "Error al obtener el Kardex",
+        error:
+          error.message
+      });
+    }
+  };
+
+// =========================================================
 // CONSUMO
-// Solo movimientos de salida de la ubicación propia.
 // =========================================================
 
 const getConsumo = async (
@@ -834,24 +1067,12 @@ const getConsumo = async (
       });
     }
 
-    const ubicacionUsuario =
-      obtenerUbicacionUsuario(req);
-
-    if (!ubicacionUsuario) {
-      return res.status(400).json({
-        message:
-          "El usuario no tiene una ubicación válida"
-      });
-    }
-
     const {
       desde,
       hasta
     } = req.query;
 
-    const params = [
-      ubicacionUsuario
-    ];
+    const params = [];
 
     let sql = `
       SELECT
@@ -909,15 +1130,36 @@ const getConsumo = async (
            c.id
 
       WHERE
-        m.tipo = 'salida'
+        m.tipo =
+          'salida'
 
-        AND m.ubicacion_id =
-          $1
+        AND u.activo =
+          TRUE
 
-        AND u.activo = TRUE
-
-        AND p.activo = TRUE
+        AND p.activo =
+          TRUE
     `;
+
+    if (!esPrincipal(req)) {
+      const ubicacionUsuario =
+        obtenerUbicacionUsuario(req);
+
+      if (!ubicacionUsuario) {
+        return res.status(400).json({
+          message:
+            "El usuario no tiene una ubicación válida"
+        });
+      }
+
+      params.push(
+        ubicacionUsuario
+      );
+
+      sql += `
+        AND m.ubicacion_id =
+          $${params.length}
+      `;
+    }
 
     sql =
       agregarFiltroCategoriaVisible(
@@ -998,10 +1240,14 @@ const getConsumo = async (
         result.rows
     });
   } catch (error) {
+    console.error(
+      "Error getConsumo:",
+      error
+    );
+
     return res.status(500).json({
       message:
         "Error al obtener el reporte de consumo",
-
       error:
         error.message
     });
@@ -1009,10 +1255,7 @@ const getConsumo = async (
 };
 
 // =========================================================
-// HISTORIAL DE SOLICITUDES
-// Central puede administrar solicitudes.
-// Sucursales / Equipos Internos solo ven solicitudes donde
-// participan como solicitante o destino.
+// SOLICITUDES
 // =========================================================
 
 const getSolicitudesReporte =
@@ -1027,6 +1270,8 @@ const getSolicitudesReporte =
             "Usuario no autenticado"
         });
       }
+
+      const params = [];
 
       let sql = `
         SELECT
@@ -1071,19 +1316,13 @@ const getSolicitudesReporte =
           ON s.creado_por_usuario_id =
              creador.id
 
-        WHERE 1 = 1
+        WHERE
+          1 = 1
       `;
 
-      const params = [];
-
-      if (
-        req.usuario.rol !==
-        "principal"
-      ) {
+      if (!esPrincipal(req)) {
         const ubicacionUsuario =
-          obtenerUbicacionUsuario(
-            req
-          );
+          obtenerUbicacionUsuario(req);
 
         if (!ubicacionUsuario) {
           return res.status(400).json({
@@ -1093,14 +1332,13 @@ const getSolicitudesReporte =
         }
 
         params.push(
-          ubicacionUsuario,
           ubicacionUsuario
         );
 
         sql += `
           AND (
             s.destino_ubicacion_id =
-              $${params.length - 1}
+              $${params.length}
 
             OR
 
@@ -1125,10 +1363,14 @@ const getSolicitudesReporte =
         result.rows
       );
     } catch (error) {
+      console.error(
+        "Error getSolicitudesReporte:",
+        error
+      );
+
       return res.status(500).json({
         message:
           "Error al obtener historial de solicitudes",
-
         error:
           error.message
       });
@@ -1137,8 +1379,6 @@ const getSolicitudesReporte =
 
 // =========================================================
 // RESUMEN
-// Sigue siendo administrativo y exclusivo de Central.
-// No expone stock ni productos de ubicaciones individuales.
 // =========================================================
 
 const getResumen = async (
@@ -1146,10 +1386,14 @@ const getResumen = async (
   res
 ) => {
   try {
-    if (
-      req.usuario?.rol !==
-      "principal"
-    ) {
+    if (!req.usuario) {
+      return res.status(401).json({
+        message:
+          "Usuario no autenticado"
+      });
+    }
+
+    if (!esPrincipal(req)) {
       return res.status(403).json({
         message:
           "El resumen global es exclusivo de Central"
@@ -1163,7 +1407,8 @@ const getResumen = async (
 
         FROM ubicaciones
 
-        WHERE activo = TRUE
+        WHERE
+          activo = TRUE
       `);
 
     const productosResult =
@@ -1179,71 +1424,45 @@ const getResumen = async (
              c.id
 
         WHERE
-          p.activo = TRUE
-
-          AND (
-            c.id IS NULL
-
-            OR c.tipo IS NULL
-
-            OR c.tipo = 'global'
-          )
+          p.activo =
+            TRUE
       `);
 
     const alertasResult =
-      await pool.query(
-        `
-          SELECT
-            COUNT(*)
-              AS total
+      await pool.query(`
+        SELECT
+          COUNT(*) AS total
 
-          FROM inventario i
+        FROM inventario i
 
-          INNER JOIN productos p
-            ON i.producto_id =
-               p.id
+        INNER JOIN productos p
+          ON i.producto_id =
+             p.id
 
-          LEFT JOIN categorias c
-            ON p.categoria_id =
-               c.id
+        INNER JOIN ubicaciones u
+          ON i.ubicacion_id =
+             u.id
 
-          WHERE
-            i.ubicacion_id =
-              $1
+        WHERE
+          u.activo =
+            TRUE
 
-            AND p.activo =
-              TRUE
+          AND p.activo =
+            TRUE
 
-            AND p.punto_reorden
-              IS NOT NULL
+          AND p.punto_reorden
+            IS NOT NULL
 
-            AND i.cantidad <
-              p.punto_reorden
-
-            AND (
-              c.id IS NULL
-
-              OR c.tipo IS NULL
-
-              OR c.tipo =
-                'global'
-            )
-        `,
-        [
-          Number(
-            req.usuario
-              .ubicacion_id
-          )
-        ]
-      );
+          AND i.cantidad <
+            p.punto_reorden
+      `);
 
     const solicitudesResult =
       await pool.query(`
         SELECT
           estado,
 
-          COUNT(*)
-            AS total
+          COUNT(*) AS total
 
         FROM solicitudes
 
@@ -1277,21 +1496,29 @@ const getResumen = async (
         solicitudesResult.rows
     });
   } catch (error) {
+    console.error(
+      "Error getResumen:",
+      error
+    );
+
     return res.status(500).json({
       message:
         "Error al obtener el resumen",
-
       error:
         error.message
     });
   }
 };
 
+// =========================================================
+// EXPORTS
+// =========================================================
+
 module.exports = {
   getInventario,
   getAlertas,
-  getKardexProducto,
   getKardex,
+  getKardexProducto,
   getConsumo,
   getSolicitudesReporte,
   getResumen
