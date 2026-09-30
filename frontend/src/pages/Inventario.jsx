@@ -150,12 +150,14 @@ const Inventario = () => {
     "";
 
   const esPrincipal =
-    tipoUbicacion ===
-      "principal" ||
-    usuario?.es_principal ===
-      true ||
-    usuario?.es_principal ===
-      1;
+  tipoUbicacion ===
+    "principal" ||
+  usuario?.rol ===
+    "principal" ||
+  usuario?.es_principal ===
+    true ||
+  usuario?.es_principal ===
+    1;
 
   const obtenerProveedorId = (
     producto

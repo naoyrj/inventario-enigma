@@ -65,13 +65,6 @@ const generarSku = () =>
     1000 + Math.random() * 9000
   )}`;
 
-// =========================================================
-// BUSCAR PRODUCTO POR SKU
-// =========================================================
-// MOU-001 = MOU001 = MOU_001
-// También ignora espacios.
-// =========================================================
-
 const buscarProductoPorSku = async (
   client,
   sku
@@ -88,16 +81,12 @@ const buscarProductoPorSku = async (
         p.sku,
         p.categoria_id,
         p.activo,
-
         c.nombre AS categoria_nombre,
         c.tipo AS categoria_tipo,
         c.ubicacion_propietaria_id
-
       FROM productos p
-
       LEFT JOIN categorias c
         ON c.id = p.categoria_id
-
       WHERE
         LOWER(
           REPLACE(
@@ -130,9 +119,7 @@ const buscarProductoPorSku = async (
             ''
           )
         )
-
       ORDER BY p.id ASC
-
       LIMIT 1
     `,
     [sku]
@@ -141,10 +128,6 @@ const buscarProductoPorSku = async (
   return r.rows[0] || null;
 };
 
-// =========================================================
-// INVENTARIO GENERAL
-// =========================================================
-
 const getInventario = async (
   req,
   res
@@ -152,8 +135,7 @@ const getInventario = async (
   try {
     if (!req.usuario) {
       return res.status(401).json({
-        message:
-          "Usuario no autenticado"
+        message: "Usuario no autenticado"
       });
     }
 
@@ -165,17 +147,14 @@ const getInventario = async (
         i.ubicacion_id,
         u.nombre AS ubicacion_nombre,
         u.tipo AS ubicacion_tipo,
-
         i.producto_id,
         p.nombre AS producto_nombre,
         p.descripcion,
         p.sku,
         p.unidad_medida,
         p.punto_reorden,
-
         (
-          SELECT
-            pp.proveedor_id
+          SELECT pp.proveedor_id
           FROM proveedor_productos pp
           INNER JOIN proveedores pr
             ON pr.id = pp.proveedor_id
@@ -185,14 +164,12 @@ const getInventario = async (
           ORDER BY pr.nombre
           LIMIT 1
         ) AS proveedor_id,
-
         COALESCE(
           (
-            SELECT
-              STRING_AGG(
-                DISTINCT pr.nombre,
-                ', ' ORDER BY pr.nombre
-              )
+            SELECT STRING_AGG(
+              DISTINCT pr.nombre,
+              ', ' ORDER BY pr.nombre
+            )
             FROM proveedor_productos pp
             INNER JOIN proveedores pr
               ON pr.id = pp.proveedor_id
@@ -202,26 +179,19 @@ const getInventario = async (
           ),
           'Sin proveedor'
         ) AS proveedor_nombre,
-
         p.categoria_id,
         c.nombre AS categoria_nombre,
         c.tipo AS categoria_tipo,
         c.ubicacion_propietaria_id,
-
         i.cantidad,
         i.updated_at
-
       FROM inventario i
-
       INNER JOIN ubicaciones u
         ON u.id = i.ubicacion_id
-
       INNER JOIN productos p
         ON p.id = i.producto_id
-
       LEFT JOIN categorias c
         ON c.id = p.categoria_id
-
       WHERE
         u.activo = TRUE
         AND p.activo = TRUE
@@ -233,9 +203,7 @@ const getInventario = async (
       );
 
       if (
-        !Number.isInteger(
-          ubicacionId
-        ) ||
+        !Number.isInteger(ubicacionId) ||
         ubicacionId <= 0
       ) {
         return res.status(400).json({
@@ -244,13 +212,10 @@ const getInventario = async (
         });
       }
 
-      params.push(
-        ubicacionId
-      );
+      params.push(ubicacionId);
 
       sql += `
-        AND i.ubicacion_id =
-          $${params.length}
+        AND i.ubicacion_id = $${params.length}
       `;
     }
 
@@ -260,20 +225,17 @@ const getInventario = async (
         p.nombre
     `;
 
-    const result =
-      await pool.query(
-        sql,
-        params
-      );
+    const result = await pool.query(
+      sql,
+      params
+    );
 
     const inventarioVisible =
       result.rows.filter(
         (item) =>
           categoriaVisible(
             {
-              tipo:
-                item.categoria_tipo,
-
+              tipo: item.categoria_tipo,
               ubicacion_propietaria_id:
                 item.ubicacion_propietaria_id
             },
@@ -296,10 +258,6 @@ const getInventario = async (
     });
   }
 };
-
-// =========================================================
-// INVENTARIO POR UBICACIÓN
-// =========================================================
 
 const getInventarioByUbicacion =
   async (
@@ -355,83 +313,56 @@ const getInventarioByUbicacion =
               i.ubicacion_id,
               u.nombre AS ubicacion_nombre,
               u.tipo AS ubicacion_tipo,
-
               i.producto_id,
               p.nombre AS producto_nombre,
               p.descripcion,
               p.sku,
               p.unidad_medida,
               p.punto_reorden,
-
               (
-                SELECT
-                  pp.proveedor_id
+                SELECT pp.proveedor_id
                 FROM proveedor_productos pp
                 INNER JOIN proveedores pr
-                  ON pr.id =
-                    pp.proveedor_id
+                  ON pr.id = pp.proveedor_id
                 WHERE
-                  pp.producto_id =
-                    p.id
-                  AND pr.activo =
-                    TRUE
+                  pp.producto_id = p.id
+                  AND pr.activo = TRUE
                 ORDER BY pr.nombre
                 LIMIT 1
               ) AS proveedor_id,
-
               COALESCE(
                 (
-                  SELECT
-                    STRING_AGG(
-                      DISTINCT pr.nombre,
-                      ', '
-                      ORDER BY pr.nombre
-                    )
+                  SELECT STRING_AGG(
+                    DISTINCT pr.nombre,
+                    ', ' ORDER BY pr.nombre
+                  )
                   FROM proveedor_productos pp
                   INNER JOIN proveedores pr
-                    ON pr.id =
-                      pp.proveedor_id
+                    ON pr.id = pp.proveedor_id
                   WHERE
-                    pp.producto_id =
-                      p.id
-                    AND pr.activo =
-                      TRUE
+                    pp.producto_id = p.id
+                    AND pr.activo = TRUE
                 ),
                 'Sin proveedor'
               ) AS proveedor_nombre,
-
               p.categoria_id,
               c.nombre AS categoria_nombre,
               c.tipo AS categoria_tipo,
               c.ubicacion_propietaria_id,
-
               i.cantidad,
               i.updated_at
-
             FROM inventario i
-
             INNER JOIN ubicaciones u
-              ON u.id =
-                i.ubicacion_id
-
+              ON u.id = i.ubicacion_id
             INNER JOIN productos p
-              ON p.id =
-                i.producto_id
-
+              ON p.id = i.producto_id
             LEFT JOIN categorias c
-              ON c.id =
-                p.categoria_id
-
+              ON c.id = p.categoria_id
             WHERE
-              i.ubicacion_id =
-                $1
-              AND u.activo =
-                TRUE
-              AND p.activo =
-                TRUE
-
-            ORDER BY
-              p.nombre
+              i.ubicacion_id = $1
+              AND u.activo = TRUE
+              AND p.activo = TRUE
+            ORDER BY p.nombre
           `,
           [ubicacionId]
         );
@@ -443,7 +374,6 @@ const getInventarioByUbicacion =
               {
                 tipo:
                   item.categoria_tipo,
-
                 ubicacion_propietaria_id:
                   item.ubicacion_propietaria_id
               },
@@ -458,15 +388,10 @@ const getInventarioByUbicacion =
       return res.status(500).json({
         message:
           "Error al obtener inventario de la ubicación",
-        error:
-          error.message
+        error: error.message
       });
     }
   };
-
-// =========================================================
-// STOCK INICIAL
-// =========================================================
 
 const setStockInicial = async (
   req,
@@ -499,9 +424,7 @@ const setStockInicial = async (
     if (
       !ubicacion_id ||
       !producto_id ||
-      !cantidadPositiva(
-        cantidad
-      )
+      !cantidadPositiva(cantidad)
     ) {
       return res.status(400).json({
         message:
@@ -510,9 +433,7 @@ const setStockInicial = async (
     }
 
     const ubicacionId =
-      Number(
-        ubicacion_id
-      );
+      Number(ubicacion_id);
 
     await client.query(
       "BEGIN"
@@ -521,9 +442,7 @@ const setStockInicial = async (
     const ubicacion =
       await client.query(
         `
-          SELECT
-            id,
-            nombre
+          SELECT id,nombre
           FROM ubicaciones
           WHERE
             id = $1
@@ -532,9 +451,7 @@ const setStockInicial = async (
         [ubicacionId]
       );
 
-    if (
-      !ubicacion.rows.length
-    ) {
+    if (!ubicacion.rows.length) {
       await client.query(
         "ROLLBACK"
       );
@@ -560,18 +477,13 @@ const setStockInicial = async (
             $3,
             CURRENT_TIMESTAMP
           )
-
           ON CONFLICT (
             ubicacion_id,
             producto_id
           )
-
           DO UPDATE SET
-            cantidad =
-              EXCLUDED.cantidad,
-            updated_at =
-              CURRENT_TIMESTAMP
-
+            cantidad = EXCLUDED.cantidad,
+            updated_at = CURRENT_TIMESTAMP
           RETURNING *
         `,
         [
@@ -621,7 +533,6 @@ const setStockInicial = async (
     return res.json({
       message:
         "Stock inicial actualizado correctamente",
-
       inventario:
         inventario.rows[0]
     });
@@ -640,10 +551,6 @@ const setStockInicial = async (
     client.release();
   }
 };
-
-// =========================================================
-// AGREGAR PRODUCTO EXISTENTE
-// =========================================================
 
 const agregarProductoExistentePropio =
   async (
@@ -705,18 +612,11 @@ const agregarProductoExistentePropio =
               p.nombre,
               p.sku,
               p.categoria_id,
-
-              c.tipo
-                AS categoria_tipo,
-
+              c.tipo AS categoria_tipo,
               c.ubicacion_propietaria_id
-
             FROM productos p
-
             LEFT JOIN categorias c
-              ON c.id =
-                p.categoria_id
-
+              ON c.id = p.categoria_id
             WHERE
               p.id = $1
               AND p.activo = TRUE
@@ -741,7 +641,6 @@ const agregarProductoExistentePropio =
           {
             tipo:
               producto.categoria_tipo,
-
             ubicacion_propietaria_id:
               producto.ubicacion_propietaria_id
           },
@@ -773,20 +672,16 @@ const agregarProductoExistentePropio =
               $3,
               CURRENT_TIMESTAMP
             )
-
             ON CONFLICT (
               ubicacion_id,
               producto_id
             )
-
             DO UPDATE SET
               cantidad =
                 inventario.cantidad +
                 EXCLUDED.cantidad,
-
               updated_at =
                 CURRENT_TIMESTAMP
-
             RETURNING *
           `,
           [
@@ -836,9 +731,7 @@ const agregarProductoExistentePropio =
       return res.json({
         message:
           "Producto agregado al stock correctamente",
-
         producto,
-
         inventario:
           inventario.rows[0]
       });
@@ -859,10 +752,6 @@ const agregarProductoExistentePropio =
       client.release();
     }
   };
-
-// =========================================================
-// CREAR PRODUCTO NUEVO
-// =========================================================
 
 const agregarProductoNuevoPropio =
   async (
@@ -912,9 +801,7 @@ const agregarProductoNuevoPropio =
       }
 
       if (
-        !cantidadPositiva(
-          cantidad
-        )
+        !cantidadPositiva(cantidad)
       ) {
         return res.status(400).json({
           message:
@@ -923,14 +810,10 @@ const agregarProductoNuevoPropio =
       }
 
       const punto =
-        Number(
-          punto_reorden
-        );
+        Number(punto_reorden);
 
       if (
-        !Number.isFinite(
-          punto
-        ) ||
+        !Number.isFinite(punto) ||
         punto < 0
       ) {
         return res.status(400).json({
@@ -990,20 +873,18 @@ const agregarProductoNuevoPropio =
         });
       }
 
-      const skuFinal =
-        sku?.trim() ||
-        generarSku();
-
       const productoExistente =
-        await buscarProductoPorSku(
-          client,
-          skuFinal
-        );
+        sku?.trim()
+          ? await buscarProductoPorSku(
+              client,
+              sku
+            )
+          : null;
 
       if (productoExistente) {
         return res.status(409).json({
           message:
-            `El SKU ${skuFinal} ya existe y pertenece al artículo "${productoExistente.nombre}"`
+            `El SKU ${productoExistente.sku} ya existe y pertenece al artículo "${productoExistente.nombre}"`
         });
       }
 
@@ -1038,12 +919,16 @@ const agregarProductoNuevoPropio =
             nombre.trim(),
             descripcion?.trim() ||
               null,
-            skuFinal,
+            sku?.trim() ||
+              generarSku(),
             Number(categoria_id),
             unidad_medida.trim(),
             punto
           ]
         );
+
+      const productoCreado =
+        producto.rows[0];
 
       const inventario =
         await client.query(
@@ -1064,7 +949,7 @@ const agregarProductoNuevoPropio =
           `,
           [
             ubicacion.id,
-            producto.rows[0].id,
+            productoCreado.id,
             Number(cantidad)
           ]
         );
@@ -1094,11 +979,11 @@ const agregarProductoNuevoPropio =
         `,
         [
           ubicacion.id,
-          producto.rows[0].id,
+          productoCreado.id,
           Number(req.usuario.id),
           Number(cantidad),
           inventario.rows[0].id,
-          "Producto nuevo agregado al stock"
+          "Alta de producto nuevo"
         ]
       );
 
@@ -1108,11 +993,9 @@ const agregarProductoNuevoPropio =
 
       return res.status(201).json({
         message:
-          "Producto creado y agregado a tu stock correctamente",
-
+          "Producto creado y agregado al inventario correctamente",
         producto:
-          producto.rows[0],
-
+          productoCreado,
         inventario:
           inventario.rows[0]
       });
@@ -1123,19 +1006,9 @@ const agregarProductoNuevoPropio =
         );
       } catch {}
 
-      if (
-        error.code ===
-        "23505"
-      ) {
-        return res.status(409).json({
-          message:
-            "Ya existe un producto con ese SKU"
-        });
-      }
-
       return res.status(500).json({
         message:
-          "Error al crear el producto y agregarlo al stock",
+          "Error al crear el producto",
         error:
           error.message
       });
@@ -1144,28 +1017,21 @@ const agregarProductoNuevoPropio =
     }
   };
 
-// =========================================================
-// LEER CSV
-// =========================================================
-
-const leerCsv = async (
+const leerCsv = (
   buffer
-) => {
-  const filas = [];
-
-  await new Promise(
+) =>
+  new Promise(
     (
       resolve,
       reject
     ) => {
-      Readable
-        .from([buffer])
+      const filas = [];
+
+      Readable.from(buffer)
         .pipe(
           csv({
             mapHeaders:
-              ({
-                header
-              }) =>
+              ({ header }) =>
                 header
                   .replace(
                     /^\uFEFF/,
@@ -1178,13 +1044,12 @@ const leerCsv = async (
         .on(
           "data",
           (fila) =>
-            filas.push(
-              fila
-            )
+            filas.push(fila)
         )
         .on(
           "end",
-          resolve
+          () =>
+            resolve(filas)
         )
         .on(
           "error",
@@ -1193,129 +1058,29 @@ const leerCsv = async (
     }
   );
 
-  return filas;
-};
-
-// =========================================================
-// IMPORTAR CSV
-// =========================================================
-
 const importarInventarioCsv =
   async (
     req,
     res
   ) => {
-    if (!req.usuario) {
-      return res.status(401).json({
-        message:
-          "Usuario no autenticado"
-      });
-    }
-
-    if (!req.file) {
-      return res.status(400).json({
-        message:
-          "Debes seleccionar un archivo CSV"
-      });
-    }
-
-    let filas;
-
-    try {
-      filas =
-        await leerCsv(
-          req.file.buffer
-        );
-    } catch {
-      return res.status(400).json({
-        message:
-          "Error de formato: no se pudo leer el archivo CSV"
-      });
-    }
-
-    if (!filas.length) {
-      return res.status(400).json({
-        message:
-          "El archivo CSV está vacío"
-      });
-    }
-
-    const obligatorias = [
-      "nombre",
-      "unidad_medida",
-      "cantidad"
-    ];
-
-    const columnas =
-      Object.keys(
-        filas[0]
-      );
-
-    const faltantes =
-      obligatorias.filter(
-        (campo) =>
-          !columnas.includes(
-            campo
-          )
-      );
-
-    if (
-      faltantes.length
-    ) {
-      return res.status(400).json({
-        message:
-          `Error en ${faltantes.length} campo(s) obligatorio(s) del CSV`,
-
-        columnas_faltantes:
-          faltantes,
-
-        campos_obligatorios:
-          obligatorias,
-
-        campos_opcionales: [
-          "descripcion",
-          "sku",
-          "categoria",
-          "categoria_nombre",
-          "categoria_id",
-          "punto_reorden",
-          "proveedor_id"
-        ]
-      });
-    }
-
     const client =
       await pool.connect();
 
-    const resumen = {
-      total:
-        filas.length,
-
-      procesadas:
-        0,
-
-      productos_creados:
-        0,
-
-      productos_existentes:
-        0,
-
-      inventarios_creados:
-        0,
-
-      inventarios_actualizados:
-        0,
-
-      movimientos_creados:
-        0,
-
-      categorias_creadas:
-        0,
-
-      errores: []
-    };
-
     try {
+      if (!req.usuario) {
+        return res.status(401).json({
+          message:
+            "Usuario no autenticado"
+        });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({
+          message:
+            "No se recibió ningún archivo CSV"
+        });
+      }
+
       const ubicacion =
         await obtenerUbicacionUsuario(
           client,
@@ -1323,16 +1088,73 @@ const importarInventarioCsv =
         );
 
       if (!ubicacion) {
-        return res.status(404).json({
+        return res.status(400).json({
           message:
-            "La ubicación del usuario no existe o está inactiva"
+            "El usuario no tiene una ubicación válida"
         });
       }
 
+      const filas =
+        await leerCsv(
+          req.file.buffer
+        );
+
+      if (!filas.length) {
+        return res.status(400).json({
+          message:
+            "El archivo CSV está vacío"
+        });
+      }
+
+      const obligatorias = [
+        "nombre",
+        "unidad_medida",
+        "cantidad"
+      ];
+
+      const columnas =
+        Object.keys(
+          filas[0]
+        );
+
+      const faltantes =
+        obligatorias.filter(
+          (campo) =>
+            !columnas.includes(
+              campo
+            )
+        );
+
+      if (faltantes.length) {
+        return res.status(400).json({
+          message:
+            `Faltan campos obligatorios: ${faltantes.join(", ")}`
+        });
+      }
+
+      const resumen = {
+        total:
+          filas.length,
+        procesadas:
+          0,
+        errores: [],
+        productos_creados:
+          0,
+        productos_existentes:
+          0,
+        inventarios_creados:
+          0,
+        inventarios_actualizados:
+          0,
+        categorias_creadas:
+          0,
+        movimientos_creados:
+          0
+      };
+
       for (
         let indice = 0;
-        indice <
-          filas.length;
+        indice < filas.length;
         indice++
       ) {
         const fila =
@@ -1341,52 +1163,48 @@ const importarInventarioCsv =
         const numeroFila =
           indice + 2;
 
-        const nombre =
-          fila.nombre?.trim();
-
-        const descripcion =
-          fila.descripcion?.trim() ||
-          null;
-
-        const skuCsv =
-          fila.sku?.trim() ||
-          null;
-
-        const unidad =
-          fila.unidad_medida?.trim();
-
-        const cantidad =
-          Number(
-            fila.cantidad
-          );
-
-        const categoriaNombre =
-          fila.categoria?.trim() ||
-          fila.categoria_nombre?.trim() ||
-          null;
-
-        const categoriaIdCsv =
-          fila.categoria_id?.trim() ||
-          null;
-
-        const punto =
-          fila.punto_reorden ===
-            "" ||
-          fila.punto_reorden ===
-            undefined
-            ? 0
-            : Number(
-                fila.punto_reorden
-              );
-
-        const proveedorId =
-          fila.proveedor_id?.trim() ||
-          null;
-
         try {
+          const nombre =
+            fila.nombre?.trim();
+
+          const unidad =
+            fila.unidad_medida?.trim();
+
+          const cantidad =
+            Number(
+              fila.cantidad
+            );
+
+          const descripcion =
+            fila.descripcion?.trim() ||
+            null;
+
+          const skuCsv =
+            fila.sku?.trim() ||
+            null;
+
+          const punto =
+            fila.punto_reorden ===
+              undefined ||
+            fila.punto_reorden ===
+              ""
+              ? 0
+              : Number(
+                  fila.punto_reorden
+                );
+
+          const proveedorIdCsv =
+            fila.proveedor_id?.trim() ||
+            null;
+
+          const proveedorNombreCsv =
+            fila.proveedor?.trim() ||
+            fila.proveedor_nombre?.trim() ||
+            null;
+
           if (!nombre) {
             throw new Error(
-              "El nombre del artículo es obligatorio"
+              "El nombre es obligatorio"
             );
           }
 
@@ -1402,34 +1220,37 @@ const importarInventarioCsv =
             )
           ) {
             throw new Error(
-              "La cantidad debe ser un número mayor o igual a 0"
+              "La cantidad debe ser un número mayor o igual a cero"
             );
           }
 
           if (
-            !Number.isFinite(
-              punto
-            ) ||
+            !Number.isFinite(punto) ||
             punto < 0
           ) {
             throw new Error(
-              "El punto de reorden debe ser mayor o igual a 0"
+              "El punto de reorden no es válido"
             );
           }
+
+          let categoriaId =
+            fila.categoria_id?.trim()
+              ? Number(
+                  fila.categoria_id
+                )
+              : null;
+
+          const categoriaNombre =
+            fila.categoria?.trim() ||
+            fila.categoria_nombre?.trim() ||
+            null;
 
           await client.query(
             "BEGIN"
           );
 
-          // =============================================
-          // CATEGORÍA
-          // =============================================
-
-          let categoriaId =
-            null;
-
           if (
-            categoriaIdCsv
+            categoriaId
           ) {
             const categoria =
               await client.query(
@@ -1438,17 +1259,15 @@ const importarInventarioCsv =
                     id,
                     nombre,
                     tipo,
-                    ubicacion_propietaria_id,
-                    activo
+                    ubicacion_propietaria_id
                   FROM categorias
                   WHERE
                     id = $1
                     AND activo = TRUE
+                  LIMIT 1
                 `,
                 [
-                  Number(
-                    categoriaIdCsv
-                  )
+                  categoriaId
                 ]
               );
 
@@ -1470,11 +1289,6 @@ const importarInventarioCsv =
                 "No tienes permiso para utilizar esta categoría"
               );
             }
-
-            categoriaId =
-              Number(
-                categoria.rows[0].id
-              );
           } else if (
             categoriaNombre
           ) {
@@ -1485,25 +1299,12 @@ const importarInventarioCsv =
                     id,
                     nombre,
                     tipo,
-                    ubicacion_propietaria_id,
-                    activo
+                    ubicacion_propietaria_id
                   FROM categorias
                   WHERE
-                    LOWER(
-                      TRIM(nombre)
-                    ) =
-                    LOWER(
-                      TRIM($1)
-                    )
+                    LOWER(TRIM(nombre)) =
+                      LOWER(TRIM($1))
                     AND activo = TRUE
-                  ORDER BY
-                    CASE
-                      WHEN tipo =
-                        'global'
-                      THEN 0
-                      ELSE 1
-                    END,
-                    id
                   LIMIT 1
                 `,
                 [
@@ -1566,10 +1367,6 @@ const importarInventarioCsv =
             }
           }
 
-          // =============================================
-          // BUSCAR SKU
-          // =============================================
-
           let producto =
             await buscarProductoPorSku(
               client,
@@ -1577,10 +1374,6 @@ const importarInventarioCsv =
             );
 
           let productoId;
-
-          // =============================================
-          // SKU EXISTENTE
-          // =============================================
 
           if (producto) {
             if (
@@ -1609,7 +1402,6 @@ const importarInventarioCsv =
                 {
                   tipo:
                     producto.categoria_tipo,
-
                   ubicacion_propietaria_id:
                     producto.ubicacion_propietaria_id
                 },
@@ -1644,17 +1436,10 @@ const importarInventarioCsv =
             resumen
               .productos_existentes++;
           } else {
-            // =========================================
-            // PRODUCTO NUEVO
-            // =========================================
-
             const skuFinal =
               skuCsv ||
               generarSku();
 
-            // Segunda búsqueda antes del INSERT.
-            // Esto evita que una carrera termine creando
-            // otro artículo con el mismo SKU.
             const repetido =
               await buscarProductoPorSku(
                 client,
@@ -1728,9 +1513,44 @@ const importarInventarioCsv =
             }
           }
 
-          // =============================================
-          // PROVEEDOR
-          // =============================================
+          let proveedorId =
+            proveedorIdCsv;
+
+          if (
+            !proveedorId &&
+            proveedorNombreCsv
+          ) {
+            const proveedorPorNombre =
+              await client.query(
+                `
+                  SELECT id
+                  FROM proveedores
+                  WHERE
+                    LOWER(TRIM(nombre)) =
+                      LOWER(TRIM($1))
+                    AND activo = TRUE
+                  LIMIT 1
+                `,
+                [
+                  proveedorNombreCsv
+                ]
+              );
+
+            if (
+              !proveedorPorNombre.rows.length
+            ) {
+              throw new Error(
+                "El proveedor indicado no existe o está inactivo"
+              );
+            }
+
+            proveedorId =
+              String(
+                proveedorPorNombre
+                  .rows[0]
+                  .id
+              );
+          }
 
           if (
             proveedorId
@@ -1804,11 +1624,6 @@ const importarInventarioCsv =
             }
           }
 
-          // =============================================
-          // INVENTARIO
-          // CSV = EXISTENCIA FINAL
-          // =============================================
-
           const anterior =
             await client.query(
               `
@@ -1836,8 +1651,7 @@ const importarInventarioCsv =
           const cantidadAnterior =
             existe
               ? Number(
-                  anterior
-                    .rows[0]
+                  anterior.rows[0]
                     .cantidad
                 )
               : 0;
@@ -1854,14 +1668,10 @@ const importarInventarioCsv =
                 `
                   UPDATE inventario
                   SET
-                    cantidad =
-                      $1,
-
+                    cantidad = $1,
                     updated_at =
                       CURRENT_TIMESTAMP
-
                   WHERE id = $2
-
                   RETURNING
                     id,
                     cantidad,
@@ -1896,7 +1706,6 @@ const importarInventarioCsv =
                     $3,
                     CURRENT_TIMESTAMP
                   )
-
                   RETURNING
                     id,
                     cantidad,
@@ -1917,13 +1726,8 @@ const importarInventarioCsv =
               .inventarios_creados++;
           }
 
-          // =============================================
-          // KARDEX
-          // =============================================
-
           if (
-            diferencia !==
-            0
+            diferencia !== 0
           ) {
             await client.query(
               `
@@ -1950,23 +1754,17 @@ const importarInventarioCsv =
               `,
               [
                 ubicacion.id,
-
                 productoId,
-
                 Number(
                   req.usuario.id
                 ),
-
                 diferencia > 0
                   ? "ajuste_positivo"
                   : "ajuste_negativo",
-
                 Math.abs(
                   diferencia
                 ),
-
                 inventarioId,
-
                 `Importación CSV. Fila ${numeroFila}. Existencia anterior: ${cantidadAnterior}. Existencia nueva: ${cantidad}.`
               ]
             );
@@ -1990,10 +1788,9 @@ const importarInventarioCsv =
           resumen.errores.push({
             fila:
               numeroFila,
-
             sku:
-              skuCsv,
-
+              fila.sku?.trim() ||
+              "",
             error:
               error.code ===
               "23505"
@@ -2012,44 +1809,32 @@ const importarInventarioCsv =
           hayErrores
             ? `Archivo cargado con revisión: ${resumen.procesadas} de ${resumen.total} filas procesadas`
             : "Archivo cargado con éxito",
-
         ubicacion: {
           id:
             ubicacion.id,
-
           nombre:
             ubicacion.nombre
         },
-
         resumen: {
           total_filas:
             resumen.total,
-
           filas_procesadas:
             resumen.procesadas,
-
           filas_con_error:
             resumen.errores.length,
-
           productos_creados:
             resumen.productos_creados,
-
           productos_existentes:
             resumen.productos_existentes,
-
           inventarios_creados:
             resumen.inventarios_creados,
-
           inventarios_actualizados:
             resumen.inventarios_actualizados,
-
           categorias_creadas:
             resumen.categorias_creadas,
-
           movimientos_kardex:
             resumen.movimientos_creados
         },
-
         errores:
           resumen.errores
       });
@@ -2067,10 +1852,6 @@ const importarInventarioCsv =
       client.release();
     }
   };
-
-// =========================================================
-// AJUSTAR STOCK
-// =========================================================
 
 const ajustarStock = async (
   req,
@@ -2189,38 +1970,19 @@ const ajustarStock = async (
             i.ubicacion_id,
             i.producto_id,
             i.cantidad,
-
-            p.nombre
-              AS producto_nombre,
-
+            p.nombre AS producto_nombre,
             p.sku,
-
-            u.nombre
-              AS ubicacion_nombre
-
+            u.nombre AS ubicacion_nombre
           FROM inventario i
-
           INNER JOIN productos p
-            ON p.id =
-              i.producto_id
-
+            ON p.id = i.producto_id
           INNER JOIN ubicaciones u
-            ON u.id =
-              i.ubicacion_id
-
+            ON u.id = i.ubicacion_id
           WHERE
-            i.ubicacion_id =
-              $1
-
-            AND i.producto_id =
-              $2
-
-            AND p.activo =
-              TRUE
-
-            AND u.activo =
-              TRUE
-
+            i.ubicacion_id = $1
+            AND i.producto_id = $2
+            AND p.activo = TRUE
+            AND u.activo = TRUE
           FOR UPDATE
         `,
         [
@@ -2284,16 +2046,11 @@ const ajustarStock = async (
       await client.query(
         `
           UPDATE inventario
-
           SET
-            cantidad =
-              $1,
-
+            cantidad = $1,
             updated_at =
               CURRENT_TIMESTAMP
-
           WHERE id = $2
-
           RETURNING
             id,
             ubicacion_id,
@@ -2332,23 +2089,17 @@ const ajustarStock = async (
       `,
       [
         destino,
-
         Number(
           producto_id
         ),
-
         Number(
           req.usuario.id
         ),
-
         tipo,
-
         Math.abs(
           diferencia
         ),
-
         registro.id,
-
         motivo.trim()
       ]
     );
@@ -2360,37 +2111,26 @@ const ajustarStock = async (
     return res.json({
       message:
         "Stock ajustado correctamente",
-
       ajuste: {
         ubicacion_id:
           destino,
-
         ubicacion_nombre:
           registro.ubicacion_nombre,
-
         producto_id:
           registro.producto_id,
-
         producto_nombre:
           registro.producto_nombre,
-
         sku:
           registro.sku,
-
         cantidad_anterior:
           cantidadAnterior,
-
         cantidad_nueva:
           cantidadNueva,
-
         diferencia,
-
         tipo,
-
         motivo:
           motivo.trim()
       },
-
       inventario:
         actualizado.rows[0]
     });
@@ -2404,7 +2144,6 @@ const ajustarStock = async (
     return res.status(500).json({
       message:
         "Error al realizar el ajuste de stock",
-
       error:
         error.message
     });
@@ -2412,10 +2151,6 @@ const ajustarStock = async (
     client.release();
   }
 };
-
-// =========================================================
-// EXPORTS
-// =========================================================
 
 module.exports = {
   getInventario,
