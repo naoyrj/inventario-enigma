@@ -17,35 +17,20 @@ const {
 const router = express.Router();
 
 // =========================================================
-// CONFIGURACIÓN PARA IMÁGENES DE PRODUCTOS
-// =========================================================
-//
-// Las imágenes se reciben directamente en memoria porque
-// el controlador guarda el contenido en PostgreSQL.
-//
-// Campo esperado desde el frontend:
-// "imagen"
-//
-// Tamaño máximo:
-// 5 MB
+// CONFIGURACIÓN DE MULTER PARA IMÁGENES
 // =========================================================
 
 const upload = multer({
   storage: multer.memoryStorage(),
 
   limits: {
-    fileSize:
-      5 * 1024 * 1024
+    fileSize: 5 * 1024 * 1024
   },
 
-  fileFilter: (
-    req,
-    file,
-    cb
-  ) => {
+  fileFilter: (req, file, cb) => {
     const tiposPermitidos = [
-      "image/png",
-      "image/jpeg"
+      "image/jpeg",
+      "image/png"
     ];
 
     if (
@@ -55,7 +40,7 @@ const upload = multer({
     ) {
       return cb(
         new Error(
-          "Solo se permiten imágenes PNG, JPG o JPEG"
+          "Solo se permiten imágenes JPG, JPEG o PNG"
         )
       );
     }
@@ -65,7 +50,7 @@ const upload = multer({
 });
 
 // =========================================================
-// OBTENER TODOS LOS PRODUCTOS
+// PRODUCTOS
 // =========================================================
 
 router.get(
@@ -75,17 +60,7 @@ router.get(
 );
 
 // =========================================================
-// OBTENER PRODUCTO POR ID
-// =========================================================
-
-router.get(
-  "/:id",
-  verifyToken,
-  getProductoById
-);
-
-// =========================================================
-// OBTENER IMAGEN DEL PRODUCTO
+// IMAGEN DEL PRODUCTO
 // =========================================================
 
 router.get(
@@ -95,15 +70,17 @@ router.get(
 );
 
 // =========================================================
-// CREAR PRODUCTO
+// PRODUCTO POR ID
 // =========================================================
-//
-// upload.single("imagen") permite:
-//
-// - Crear producto sin imagen
-// - Crear producto con imagen
-//
-// Si no se envía imagen, req.file simplemente será undefined.
+
+router.get(
+  "/:id",
+  verifyToken,
+  getProductoById
+);
+
+// =========================================================
+// CREAR PRODUCTO
 // =========================================================
 
 router.post(
@@ -115,29 +92,6 @@ router.post(
 
 // =========================================================
 // ACTUALIZAR PRODUCTO
-// =========================================================
-//
-// Esta es la corrección importante.
-//
-// Inventario.jsx envía FormData cuando actualiza
-// las especificaciones del producto.
-//
-// Ahora multer procesa:
-//
-// nombre
-// descripcion
-// sku
-// categoria_id
-// unidad_medida
-// punto_reorden
-// proveedor_id
-// activo
-// imagen
-//
-// El controlador recibe:
-//
-// req.body
-// req.file
 // =========================================================
 
 router.put(
@@ -162,41 +116,32 @@ router.patch(
 // =========================================================
 
 router.use(
-  (
-    error,
-    req,
-    res,
-    next
-  ) => {
+  (error, req, res, next) => {
     if (
-      error instanceof
-      multer.MulterError
+      error instanceof multer.MulterError
     ) {
       if (
-        error.code ===
-        "LIMIT_FILE_SIZE"
+        error.code === "LIMIT_FILE_SIZE"
       ) {
         return res.status(400).json({
           message:
-            "La imagen no puede superar los 5 MB"
+            "La imagen no puede superar los 5 MB."
         });
       }
 
       return res.status(400).json({
         message:
-          "Error al procesar la imagen",
-        error:
-          error.message
+          "Error al procesar la imagen."
       });
     }
 
     if (
-      error?.message ===
-      "Solo se permiten imágenes PNG, JPG o JPEG"
+      error &&
+      error.message ===
+        "Solo se permiten imágenes JPG, JPEG o PNG"
     ) {
       return res.status(400).json({
-        message:
-          "Solo se permiten imágenes PNG, JPG o JPEG"
+        message: error.message
       });
     }
 

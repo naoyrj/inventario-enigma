@@ -150,14 +150,14 @@ const Inventario = () => {
     "";
 
   const esPrincipal =
-  tipoUbicacion ===
-    "principal" ||
-  usuario?.rol ===
-    "principal" ||
-  usuario?.es_principal ===
-    true ||
-  usuario?.es_principal ===
-    1;
+    tipoUbicacion ===
+      "principal" ||
+    usuario?.rol ===
+      "principal" ||
+    usuario?.es_principal ===
+      true ||
+    usuario?.es_principal ===
+      1;
 
   const obtenerProveedorId = (
     producto
@@ -1065,30 +1065,29 @@ const Inventario = () => {
       }
     };
 
-  const cerrarDetalle =
-    () => {
-      if (guardando) {
-        return;
-      }
+  const cerrarDetalle = () => {
+    if (guardando) {
+      return;
+    }
 
-      setMostrarDetalle(
-        false
-      );
+    setMostrarDetalle(
+      false
+    );
 
-      setArticuloDetalle(
-        null
-      );
+    setArticuloDetalle(
+      null
+    );
 
-      setEditandoDetalle(
-        false
-      );
+    setEditandoDetalle(
+      false
+    );
 
-      setMotivoExistencias(
-        ""
-      );
+    setMotivoExistencias(
+      ""
+    );
 
-      setError("");
-    };
+    setError("");
+  };
 
   const activarEdicionDetalle =
     () => {
@@ -1274,7 +1273,6 @@ const Inventario = () => {
 
         const payloadProducto = {
           nombre,
-
           descripcion:
             formularioDetalle
               .descripcion
@@ -1316,11 +1314,6 @@ const Inventario = () => {
         if (
           existenciasCambiaron
         ) {
-          /*
-            IMPORTANTE:
-            El backend recibe la existencia FINAL,
-            no la diferencia.
-          */
           const payloadAjuste = {
             producto_id:
               Number(
@@ -1485,11 +1478,7 @@ const Inventario = () => {
           </h1>
 
           <p>
-            Consulta existencias,
-            agrega artículos y
-            administra las
-            especificaciones de
-            los productos.
+            Consulta existencias, agrega artículos y administra las especificaciones de los productos.
           </p>
         </div>
 
@@ -1497,8 +1486,10 @@ const Inventario = () => {
           style={{
             display:
               "flex",
+
             gap:
               "10px",
+
             flexWrap:
               "wrap"
           }}
@@ -1659,7 +1650,9 @@ const Inventario = () => {
             </option>
 
             {categorias.map(
-              (item) => (
+              (
+                item
+              ) => (
                 <option
                   key={
                     item.id
@@ -1671,7 +1664,7 @@ const Inventario = () => {
                   {item.nombre}
 
                   {item.tipo ===
-                  "privada"
+                    "privada"
                     ? " (Privada)"
                     : ""}
                 </option>
@@ -1698,7 +1691,9 @@ const Inventario = () => {
               </option>
 
               {ubicaciones.map(
-                (item) => (
+                (
+                  item
+                ) => (
                   <option
                     key={
                       item.id
@@ -1707,7 +1702,9 @@ const Inventario = () => {
                       item.id
                     }
                   >
-                    {item.nombre}
+                    {
+                      item.nombre
+                    }
                   </option>
                 )
               )}
@@ -1757,9 +1754,7 @@ const Inventario = () => {
         {inventarioFiltrado.length ===
         0 ? (
           <div className="empty-state">
-            No hay productos que
-            coincidan con los
-            filtros.
+            No hay productos que coincidan con los filtros.
           </div>
         ) : (
           <div className="table-container">
@@ -1804,7 +1799,8 @@ const Inventario = () => {
                     const bajoStock =
                       Number(
                         item.stock_bajo
-                      ) === 1 ||
+                      ) ===
+                        1 ||
                       Number(
                         item.cantidad ||
                           0
@@ -1827,22 +1823,24 @@ const Inventario = () => {
 
                           <small className="table-secondary">
                             SKU:{" "}
-                            {item.sku ||
-                              "Sin SKU"}
+                            {
+                              item.sku ||
+                              "Sin SKU"
+                            }
                           </small>
                         </td>
 
                         <td>
                           {
                             item.proveedor_nombre ||
-                              "Sin proveedor"
+                            "Sin proveedor"
                           }
                         </td>
 
                         <td>
                           {
                             item.categoria_nombre ||
-                              "Sin categoría"
+                            "Sin categoría"
                           }
                         </td>
 
@@ -1912,7 +1910,8 @@ const Inventario = () => {
               position:
                 "fixed",
 
-              inset: 0,
+              inset:
+                0,
 
               zIndex:
                 999999,
@@ -2058,8 +2057,9 @@ const Inventario = () => {
                         }
                       >
                         {
-                          formularioDetalle.nombre ||
-                            "Sin nombre"
+                          formularioDetalle
+                            .nombre ||
+                          "Sin nombre"
                         }
                       </div>
                     </div>
@@ -2076,7 +2076,8 @@ const Inventario = () => {
                       >
                         {
                           obtenerNombreCategoria(
-                            formularioDetalle.categoria_id
+                            formularioDetalle
+                              .categoria_id
                           )
                         }
                       </div>
@@ -2103,8 +2104,9 @@ const Inventario = () => {
                       }}
                     >
                       {
-                        formularioDetalle.descripcion ||
-                          "Sin descripción"
+                        formularioDetalle
+                          .descripcion ||
+                        "Sin descripción"
                       }
                     </div>
                   </div>
@@ -2191,8 +2193,9 @@ const Inventario = () => {
                         }
                       >
                         {
-                          formularioDetalle.sku ||
-                            "Sin SKU"
+                          formularioDetalle
+                            .sku ||
+                          "Sin SKU"
                         }
                       </div>
                     </div>
@@ -2208,8 +2211,9 @@ const Inventario = () => {
                         }
                       >
                         {
-                          formularioDetalle.unidad_medida ||
-                            "Sin unidad de medida"
+                          formularioDetalle
+                            .unidad_medida ||
+                          "Sin unidad de medida"
                         }
                       </div>
                     </div>
@@ -2271,7 +2275,8 @@ const Inventario = () => {
                       <input
                         name="nombre"
                         value={
-                          formularioDetalle.nombre
+                          formularioDetalle
+                            .nombre
                         }
                         onChange={
                           handleDetalle
@@ -2597,7 +2602,8 @@ const Inventario = () => {
             position:
               "fixed",
 
-            inset: 0,
+            inset:
+              0,
 
             zIndex:
               999999,
@@ -2789,7 +2795,7 @@ const Inventario = () => {
                     "8px"
                 }}
               >
-                Las columnas obligatorias son nombre, unidad_medida y cantidad. SKU, descripción, categoria, categoria_nombre, categoria_id, punto_reorden y proveedor_id son opcionales. La categoría puede escribirse por nombre; si no existe, se crea como categoría global.
+                Las columnas obligatorias son nombre, unidad_medida y cantidad. SKU, descripción, categoria, categoria_nombre, categoria_id, punto_reorden y proveedor son opcionales. El proveedor puede escribirse por nombre usando la columna proveedor, o mediante proveedor_nombre o proveedor_id. La categoría puede escribirse por nombre; si no existe, se crea como categoría global.
               </p>
 
               <div
@@ -2827,6 +2833,10 @@ const Inventario = () => {
                       <th>
                         punto_reorden
                       </th>
+
+                      <th>
+                        proveedor
+                      </th>
                     </tr>
                   </thead>
 
@@ -2854,6 +2864,10 @@ const Inventario = () => {
 
                       <td>
                         Opcional
+                      </td>
+
+                      <td>
+                        Proveedor ABC
                       </td>
                     </tr>
                   </tbody>
@@ -3005,14 +3019,14 @@ const Inventario = () => {
                                 <td>
                                   {
                                     item.nombre ||
-                                      "-"
+                                    "-"
                                   }
                                 </td>
 
                                 <td>
                                   {
                                     item.sku ||
-                                      "-"
+                                    "-"
                                   }
                                 </td>
 
@@ -3094,7 +3108,8 @@ const Inventario = () => {
             position:
               "fixed",
 
-            inset: 0,
+            inset:
+              0,
 
             zIndex:
               999999,
