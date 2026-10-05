@@ -25,120 +25,78 @@ import api from "../services/api";
 import "../App.css";
 
 const Inventario = () => {
-  const [inventario, setInventario] =
-    useState([]);
+  const [inventario, setInventario] = useState([]);
+  const [categorias, setCategorias] = useState([]);
+  const [ubicaciones, setUbicaciones] = useState([]);
+  const [productos, setProductos] = useState([]);
+  const [proveedores, setProveedores] = useState([]);
 
-  const [categorias, setCategorias] =
-    useState([]);
+  const [loading, setLoading] = useState(true);
+  const [guardando, setGuardando] = useState(false);
+  const [importando, setImportando] = useState(false);
+  const [cargandoDetalle, setCargandoDetalle] = useState(false);
 
-  const [ubicaciones, setUbicaciones] =
-    useState([]);
+  const [error, setError] = useState("");
+  const [mensaje, setMensaje] = useState("");
 
-  const [productos, setProductos] =
-    useState([]);
+  const [busqueda, setBusqueda] = useState("");
+  const [categoria, setCategoria] = useState("");
+  const [ubicacion, setUbicacion] = useState("");
+  const [soloBajoStock, setSoloBajoStock] = useState(false);
 
-  const [proveedores, setProveedores] =
-    useState([]);
+  const [mostrarModal, setMostrarModal] = useState(false);
+  const [mostrarImportacion, setMostrarImportacion] = useState(false);
+  const [mostrarDetalle, setMostrarDetalle] = useState(false);
 
-  const [loading, setLoading] =
-    useState(true);
+  const [articuloDetalle, setArticuloDetalle] = useState(null);
+  const [editandoDetalle, setEditandoDetalle] = useState(false);
 
-  const [guardando, setGuardando] =
-    useState(false);
+  const [archivoCsv, setArchivoCsv] = useState(null);
+  const [resultadoImportacion, setResultadoImportacion] = useState(null);
 
-  const [importando, setImportando] =
-    useState(false);
+  const [imagenDetalleUrl, setImagenDetalleUrl] = useState("");
+  const [archivoImagenDetalle, setArchivoImagenDetalle] = useState(null);
+  const [previewImagenDetalle, setPreviewImagenDetalle] = useState("");
+  const [tieneImagenDetalle, setTieneImagenDetalle] = useState(false);
 
-  const [error, setError] =
-    useState("");
+  const inputArchivoRef = useRef(null);
+  const inputImagenDetalleRef = useRef(null);
 
-  const [mensaje, setMensaje] =
-    useState("");
+  const [formulario, setFormulario] = useState({
+    producto_id: "",
+    cantidad: "",
+    ubicacion_id: "",
+    motivo: ""
+  });
 
-  const [busqueda, setBusqueda] =
-    useState("");
+  const [formularioDetalle, setFormularioDetalle] = useState({
+    nombre: "",
+    descripcion: "",
+    existencias: "",
+    punto_reorden: "",
+    proveedor_id: "",
+    categoria_id: "",
+    sku: "",
+    unidad_medida: ""
+  });
 
-  const [categoria, setCategoria] =
-    useState("");
+  const [detalleOriginal, setDetalleOriginal] = useState({
+    nombre: "",
+    descripcion: "",
+    existencias: "",
+    punto_reorden: "",
+    proveedor_id: "",
+    categoria_id: "",
+    sku: "",
+    unidad_medida: ""
+  });
 
-  const [ubicacion, setUbicacion] =
-    useState("");
-
-  const [soloBajoStock, setSoloBajoStock] =
-    useState(false);
-
-  const [mostrarModal, setMostrarModal] =
-    useState(false);
-
-  const [mostrarImportacion, setMostrarImportacion] =
-    useState(false);
-
-  const [mostrarDetalle, setMostrarDetalle] =
-    useState(false);
-
-  const [cargandoDetalle, setCargandoDetalle] =
-    useState(false);
-
-  const [articuloDetalle, setArticuloDetalle] =
-    useState(null);
-
-  const [editandoDetalle, setEditandoDetalle] =
-    useState(false);
-
-  const [archivoCsv, setArchivoCsv] =
-    useState(null);
-
-  const [resultadoImportacion, setResultadoImportacion] =
-    useState(null);
-
-  const inputArchivoRef =
-    useRef(null);
-
-  const [formulario, setFormulario] =
-    useState({
-      producto_id: "",
-      cantidad: "",
-      ubicacion_id: "",
-      motivo: ""
-    });
-
-  const [formularioDetalle, setFormularioDetalle] =
-    useState({
-      nombre: "",
-      descripcion: "",
-      existencias: "",
-      punto_reorden: "",
-      proveedor_id: "",
-      categoria_id: "",
-      sku: "",
-      unidad_medida: ""
-    });
-
-  const [detalleOriginal, setDetalleOriginal] =
-    useState({
-      nombre: "",
-      descripcion: "",
-      existencias: "",
-      punto_reorden: "",
-      proveedor_id: "",
-      categoria_id: "",
-      sku: "",
-      unidad_medida: ""
-    });
-
-  const [motivoExistencias, setMotivoExistencias] =
-    useState("");
+  const [motivoExistencias, setMotivoExistencias] = useState("");
 
   const usuario = useMemo(() => {
     try {
-      const datos =
-        localStorage.getItem(
-          "usuario"
-        );
-
-      return datos
-        ? JSON.parse(datos)
-        : null;
+      const datos = localStorage.getItem("usuario");
+      return datos ? JSON.parse(datos) : null;
     } catch {
       return null;
     }
@@ -150,39 +108,25 @@ const Inventario = () => {
     "";
 
   const esPrincipal =
-    tipoUbicacion ===
-      "principal" ||
-    usuario?.rol ===
-      "principal" ||
-    usuario?.es_principal ===
-      true ||
-    usuario?.es_principal ===
-      1;
+    tipoUbicacion === "principal" ||
+    usuario?.rol === "principal" ||
+    usuario?.es_principal === true ||
+    usuario?.es_principal === 1;
 
-  const obtenerProveedorId = (
-    producto
-  ) => {
+  const obtenerProveedorId = (producto) => {
     if (!producto) {
       return "";
     }
 
-    if (
-      producto.proveedor_id
-    ) {
-      return String(
-        producto.proveedor_id
-      );
+    if (producto.proveedor_id) {
+      return String(producto.proveedor_id);
     }
 
     if (
-      Array.isArray(
-        producto.proveedores
-      ) &&
-      producto.proveedores
-        .length > 0
+      Array.isArray(producto.proveedores) &&
+      producto.proveedores.length > 0
     ) {
-      const proveedor =
-        producto.proveedores[0];
+      const proveedor = producto.proveedores[0];
 
       return String(
         proveedor?.id ||
@@ -192,23 +136,16 @@ const Inventario = () => {
     }
 
     if (
-      Array.isArray(
-        producto.proveedor_ids
-      ) &&
-      producto.proveedor_ids
-        .length > 0
+      Array.isArray(producto.proveedor_ids) &&
+      producto.proveedor_ids.length > 0
     ) {
-      return String(
-        producto.proveedor_ids[0]
-      );
+      return String(producto.proveedor_ids[0]);
     }
 
     return "";
   };
 
-  const obtenerCategoriaId = (
-    producto
-  ) => {
+  const obtenerCategoriaId = (producto) => {
     if (!producto) {
       return "";
     }
@@ -220,396 +157,304 @@ const Inventario = () => {
     );
   };
 
-  const obtenerNombreProveedor = (
-    proveedorId
-  ) => {
+  const obtenerNombreProveedor = (proveedorId) => {
     if (!proveedorId) {
       return "Sin proveedor";
     }
 
-    const proveedor =
-      proveedores.find(
-        (item) =>
-          Number(item.id) ===
-          Number(proveedorId)
-      );
-
-    return (
-      proveedor?.nombre ||
-      "Sin proveedor"
+    const proveedor = proveedores.find(
+      (item) =>
+        Number(item.id) === Number(proveedorId)
     );
+
+    return proveedor?.nombre || "Sin proveedor";
   };
 
-  const obtenerNombreCategoria = (
-    categoriaId
-  ) => {
+  const obtenerNombreCategoria = (categoriaId) => {
     if (!categoriaId) {
       return "Sin categoría";
     }
 
-    const categoriaEncontrada =
-      categorias.find(
-        (item) =>
-          Number(item.id) ===
-          Number(categoriaId)
-      );
-
-    return (
-      categoriaEncontrada?.nombre ||
-      "Sin categoría"
+    const categoriaEncontrada = categorias.find(
+      (item) =>
+        Number(item.id) === Number(categoriaId)
     );
+
+    return categoriaEncontrada?.nombre || "Sin categoría";
   };
 
-  const normalizarInventario = (
-    respuesta
-  ) => {
-    if (
-      Array.isArray(
-        respuesta
-      )
-    ) {
+  const normalizarInventario = (respuesta) => {
+    if (Array.isArray(respuesta)) {
       return respuesta;
     }
 
-    if (
-      Array.isArray(
-        respuesta?.inventario
-      )
-    ) {
+    if (Array.isArray(respuesta?.inventario)) {
       return respuesta.inventario;
     }
 
-    if (
-      Array.isArray(
-        respuesta?.data
-      )
-    ) {
+    if (Array.isArray(respuesta?.data)) {
       return respuesta.data;
     }
 
     return [];
   };
 
-  const normalizarLista = (
-    respuesta,
-    propiedad
-  ) => {
-    if (
-      Array.isArray(
-        respuesta
-      )
-    ) {
+  const normalizarLista = (respuesta, propiedad) => {
+    if (Array.isArray(respuesta)) {
       return respuesta;
     }
 
     if (
       propiedad &&
-      Array.isArray(
-        respuesta?.[propiedad]
-      )
+      Array.isArray(respuesta?.[propiedad])
     ) {
       return respuesta[propiedad];
     }
 
-    if (
-      Array.isArray(
-        respuesta?.data
-      )
-    ) {
+    if (Array.isArray(respuesta?.data)) {
       return respuesta.data;
     }
 
     return [];
   };
 
-  const cargarInventario =
-    async () => {
-      try {
-        let response;
+  const cargarInventario = async () => {
+    try {
+      let response;
 
-        if (esPrincipal) {
-          response =
-            await api.get(
-              "/reportes/inventario"
-            );
-        } else {
-          response =
-            await api.get(
-              "/inventario"
-            );
-        }
-
-        setInventario(
-          normalizarInventario(
-            response.data
-          )
-        );
-      } catch (err) {
-        console.error(
-          "Error al cargar inventario:",
-          err
-        );
-
-        throw err;
+      if (esPrincipal) {
+        response = await api.get("/reportes/inventario");
+      } else {
+        response = await api.get("/inventario");
       }
-    };
 
-  const cargarCategorias =
-    async () => {
-      try {
-        const response =
-          await api.get(
-            "/categorias"
-          );
+      setInventario(
+        normalizarInventario(response.data)
+      );
+    } catch (err) {
+      console.error(
+        "Error al cargar inventario:",
+        err
+      );
 
-        setCategorias(
-          normalizarLista(
-            response.data,
-            "categorias"
-          )
-        );
-      } catch (err) {
-        console.error(
-          "Error al cargar categorías:",
-          err
-        );
+      throw err;
+    }
+  };
 
-        setCategorias([]);
-      }
-    };
+  const cargarCategorias = async () => {
+    try {
+      const response = await api.get("/categorias");
 
-  const cargarUbicaciones =
-    async () => {
-      try {
-        const response =
-          await api.get(
-            "/ubicaciones"
-          );
+      setCategorias(
+        normalizarLista(
+          response.data,
+          "categorias"
+        )
+      );
+    } catch (err) {
+      console.error(
+        "Error al cargar categorías:",
+        err
+      );
 
-        setUbicaciones(
-          normalizarLista(
-            response.data,
-            "ubicaciones"
-          )
-        );
-      } catch (err) {
-        console.error(
-          "Error al cargar ubicaciones:",
-          err
-        );
+      setCategorias([]);
+    }
+  };
 
-        setUbicaciones([]);
-      }
-    };
+  const cargarUbicaciones = async () => {
+    try {
+      const response = await api.get("/ubicaciones");
 
-  const cargarProductos =
-    async () => {
-      try {
-        const response =
-          await api.get(
-            "/productos"
-          );
+      setUbicaciones(
+        normalizarLista(
+          response.data,
+          "ubicaciones"
+        )
+      );
+    } catch (err) {
+      console.error(
+        "Error al cargar ubicaciones:",
+        err
+      );
 
-        setProductos(
-          normalizarLista(
-            response.data,
-            "productos"
-          )
-        );
-      } catch (err) {
-        console.error(
-          "Error al cargar productos:",
-          err
-        );
+      setUbicaciones([]);
+    }
+  };
 
-        setProductos([]);
-      }
-    };
+  const cargarProductos = async () => {
+    try {
+      const response = await api.get("/productos");
 
-  const cargarProveedores =
-    async () => {
-      try {
-        const response =
-          await api.get(
-            "/proveedores"
-          );
+      setProductos(
+        normalizarLista(
+          response.data,
+          "productos"
+        )
+      );
+    } catch (err) {
+      console.error(
+        "Error al cargar productos:",
+        err
+      );
 
-        setProveedores(
-          normalizarLista(
-            response.data,
-            "proveedores"
-          )
-        );
-      } catch (err) {
-        console.error(
-          "Error al cargar proveedores:",
-          err
-        );
+      setProductos([]);
+    }
+  };
 
-        setProveedores([]);
-      }
-    };
+  const cargarProveedores = async () => {
+    try {
+      const response = await api.get("/proveedores");
 
-  const cargarDatos =
-    async () => {
-      setLoading(true);
-      setError("");
+      setProveedores(
+        normalizarLista(
+          response.data,
+          "proveedores"
+        )
+      );
+    } catch (err) {
+      console.error(
+        "Error al cargar proveedores:",
+        err
+      );
 
-      try {
-        await Promise.all([
-          cargarInventario(),
-          cargarCategorias(),
-          cargarUbicaciones(),
-          cargarProductos(),
-          cargarProveedores()
-        ]);
-      } catch (err) {
-        setError(
-          err.response?.data?.message ||
-            err.response?.data?.mensaje ||
-            "No fue posible cargar el inventario."
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
+      setProveedores([]);
+    }
+  };
+
+  const cargarDatos = async () => {
+    setLoading(true);
+    setError("");
+
+    try {
+      await Promise.all([
+        cargarInventario(),
+        cargarCategorias(),
+        cargarUbicaciones(),
+        cargarProductos(),
+        cargarProveedores()
+      ]);
+    } catch (err) {
+      console.error(
+        "Error al cargar inventario:",
+        err
+      );
+
+      setError(
+        err.response?.data?.message ||
+          err.response?.data?.mensaje ||
+          "No fue posible cargar el inventario."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     cargarDatos();
   }, []);
 
-  const inventarioFiltrado =
-    useMemo(() => {
-      const termino =
-        busqueda
-          .trim()
-          .toLowerCase();
+  useEffect(() => {
+    return () => {
+      if (
+        imagenDetalleUrl &&
+        imagenDetalleUrl.startsWith("blob:")
+      ) {
+        URL.revokeObjectURL(imagenDetalleUrl);
+      }
 
-      return inventario.filter(
-        (item) => {
-          const nombre =
-            String(
-              item.producto_nombre ||
-                item.nombre ||
-                ""
-            ).toLowerCase();
+      if (
+        previewImagenDetalle &&
+        previewImagenDetalle.startsWith("blob:")
+      ) {
+        URL.revokeObjectURL(previewImagenDetalle);
+      }
+    };
+  }, [imagenDetalleUrl, previewImagenDetalle]);
 
-          const sku =
-            String(
-              item.sku || ""
-            ).toLowerCase();
+  const inventarioFiltrado = useMemo(() => {
+    const termino =
+      busqueda.trim().toLowerCase();
 
-          const proveedor =
-            String(
-              item.proveedor_nombre ||
-                item.proveedor ||
-                ""
-            ).toLowerCase();
+    return inventario.filter((item) => {
+      const nombre = String(
+        item.producto_nombre ||
+          item.nombre ||
+          ""
+      ).toLowerCase();
 
-          const coincideBusqueda =
-            !termino ||
-            nombre.includes(
-              termino
-            ) ||
-            sku.includes(
-              termino
-            ) ||
-            proveedor.includes(
-              termino
-            );
+      const sku = String(
+        item.sku || ""
+      ).toLowerCase();
 
-          const coincideCategoria =
-            !categoria ||
-            String(
-              item.categoria_id
-            ) ===
-              String(
-                categoria
-              );
+      const proveedor = String(
+        item.proveedor_nombre ||
+          item.proveedor ||
+          ""
+      ).toLowerCase();
 
-          const coincideUbicacion =
-            !ubicacion ||
-            String(
-              item.ubicacion_id
-            ) ===
-              String(
-                ubicacion
-              );
+      const coincideBusqueda =
+        !termino ||
+        nombre.includes(termino) ||
+        sku.includes(termino) ||
+        proveedor.includes(termino);
 
-          const stockBajo =
-            Number(
-              item.stock_bajo
-            ) === 1 ||
-            Number(
-              item.cantidad || 0
-            ) <=
-              Number(
-                item.punto_reorden ||
-                  0
-              );
+      const coincideCategoria =
+        !categoria ||
+        String(item.categoria_id) ===
+          String(categoria);
 
-          const coincideStock =
-            !soloBajoStock ||
-            stockBajo;
+      const coincideUbicacion =
+        !ubicacion ||
+        String(item.ubicacion_id) ===
+          String(ubicacion);
 
-          return (
-            coincideBusqueda &&
-            coincideCategoria &&
-            coincideUbicacion &&
-            coincideStock
-          );
-        }
+      const stockBajo =
+        Number(item.stock_bajo) === 1 ||
+        Number(item.cantidad || 0) <=
+          Number(item.punto_reorden || 0);
+
+      const coincideStock =
+        !soloBajoStock || stockBajo;
+
+      return (
+        coincideBusqueda &&
+        coincideCategoria &&
+        coincideUbicacion &&
+        coincideStock
       );
-    }, [
-      inventario,
-      busqueda,
-      categoria,
-      ubicacion,
-      soloBajoStock
-    ]);
+    });
+  }, [
+    inventario,
+    busqueda,
+    categoria,
+    ubicacion,
+    soloBajoStock
+  ]);
 
   const totalProductos =
     inventarioFiltrado.length;
 
   const totalUnidades =
     inventarioFiltrado.reduce(
-      (
-        total,
-        item
-      ) =>
-        total +
-        Number(
-          item.cantidad ||
-            0
-        ),
+      (total, item) =>
+        total + Number(item.cantidad || 0),
       0
     );
 
   const totalAlertas =
     inventarioFiltrado.filter(
       (item) =>
-        Number(
-          item.stock_bajo
-        ) === 1 ||
-        Number(
-          item.cantidad ||
-            0
-        ) <=
-          Number(
-            item.punto_reorden ||
-              0
-          )
+        Number(item.stock_bajo) === 1 ||
+        Number(item.cantidad || 0) <=
+          Number(item.punto_reorden || 0)
     ).length;
 
-  const limpiarFiltros =
-    () => {
-      setBusqueda("");
-      setCategoria("");
-      setUbicacion("");
-      setSoloBajoStock(
-        false
-      );
-    };
+  const limpiarFiltros = () => {
+    setBusqueda("");
+    setCategoria("");
+    setUbicacion("");
+    setSoloBajoStock(false);
+  };
 
   const abrirModal = () => {
     setError("");
@@ -630,289 +475,351 @@ const Inventario = () => {
       return;
     }
 
-    setMostrarModal(
-      false
-    );
-
+    setMostrarModal(false);
     setError("");
   };
 
-  const handleFormulario = (
-    event
-  ) => {
+  const handleFormulario = (event) => {
     const {
       name,
       value
     } = event.target;
 
-    setFormulario(
-      (actual) => ({
-        ...actual,
-        [name]: value
-      })
-    );
+    setFormulario((actual) => ({
+      ...actual,
+      [name]: value
+    }));
   };
 
-  const guardarArticulo =
-    async (event) => {
-      event.preventDefault();
+  const guardarArticulo = async (event) => {
+    event.preventDefault();
 
-      setError("");
-      setMensaje("");
-
-      if (
-        !formulario.producto_id
-      ) {
-        setError(
-          "Selecciona un producto."
-        );
-
-        return;
-      }
-
-      const cantidad =
-        Number(
-          formulario.cantidad
-        );
-
-      if (
-        Number.isNaN(
-          cantidad
-        ) ||
-        cantidad < 0
-      ) {
-        setError(
-          "La cantidad debe ser un número válido."
-        );
-
-        return;
-      }
-
-      setGuardando(true);
-
-      try {
-        const payload = {
-          producto_id:
-            Number(
-              formulario.producto_id
-            ),
-
-          cantidad
-        };
-
-        if (
-          formulario.ubicacion_id
-        ) {
-          payload.ubicacion_id =
-            Number(
-              formulario.ubicacion_id
-            );
-        }
-
-        if (
-          formulario.motivo.trim()
-        ) {
-          payload.motivo =
-            formulario.motivo.trim();
-        }
-
-        await api.post(
-          "/inventario/stock-inicial",
-          payload
-        );
-
-        setMensaje(
-          "Artículo agregado correctamente al inventario."
-        );
-
-        setMostrarModal(
-          false
-        );
-
-        await cargarInventario();
-      } catch (err) {
-        console.error(
-          "Error al agregar artículo:",
-          err
-        );
-
-        setError(
-          err.response?.data
-            ?.message ||
-            err.response?.data
-              ?.mensaje ||
-            "No fue posible agregar el artículo."
-        );
-      } finally {
-        setGuardando(false);
-      }
-    };
-
-  const abrirImportacion =
-    () => {
-      setError("");
-      setMensaje("");
-      setArchivoCsv(null);
-      setResultadoImportacion(
-        null
-      );
-
-      if (
-        inputArchivoRef.current
-      ) {
-        inputArchivoRef.current.value =
-          "";
-      }
-
-      setMostrarImportacion(
-        true
-      );
-    };
-
-  const cerrarImportacion =
-    () => {
-      if (importando) {
-        return;
-      }
-
-      setMostrarImportacion(
-        false
-      );
-
-      setArchivoCsv(null);
-
-      setResultadoImportacion(
-        null
-      );
-
-      setError("");
-    };
-
-  const seleccionarArchivoCsv =
-    (event) => {
-      const archivo =
-        event.target.files?.[0] ||
-        null;
-
-      setArchivoCsv(
-        archivo
-      );
-
-      setResultadoImportacion(
-        null
-      );
-
-      setError("");
-      setMensaje("");
-    };
-
-  const importarCsv =
-    async () => {
-      if (!archivoCsv) {
-        setError(
-          "Selecciona un archivo CSV."
-        );
-
-        return;
-      }
-
-      setImportando(true);
-      setError("");
-      setMensaje("");
-      setResultadoImportacion(
-        null
-      );
-
-      try {
-        const formData =
-          new FormData();
-
-        formData.append(
-          "archivo",
-          archivoCsv
-        );
-
-        const response =
-          await api.post(
-            "/inventario/importar-csv",
-            formData,
-            {
-              headers: {
-                "Content-Type":
-                  "multipart/form-data"
-              }
-            }
-          );
-
-        setResultadoImportacion(
-          response.data
-        );
-
-        setMensaje(
-          response.data
-            ?.message ||
-            response.data
-              ?.mensaje ||
-            "Archivo procesado correctamente."
-        );
-
-        await Promise.all([
-          cargarInventario(),
-          cargarProductos()
-        ]);
-      } catch (err) {
-        console.error(
-          "Error al importar CSV:",
-          err
-        );
-
-        setError(
-          err.response?.data
-            ?.message ||
-            err.response?.data
-              ?.mensaje ||
-            "No fue posible importar el archivo CSV."
-        );
-
-        if (
-          err.response?.data
-        ) {
-          setResultadoImportacion(
-            err.response.data
-          );
-        }
-      } finally {
-        setImportando(false);
-      }
-    };
-
-  const abrirDetalle = (
-    item
-  ) => {
     setError("");
     setMensaje("");
 
-    setArticuloDetalle(
-      item
+    if (!formulario.producto_id) {
+      setError("Selecciona un producto.");
+      return;
+    }
+
+    const cantidad =
+      Number(formulario.cantidad);
+
+    if (
+      Number.isNaN(cantidad) ||
+      cantidad < 0
+    ) {
+      setError(
+        "La cantidad debe ser un número válido."
+      );
+      return;
+    }
+
+    setGuardando(true);
+
+    try {
+      const payload = {
+        producto_id:
+          Number(formulario.producto_id),
+        cantidad
+      };
+
+      if (formulario.ubicacion_id) {
+        payload.ubicacion_id =
+          Number(formulario.ubicacion_id);
+      }
+
+      if (formulario.motivo.trim()) {
+        payload.motivo =
+          formulario.motivo.trim();
+      }
+
+      await api.post(
+        "/inventario/stock-inicial",
+        payload
+      );
+
+      setMensaje(
+        "Artículo agregado correctamente al inventario."
+      );
+
+      setMostrarModal(false);
+
+      await cargarInventario();
+    } catch (err) {
+      console.error(
+        "Error al agregar artículo:",
+        err
+      );
+
+      setError(
+        err.response?.data?.message ||
+          err.response?.data?.mensaje ||
+          "No fue posible agregar el artículo."
+      );
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  const abrirImportacion = () => {
+    setError("");
+    setMensaje("");
+    setArchivoCsv(null);
+    setResultadoImportacion(null);
+
+    if (inputArchivoRef.current) {
+      inputArchivoRef.current.value = "";
+    }
+
+    setMostrarImportacion(true);
+  };
+
+  const cerrarImportacion = () => {
+    if (importando) {
+      return;
+    }
+
+    setMostrarImportacion(false);
+    setArchivoCsv(null);
+    setResultadoImportacion(null);
+    setError("");
+  };
+
+  const seleccionarArchivoCsv = (event) => {
+    const archivo =
+      event.target.files?.[0] || null;
+
+    setArchivoCsv(archivo);
+    setResultadoImportacion(null);
+    setError("");
+    setMensaje("");
+  };
+
+  const importarCsv = async () => {
+    if (!archivoCsv) {
+      setError(
+        "Selecciona un archivo CSV."
+      );
+      return;
+    }
+
+    setImportando(true);
+    setError("");
+    setMensaje("");
+    setResultadoImportacion(null);
+
+    try {
+      const formData = new FormData();
+
+      formData.append(
+        "archivo",
+        archivoCsv
+      );
+
+      const response = await api.post(
+        "/inventario/importar-csv",
+        formData
+      );
+
+      setResultadoImportacion(
+        response.data
+      );
+
+      setMensaje(
+        response.data?.message ||
+          response.data?.mensaje ||
+          "Archivo procesado correctamente."
+      );
+
+      await Promise.all([
+        cargarInventario(),
+        cargarProductos()
+      ]);
+    } catch (err) {
+      console.error(
+        "Error al importar CSV:",
+        err
+      );
+
+      setError(
+        err.response?.data?.message ||
+          err.response?.data?.mensaje ||
+          "No fue posible importar el archivo CSV."
+      );
+
+      if (err.response?.data) {
+        setResultadoImportacion(
+          err.response.data
+        );
+      }
+    } finally {
+      setImportando(false);
+    }
+  };
+
+  const liberarUrlImagen = (url) => {
+    if (
+      url &&
+      url.startsWith("blob:")
+    ) {
+      URL.revokeObjectURL(url);
+    }
+  };
+
+  const limpiarSeleccionImagen = () => {
+    setArchivoImagenDetalle(null);
+
+    setPreviewImagenDetalle(
+      (urlActual) => {
+        liberarUrlImagen(urlActual);
+        return "";
+      }
     );
 
-    setMotivoExistencias(
-      ""
+    if (inputImagenDetalleRef.current) {
+      inputImagenDetalleRef.current.value = "";
+    }
+  };
+
+  const limpiarImagenActual = () => {
+    setImagenDetalleUrl(
+      (urlActual) => {
+        liberarUrlImagen(urlActual);
+        return "";
+      }
     );
 
-    setEditandoDetalle(
-      false
+    setTieneImagenDetalle(false);
+  };
+
+  const cargarImagenProducto = async (
+    productoId,
+    tieneImagen
+  ) => {
+    limpiarImagenActual();
+
+    if (!tieneImagen) {
+      return;
+    }
+
+    setTieneImagenDetalle(true);
+
+    try {
+      const response = await api.get(
+        `/productos/${productoId}/imagen`,
+        {
+          responseType: "blob"
+        }
+      );
+
+      const url =
+        URL.createObjectURL(
+          response.data
+        );
+
+      setImagenDetalleUrl(url);
+    } catch (err) {
+      console.error(
+        "No fue posible cargar la imagen del producto:",
+        err
+      );
+
+      setTieneImagenDetalle(false);
+    }
+  };
+
+  const seleccionarImagenDetalle = (
+    event
+  ) => {
+    const archivo =
+      event.target.files?.[0] ||
+      null;
+
+    setError("");
+    setMensaje("");
+
+    if (!archivo) {
+      limpiarSeleccionImagen();
+      return;
+    }
+
+    const tiposPermitidos = [
+      "image/png",
+      "image/jpeg"
+    ];
+
+    if (
+      !tiposPermitidos.includes(
+        archivo.type
+      )
+    ) {
+      setError(
+        "Formato de imagen no permitido. Solo se aceptan PNG, JPG y JPEG."
+      );
+
+      if (
+        inputImagenDetalleRef.current
+      ) {
+        inputImagenDetalleRef.current.value =
+          "";
+      }
+
+      return;
+    }
+
+    if (
+      archivo.size >
+      5 * 1024 * 1024
+    ) {
+      setError(
+        "La imagen no puede superar los 5 MB."
+      );
+
+      if (
+        inputImagenDetalleRef.current
+      ) {
+        inputImagenDetalleRef.current.value =
+          "";
+      }
+
+      return;
+    }
+
+    setArchivoImagenDetalle(
+      archivo
     );
+
+    setPreviewImagenDetalle(
+      (urlActual) => {
+        liberarUrlImagen(urlActual);
+
+        return URL.createObjectURL(
+          archivo
+        );
+      }
+    );
+  };
+
+  const abrirDetalle = (item) => {
+    setError("");
+    setMensaje("");
+    setArticuloDetalle(item);
+    setMotivoExistencias("");
+
+    /*
+      SIEMPRE abrimos "Ver" en modo consulta.
+    */
+    setEditandoDetalle(false);
+
+    limpiarSeleccionImagen();
+    limpiarImagenActual();
 
     const productoLocal =
       productos.find(
         (producto) =>
-          Number(
-            producto.id
-          ) ===
-          Number(
-            item.producto_id
-          )
+          Number(producto.id) ===
+          Number(item.producto_id)
       ) || {};
 
     const datosIniciales = {
@@ -928,10 +835,7 @@ const Inventario = () => {
         "",
 
       existencias:
-        String(
-          item.cantidad ??
-            0
-        ),
+        String(item.cantidad ?? 0),
 
       punto_reorden:
         String(
@@ -941,21 +845,12 @@ const Inventario = () => {
         ),
 
       proveedor_id:
-        obtenerProveedorId(
-          productoLocal
-        ) ||
-        obtenerProveedorId(
-          item
-        ),
+        obtenerProveedorId(productoLocal) ||
+        obtenerProveedorId(item),
 
       categoria_id:
-        obtenerCategoriaId(
-          productoLocal
-        ) ||
-        String(
-          item.categoria_id ||
-            ""
-        ),
+        obtenerCategoriaId(productoLocal) ||
+        String(item.categoria_id || ""),
 
       sku:
         productoLocal.sku ||
@@ -976,9 +871,7 @@ const Inventario = () => {
       datosIniciales
     );
 
-    setMostrarDetalle(
-      true
-    );
+    setMostrarDetalle(true);
 
     cargarDetalleProducto(
       item,
@@ -986,147 +879,131 @@ const Inventario = () => {
     );
   };
 
-  const cargarDetalleProducto =
-    async (
-      item,
-      datosIniciales
-    ) => {
-      setCargandoDetalle(
-        true
+  const cargarDetalleProducto = async (
+    item,
+    datosIniciales
+  ) => {
+    setCargandoDetalle(true);
+
+    try {
+      const response =
+        await api.get(
+          `/productos/${item.producto_id}`
+        );
+
+      const producto =
+        response.data?.producto ||
+        response.data ||
+        {};
+
+      const datosFormulario = {
+        nombre:
+          producto.nombre ||
+          datosIniciales.nombre,
+
+        descripcion:
+          producto.descripcion ??
+          datosIniciales.descripcion,
+
+        existencias:
+          datosIniciales.existencias,
+
+        punto_reorden:
+          String(
+            producto.punto_reorden ??
+              datosIniciales.punto_reorden
+          ),
+
+        proveedor_id:
+          obtenerProveedorId(producto) ||
+          datosIniciales.proveedor_id,
+
+        categoria_id:
+          obtenerCategoriaId(producto) ||
+          datosIniciales.categoria_id,
+
+        sku:
+          producto.sku ||
+          datosIniciales.sku,
+
+        unidad_medida:
+          producto.unidad_medida ||
+          datosIniciales.unidad_medida
+      };
+
+      setFormularioDetalle(
+        datosFormulario
       );
 
-      try {
-        const response =
-          await api.get(
-            `/productos/${item.producto_id}`
-          );
+      setDetalleOriginal(
+        datosFormulario
+      );
 
-        const producto =
-          response.data
-            ?.producto ||
-          response.data ||
-          {};
-
-        const datosFormulario = {
-          nombre:
-            producto.nombre ||
-            datosIniciales.nombre,
-
-          descripcion:
-            producto.descripcion ??
-            datosIniciales.descripcion,
-
-          existencias:
-            datosIniciales.existencias,
-
-          punto_reorden:
-            String(
-              producto.punto_reorden ??
-                datosIniciales.punto_reorden
-            ),
-
-          proveedor_id:
-            obtenerProveedorId(
-              producto
-            ) ||
-            datosIniciales.proveedor_id,
-
-          categoria_id:
-            obtenerCategoriaId(
-              producto
-            ) ||
-            datosIniciales.categoria_id,
-
-          sku:
-            producto.sku ||
-            datosIniciales.sku,
-
-          unidad_medida:
-            producto.unidad_medida ||
-            datosIniciales.unidad_medida
-        };
-
-        setFormularioDetalle(
-          datosFormulario
-        );
-
-        setDetalleOriginal(
-          datosFormulario
-        );
-      } catch (err) {
-        console.error(
-          "No fue posible obtener el detalle completo del producto:",
-          err
-        );
-      } finally {
-        setCargandoDetalle(
-          false
-        );
-      }
-    };
+      await cargarImagenProducto(
+        item.producto_id,
+        producto.tiene_imagen
+      );
+    } catch (err) {
+      console.error(
+        "No fue posible obtener el detalle completo del producto:",
+        err
+      );
+    } finally {
+      setCargandoDetalle(false);
+    }
+  };
 
   const cerrarDetalle = () => {
     if (guardando) {
       return;
     }
 
-    setMostrarDetalle(
-      false
-    );
-
-    setArticuloDetalle(
-      null
-    );
-
-    setEditandoDetalle(
-      false
-    );
-
-    setMotivoExistencias(
-      ""
-    );
-
+    setMostrarDetalle(false);
+    setArticuloDetalle(null);
+    setEditandoDetalle(false);
+    setMotivoExistencias("");
+    limpiarSeleccionImagen();
+    limpiarImagenActual();
     setError("");
+    setMensaje("");
   };
 
-  const activarEdicionDetalle =
-    () => {
-      setError("");
-      setMensaje("");
-      setMotivoExistencias(
-        ""
-      );
+  const activarEdicionDetalle = () => {
+    setError("");
+    setMensaje("");
+    setMotivoExistencias("");
 
-      setDetalleOriginal({
-        ...formularioDetalle
-      });
+    /*
+      Guardamos exactamente lo que se está viendo
+      antes de permitir modificaciones.
+    */
+    setDetalleOriginal({
+      ...formularioDetalle
+    });
 
-      setEditandoDetalle(
-        true
-      );
-    };
+    limpiarSeleccionImagen();
 
-  const cancelarEdicionDetalle =
-    () => {
-      setFormularioDetalle({
-        ...detalleOriginal
-      });
+    setEditandoDetalle(true);
+  };
 
-      setMotivoExistencias(
-        ""
-      );
+  const cancelarEdicionDetalle = () => {
+    /*
+      Cancelar NO cierra la ventana.
+      Simplemente descarta todos los cambios y
+      vuelve al modo de consulta.
+    */
+    setFormularioDetalle({
+      ...detalleOriginal
+    });
 
-      setError("");
-      setMensaje("");
+    setMotivoExistencias("");
+    limpiarSeleccionImagen();
+    setError("");
+    setMensaje("");
+    setEditandoDetalle(false);
+  };
 
-      setEditandoDetalle(
-        false
-      );
-    };
-
-  const handleDetalle = (
-    event
-  ) => {
+  const handleDetalle = (event) => {
     const {
       name,
       value
@@ -1142,323 +1019,355 @@ const Inventario = () => {
 
   const existenciasCambiaron =
     Number(
-      formularioDetalle
-        .existencias
+      formularioDetalle.existencias
     ) !==
     Number(
-      detalleOriginal
-        .existencias
+      detalleOriginal.existencias
     );
 
-  const guardarDetalle =
-    async (event) => {
-      event.preventDefault();
+  const guardarDetalle = async (
+    event
+  ) => {
+    event.preventDefault();
 
-      setError("");
-      setMensaje("");
+    setError("");
+    setMensaje("");
 
-      const nombre =
-        formularioDetalle
-          .nombre
-          .trim();
+    const nombre =
+      formularioDetalle.nombre.trim();
 
-      const unidadMedida =
-        formularioDetalle
-          .unidad_medida
-          .trim();
+    const unidadMedida =
+      formularioDetalle.unidad_medida.trim();
 
-      const existencias =
-        Number(
-          formularioDetalle
-            .existencias
+    const existencias =
+      Number(
+        formularioDetalle.existencias
+      );
+
+    const puntoReorden =
+      formularioDetalle.punto_reorden ===
+      ""
+        ? 0
+        : Number(
+            formularioDetalle.punto_reorden
+          );
+
+    if (!nombre) {
+      setError(
+        "El nombre es obligatorio."
+      );
+      return;
+    }
+
+    if (
+      formularioDetalle.existencias ===
+        "" ||
+      Number.isNaN(existencias) ||
+      existencias < 0
+    ) {
+      setError(
+        "Las existencias son obligatorias y deben ser un número válido."
+      );
+      return;
+    }
+
+    if (!unidadMedida) {
+      setError(
+        "La unidad de medida es obligatoria."
+      );
+      return;
+    }
+
+    if (
+      Number.isNaN(puntoReorden) ||
+      puntoReorden < 0
+    ) {
+      setError(
+        "El punto de reorden debe ser un número válido."
+      );
+      return;
+    }
+
+    if (
+      existenciasCambiaron &&
+      !motivoExistencias.trim()
+    ) {
+      setError(
+        "Debes escribir una justificación para modificar las existencias."
+      );
+      return;
+    }
+
+    if (
+      !articuloDetalle?.producto_id
+    ) {
+      setError(
+        "No se encontró el producto seleccionado."
+      );
+      return;
+    }
+
+    setGuardando(true);
+
+    try {
+      const proveedorId =
+        formularioDetalle.proveedor_id
+          ? Number(
+              formularioDetalle.proveedor_id
+            )
+          : null;
+
+      const categoriaId =
+        formularioDetalle.categoria_id
+          ? Number(
+              formularioDetalle.categoria_id
+            )
+          : null;
+
+      const formDataProducto =
+        new FormData();
+
+      formDataProducto.append(
+        "nombre",
+        nombre
+      );
+
+      formDataProducto.append(
+        "descripcion",
+        formularioDetalle.descripcion.trim()
+      );
+
+      formDataProducto.append(
+        "punto_reorden",
+        String(puntoReorden)
+      );
+
+      formDataProducto.append(
+        "sku",
+        formularioDetalle.sku.trim()
+      );
+
+      formDataProducto.append(
+        "unidad_medida",
+        unidadMedida
+      );
+
+      formDataProducto.append(
+        "proveedor_id",
+        proveedorId
+          ? String(proveedorId)
+          : ""
+      );
+
+      formDataProducto.append(
+        "categoria_id",
+        categoriaId
+          ? String(categoriaId)
+          : ""
+      );
+
+      formDataProducto.append(
+        "activo",
+        "true"
+      );
+
+      if (proveedorId) {
+        formDataProducto.append(
+          "proveedor_ids",
+          JSON.stringify([proveedorId])
         );
-
-      const puntoReorden =
-        formularioDetalle
-          .punto_reorden ===
-        ""
-          ? 0
-          : Number(
-              formularioDetalle
-                .punto_reorden
-            );
-
-      if (!nombre) {
-        setError(
-          "El nombre es obligatorio."
+      } else {
+        formDataProducto.append(
+          "proveedor_ids",
+          JSON.stringify([])
         );
-
-        return;
       }
 
-      if (
-        formularioDetalle
-          .existencias ===
-          "" ||
-        Number.isNaN(
-          existencias
-        ) ||
-        existencias < 0
-      ) {
-        setError(
-          "Las existencias son obligatorias y deben ser un número válido."
+      if (archivoImagenDetalle) {
+        formDataProducto.append(
+          "imagen",
+          archivoImagenDetalle
         );
-
-        return;
       }
 
-      if (!unidadMedida) {
-        setError(
-          "La unidad de medida es obligatoria."
-        );
+      await api.put(
+        `/productos/${articuloDetalle.producto_id}`,
+        formDataProducto
+      );
 
-        return;
-      }
+      if (existenciasCambiaron) {
+        const diferencia =
+          existencias -
+          Number(
+            detalleOriginal.existencias
+          );
 
-      if (
-        Number.isNaN(
-          puntoReorden
-        ) ||
-        puntoReorden < 0
-      ) {
-        setError(
-          "El punto de reorden debe ser un número válido."
-        );
+        const payloadAjuste = {
+          producto_id:
+            Number(
+              articuloDetalle.producto_id
+            ),
 
-        return;
-      }
+          cantidad:
+            diferencia,
 
-      if (
-        existenciasCambiaron &&
-        !motivoExistencias.trim()
-      ) {
-        setError(
-          "Debes escribir una justificación para modificar las existencias."
-        );
-
-        return;
-      }
-
-      if (
-        !articuloDetalle
-          ?.producto_id
-      ) {
-        setError(
-          "No se encontró el producto seleccionado."
-        );
-
-        return;
-      }
-
-      setGuardando(true);
-
-      try {
-        const proveedorId =
-          formularioDetalle
-            .proveedor_id
-            ? Number(
-                formularioDetalle
-                  .proveedor_id
-              )
-            : null;
-
-        const categoriaId =
-          formularioDetalle
-            .categoria_id
-            ? Number(
-                formularioDetalle
-                  .categoria_id
-              )
-            : null;
-
-        const payloadProducto = {
-          nombre,
-          descripcion:
-            formularioDetalle
-              .descripcion
-              .trim(),
-
-          punto_reorden:
-            puntoReorden,
-
-          sku:
-            formularioDetalle
-              .sku
-              .trim() ||
-            null,
-
-          unidad_medida:
-            unidadMedida,
-
-          proveedor_id:
-            proveedorId,
-
-          proveedor_ids:
-            proveedorId
-              ? [
-                  proveedorId
-                ]
-              : [],
-
-          categoria_id:
-            categoriaId,
-
-          activo: true
+          motivo:
+            motivoExistencias.trim()
         };
-
-        await api.put(
-          `/productos/${articuloDetalle.producto_id}`,
-          payloadProducto
-        );
 
         if (
-          existenciasCambiaron
+          articuloDetalle.ubicacion_id
         ) {
-          const payloadAjuste = {
-            producto_id:
-              Number(
-                articuloDetalle
-                  .producto_id
-              ),
-
-            cantidad_nueva:
-              existencias,
-
-            motivo:
-              motivoExistencias
-                .trim()
-          };
-
-          if (
-            articuloDetalle
-              .ubicacion_id
-          ) {
-            payloadAjuste
-              .ubicacion_id =
-              Number(
-                articuloDetalle
-                  .ubicacion_id
-              );
-          }
-
-          await api.post(
-            "/inventario/ajuste",
-            payloadAjuste
-          );
+          payloadAjuste.ubicacion_id =
+            Number(
+              articuloDetalle.ubicacion_id
+            );
         }
 
-        const datosGuardados = {
-          ...formularioDetalle,
-
-          nombre,
-
-          descripcion:
-            formularioDetalle
-              .descripcion
-              .trim(),
-
-          existencias:
-            String(
-              existencias
-            ),
-
-          punto_reorden:
-            String(
-              puntoReorden
-            ),
-
-          proveedor_id:
-            proveedorId
-              ? String(
-                  proveedorId
-                )
-              : "",
-
-          categoria_id:
-            categoriaId
-              ? String(
-                  categoriaId
-                )
-              : "",
-
-          sku:
-            formularioDetalle
-              .sku
-              .trim(),
-
-          unidad_medida:
-            unidadMedida
-        };
-
-        setFormularioDetalle(
-          datosGuardados
+        await api.post(
+          "/inventario/ajuste",
+          payloadAjuste
         );
-
-        setDetalleOriginal(
-          datosGuardados
-        );
-
-        setMotivoExistencias(
-          ""
-        );
-
-        setEditandoDetalle(
-          false
-        );
-
-        setMensaje(
-          "Producto actualizado correctamente."
-        );
-
-        await Promise.all([
-          cargarInventario(),
-          cargarProductos()
-        ]);
-      } catch (err) {
-        console.error(
-          "Error al guardar producto:",
-          err
-        );
-
-        setError(
-          err.response?.data
-            ?.message ||
-            err.response?.data
-              ?.mensaje ||
-            "No fue posible guardar los cambios."
-        );
-      } finally {
-        setGuardando(false);
       }
-    };
+
+      const datosGuardados = {
+        ...formularioDetalle,
+
+        nombre,
+
+        descripcion:
+          formularioDetalle.descripcion.trim(),
+
+        existencias:
+          String(existencias),
+
+        punto_reorden:
+          String(puntoReorden),
+
+        proveedor_id:
+          proveedorId
+            ? String(proveedorId)
+            : "",
+
+        categoria_id:
+          categoriaId
+            ? String(categoriaId)
+            : "",
+
+        sku:
+          formularioDetalle.sku.trim(),
+
+        unidad_medida:
+          unidadMedida
+      };
+
+      setFormularioDetalle(
+        datosGuardados
+      );
+
+      setDetalleOriginal(
+        datosGuardados
+      );
+
+      const habiaNuevaImagen =
+        Boolean(
+          archivoImagenDetalle
+        );
+
+      limpiarSeleccionImagen();
+
+      if (
+        habiaNuevaImagen ||
+        tieneImagenDetalle
+      ) {
+        await cargarImagenProducto(
+          articuloDetalle.producto_id,
+          true
+        );
+      }
+
+      setMotivoExistencias("");
+      setEditandoDetalle(false);
+
+      setMensaje(
+        "Producto actualizado correctamente."
+      );
+
+      const nombreProveedorActualizado =
+        proveedorId
+          ? obtenerNombreProveedor(
+              proveedorId
+            )
+          : "Sin proveedor";
+
+      setInventario(
+        (inventarioActual) =>
+          inventarioActual.map(
+            (item) =>
+              Number(
+                item.producto_id
+              ) ===
+              Number(
+                articuloDetalle.producto_id
+              )
+                ? {
+                    ...item,
+                    proveedor_id:
+                      proveedorId,
+                    proveedor_nombre:
+                      nombreProveedorActualizado
+                  }
+                : item
+          )
+      );
+
+      await cargarProductos();
+    } catch (err) {
+      console.error(
+        "Error al guardar producto:",
+        err
+      );
+
+      setError(
+        err.response?.data?.message ||
+          err.response?.data?.mensaje ||
+          "No fue posible guardar los cambios."
+      );
+    } finally {
+      setGuardando(false);
+    }
+  };
 
   const estiloDatoConsulta = {
-    padding:
-      "11px 13px",
+    padding: "11px 13px",
+    border: "1px solid #e2e8f0",
+    borderRadius: "9px",
+    background: "#f8fafc",
+    minHeight: "44px",
+    display: "flex",
+    alignItems: "center",
+    color: "#1e293b",
+    wordBreak: "break-word"
+  };
 
-    border:
-      "1px solid #e2e8f0",
+  const estiloImagen = {
+    border: "1px solid #e2e8f0",
+    borderRadius: "12px",
+    background: "#f8fafc",
+    minHeight: "190px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+    padding: "12px"
+  };
 
-    borderRadius:
-      "9px",
-
-    background:
-      "#f8fafc",
-
-    minHeight:
-      "44px",
-
-    display:
-      "flex",
-
-    alignItems:
-      "center",
-
-    color:
-      "#1e293b",
-
-    wordBreak:
-      "break-word"
+  const estiloImg = {
+    display: "block",
+    maxWidth: "100%",
+    maxHeight: "280px",
+    objectFit: "contain",
+    borderRadius: "8px"
   };
 
   if (loading) {
@@ -1473,66 +1382,45 @@ const Inventario = () => {
     <div>
       <header className="page-header">
         <div>
-          <h1>
-            Inventario
-          </h1>
+          <h1>Inventario</h1>
 
           <p>
-            Consulta existencias, agrega artículos y administra las especificaciones de los productos.
+            Consulta existencias, agrega artículos y administra
+            las especificaciones de los productos.
           </p>
         </div>
 
         <div
           style={{
-            display:
-              "flex",
-
-            gap:
-              "10px",
-
-            flexWrap:
-              "wrap"
+            display: "flex",
+            gap: "10px",
+            flexWrap: "wrap"
           }}
         >
           <button
             type="button"
             className="secondary-button"
-            onClick={
-              cargarDatos
-            }
+            onClick={cargarDatos}
           >
-            <RefreshCw
-              size={18}
-            />
-
+            <RefreshCw size={18} />
             Actualizar
           </button>
 
           <button
             type="button"
             className="secondary-button"
-            onClick={
-              abrirImportacion
-            }
+            onClick={abrirImportacion}
           >
-            <Upload
-              size={18}
-            />
-
+            <Upload size={18} />
             Importar CSV
           </button>
 
           <button
             type="button"
             className="primary-button"
-            onClick={
-              abrirModal
-            }
+            onClick={abrirModal}
           >
-            <Plus
-              size={18}
-            />
-
+            <Plus size={18} />
             Agregar artículo
           </button>
         </div>
@@ -1558,30 +1446,19 @@ const Inventario = () => {
 
       <section className="inventory-summary">
         <div className="mini-stat">
-          <Package
-            size={21}
-          />
+          <Package size={21} />
 
           <div>
-            <span>
-              Productos
-            </span>
-
-            <strong>
-              {totalProductos}
-            </strong>
+            <span>Productos</span>
+            <strong>{totalProductos}</strong>
           </div>
         </div>
 
         <div className="mini-stat">
-          <Boxes
-            size={21}
-          />
+          <Boxes size={21} />
 
           <div>
-            <span>
-              Existencias totales
-            </span>
+            <span>Existencias totales</span>
 
             <strong>
               {totalUnidades.toLocaleString(
@@ -1592,18 +1469,11 @@ const Inventario = () => {
         </div>
 
         <div className="mini-stat">
-          <AlertTriangle
-            size={21}
-          />
+          <AlertTriangle size={21} />
 
           <div>
-            <span>
-              Alertas
-            </span>
-
-            <strong>
-              {totalAlertas}
-            </strong>
+            <span>Alertas</span>
+            <strong>{totalAlertas}</strong>
           </div>
         </div>
       </section>
@@ -1611,37 +1481,25 @@ const Inventario = () => {
       <section className="content-card">
         <div className="filters-row">
           <div className="search-box">
-            <Search
-              size={18}
-            />
+            <Search size={18} />
 
             <input
               type="text"
               placeholder="Buscar producto, SKU o proveedor..."
-              value={
-                busqueda
-              }
-              onChange={(
-                event
-              ) =>
+              value={busqueda}
+              onChange={(event) =>
                 setBusqueda(
-                  event.target
-                    .value
+                  event.target.value
                 )
               }
             />
           </div>
 
           <select
-            value={
-              categoria
-            }
-            onChange={(
-              event
-            ) =>
+            value={categoria}
+            onChange={(event) =>
               setCategoria(
-                event.target
-                  .value
+                event.target.value
               )
             }
           >
@@ -1650,21 +1508,14 @@ const Inventario = () => {
             </option>
 
             {categorias.map(
-              (
-                item
-              ) => (
+              (item) => (
                 <option
-                  key={
-                    item.id
-                  }
-                  value={
-                    item.id
-                  }
+                  key={item.id}
+                  value={item.id}
                 >
                   {item.nombre}
 
-                  {item.tipo ===
-                    "privada"
+                  {item.tipo === "privada"
                     ? " (Privada)"
                     : ""}
                 </option>
@@ -1674,15 +1525,10 @@ const Inventario = () => {
 
           {esPrincipal && (
             <select
-              value={
-                ubicacion
-              }
-              onChange={(
-                event
-              ) =>
+              value={ubicacion}
+              onChange={(event) =>
                 setUbicacion(
-                  event.target
-                    .value
+                  event.target.value
                 )
               }
             >
@@ -1691,20 +1537,12 @@ const Inventario = () => {
               </option>
 
               {ubicaciones.map(
-                (
-                  item
-                ) => (
+                (item) => (
                   <option
-                    key={
-                      item.id
-                    }
-                    value={
-                      item.id
-                    }
+                    key={item.id}
+                    value={item.id}
                   >
-                    {
-                      item.nombre
-                    }
+                    {item.nombre}
                   </option>
                 )
               )}
@@ -1714,15 +1552,10 @@ const Inventario = () => {
           <label className="stock-filter">
             <input
               type="checkbox"
-              checked={
-                soloBajoStock
-              }
-              onChange={(
-                event
-              ) =>
+              checked={soloBajoStock}
+              onChange={(event) =>
                 setSoloBajoStock(
-                  event.target
-                    .checked
+                  event.target.checked
                 )
               }
             />
@@ -1733,9 +1566,7 @@ const Inventario = () => {
           <button
             type="button"
             className="text-button"
-            onClick={
-              limpiarFiltros
-            }
+            onClick={limpiarFiltros}
           >
             Limpiar
           </button>
@@ -1744,9 +1575,7 @@ const Inventario = () => {
         <div className="results-info">
           Mostrando{" "}
           <strong>
-            {
-              inventarioFiltrado.length
-            }
+            {inventarioFiltrado.length}
           </strong>{" "}
           registros
         </div>
@@ -1761,49 +1590,25 @@ const Inventario = () => {
             <table>
               <thead>
                 <tr>
-                  <th>
-                    Producto
-                  </th>
-
-                  <th>
-                    Proveedor
-                  </th>
-
-                  <th>
-                    Categoría
-                  </th>
-
-                  <th>
-                    Ubicación
-                  </th>
-
-                  <th>
-                    Existencias
-                  </th>
-
-                  <th>
-                    Estado
-                  </th>
-
-                  <th>
-                    Acción
-                  </th>
+                  <th>Producto</th>
+                  <th>Proveedor</th>
+                  <th>Categoría</th>
+                  <th>Ubicación</th>
+                  <th>Existencias</th>
+                  <th>Estado</th>
+                  <th>Acción</th>
                 </tr>
               </thead>
 
               <tbody>
                 {inventarioFiltrado.map(
-                  (
-                    item
-                  ) => {
+                  (item) => {
                     const bajoStock =
                       Number(
                         item.stock_bajo
-                      ) ===
-                        1 ||
+                      ) === 1 ||
                       Number(
-                        item.cantidad ||
-                          0
+                        item.cantidad || 0
                       ) <=
                         Number(
                           item.punto_reorden ||
@@ -1816,51 +1621,68 @@ const Inventario = () => {
                       >
                         <td>
                           <strong>
-                            {
-                              item.producto_nombre
-                            }
+                            {item.producto_nombre ||
+                              item.nombre}
                           </strong>
 
                           <small className="table-secondary">
                             SKU:{" "}
-                            {
-                              item.sku ||
-                              "Sin SKU"
-                            }
+                            {item.sku ||
+                              "Sin SKU"}
                           </small>
                         </td>
 
                         <td>
-                          {
-                            item.proveedor_nombre ||
-                            "Sin proveedor"
-                          }
+                          {obtenerNombreProveedor(
+                            obtenerProveedorId(
+                              productos.find(
+                                (producto) =>
+                                  Number(
+                                    producto.id
+                                  ) ===
+                                  Number(
+                                    item.producto_id
+                                  )
+                              )
+                            )
+                          ) !== "Sin proveedor"
+                            ? obtenerNombreProveedor(
+                                obtenerProveedorId(
+                                  productos.find(
+                                    (producto) =>
+                                      Number(
+                                        producto.id
+                                      ) ===
+                                      Number(
+                                        item.producto_id
+                                      )
+                                  )
+                                )
+                              )
+                            : item.proveedor_nombre ||
+                              "Sin proveedor"}
                         </td>
 
                         <td>
-                          {
-                            item.categoria_nombre ||
-                            "Sin categoría"
-                          }
+                          {item.categoria_nombre ||
+                            "Sin categoría"}
                         </td>
 
                         <td>
-                          {
-                            item.ubicacion_nombre
-                          }
+                          {item.ubicacion_nombre ||
+                            "Sin ubicación"}
                         </td>
 
                         <td>
                           <strong>
                             {Number(
-                              item.cantidad
+                              item.cantidad ||
+                                0
                             ).toLocaleString(
                               "es-MX"
                             )}
                           </strong>{" "}
-                          {
-                            item.unidad_medida
-                          }
+                          {item.unidad_medida}
                         </td>
 
                         <td>
@@ -1885,10 +1707,7 @@ const Inventario = () => {
                               )
                             }
                           >
-                            <Eye
-                              size={16}
-                            />
-
+                            <Eye size={16} />
                             Ver
                           </button>
                         </td>
@@ -1907,36 +1726,18 @@ const Inventario = () => {
           <div
             className="modal-overlay"
             style={{
-              position:
-                "fixed",
-
-              inset:
-                0,
-
-              zIndex:
-                999999,
-
-              display:
-                "flex",
-
-              alignItems:
-                "center",
-
-              justifyContent:
-                "center",
-
-              padding:
-                "16px",
-
+              position: "fixed",
+              inset: 0,
+              zIndex: 999999,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "16px",
               background:
                 "rgba(15, 23, 42, 0.65)",
-
-              overflowY:
-                "auto"
+              overflowY: "auto"
             }}
-            onMouseDown={(
-              event
-            ) => {
+            onMouseDown={(event) => {
               if (
                 event.target ===
                 event.currentTarget
@@ -1948,33 +1749,16 @@ const Inventario = () => {
             <div
               className="modal-content"
               style={{
-                position:
-                  "relative",
-
-                zIndex:
-                  1000000,
-
-                maxWidth:
-                  "760px",
-
+                position: "relative",
+                zIndex: 1000000,
+                maxWidth: "760px",
                 width:
                   "calc(100% - 32px)",
-
-                maxHeight:
-                  "90vh",
-
-                overflowY:
-                  "auto",
-
-                background:
-                  "#ffffff",
-
-                borderRadius:
-                  "16px",
-
-                padding:
-                  "24px",
-
+                maxHeight: "90vh",
+                overflowY: "auto",
+                background: "#ffffff",
+                borderRadius: "16px",
+                padding: "24px",
                 boxShadow:
                   "0 24px 70px rgba(15, 23, 42, 0.28)"
               }}
@@ -1995,16 +1779,10 @@ const Inventario = () => {
                 <button
                   type="button"
                   className="text-button"
-                  onClick={
-                    cerrarDetalle
-                  }
-                  disabled={
-                    guardando
-                  }
+                  onClick={cerrarDetalle}
+                  disabled={guardando}
                 >
-                  <X
-                    size={22}
-                  />
+                  <X size={22} />
                 </button>
               </div>
 
@@ -2012,8 +1790,7 @@ const Inventario = () => {
                 <div
                   className="table-secondary"
                   style={{
-                    marginBottom:
-                      "16px"
+                    marginBottom: "16px"
                   }}
                 >
                   Actualizando información del producto...
@@ -2034,16 +1811,45 @@ const Inventario = () => {
 
               {!editandoDetalle ? (
                 <>
+                  <div className="form-group">
+                    <label>Imagen</label>
+
+                    <div
+                      style={{
+                        ...estiloImagen,
+                        marginBottom:
+                          "18px"
+                      }}
+                    >
+                      {imagenDetalleUrl ? (
+                        <img
+                          src={
+                            imagenDetalleUrl
+                          }
+                          alt={
+                            formularioDetalle.nombre ||
+                            "Producto"
+                          }
+                          style={
+                            estiloImg
+                          }
+                        />
+                      ) : (
+                        <span className="table-secondary">
+                          {tieneImagenDetalle
+                            ? "Cargando imagen..."
+                            : "Sin imagen"}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
                   <div
                     style={{
-                      display:
-                        "grid",
-
+                      display: "grid",
                       gridTemplateColumns:
                         "repeat(auto-fit, minmax(220px, 1fr))",
-
-                      gap:
-                        "18px"
+                      gap: "18px"
                     }}
                   >
                     <div className="form-group">
@@ -2056,11 +1862,8 @@ const Inventario = () => {
                           estiloDatoConsulta
                         }
                       >
-                        {
-                          formularioDetalle
-                            .nombre ||
-                          "Sin nombre"
-                        }
+                        {formularioDetalle.nombre ||
+                          "Sin nombre"}
                       </div>
                     </div>
 
@@ -2074,12 +1877,9 @@ const Inventario = () => {
                           estiloDatoConsulta
                         }
                       >
-                        {
-                          obtenerNombreCategoria(
-                            formularioDetalle
-                              .categoria_id
-                          )
-                        }
+                        {obtenerNombreCategoria(
+                          formularioDetalle.categoria_id
+                        )}
                       </div>
                     </div>
                   </div>
@@ -2092,35 +1892,24 @@ const Inventario = () => {
                     <div
                       style={{
                         ...estiloDatoConsulta,
-
-                        minHeight:
-                          "72px",
-
+                        minHeight: "72px",
                         alignItems:
                           "flex-start",
-
                         whiteSpace:
                           "pre-wrap"
                       }}
                     >
-                      {
-                        formularioDetalle
-                          .descripcion ||
-                        "Sin descripción"
-                      }
+                      {formularioDetalle.descripcion ||
+                        "Sin descripción"}
                     </div>
                   </div>
 
                   <div
                     style={{
-                      display:
-                        "grid",
-
+                      display: "grid",
                       gridTemplateColumns:
                         "repeat(auto-fit, minmax(220px, 1fr))",
-
-                      gap:
-                        "18px"
+                      gap: "18px"
                     }}
                   >
                     <div className="form-group">
@@ -2134,8 +1923,7 @@ const Inventario = () => {
                         }
                       >
                         {Number(
-                          formularioDetalle
-                            .existencias ||
+                          formularioDetalle.existencias ||
                             0
                         ).toLocaleString(
                           "es-MX"
@@ -2154,8 +1942,7 @@ const Inventario = () => {
                         }
                       >
                         {Number(
-                          formularioDetalle
-                            .punto_reorden ||
+                          formularioDetalle.punto_reorden ||
                             0
                         ).toLocaleString(
                           "es-MX"
@@ -2173,12 +1960,9 @@ const Inventario = () => {
                           estiloDatoConsulta
                         }
                       >
-                        {
-                          obtenerNombreProveedor(
-                            formularioDetalle
-                              .proveedor_id
-                          )
-                        }
+                        {obtenerNombreProveedor(
+                          formularioDetalle.proveedor_id
+                        )}
                       </div>
                     </div>
 
@@ -2192,11 +1976,8 @@ const Inventario = () => {
                           estiloDatoConsulta
                         }
                       >
-                        {
-                          formularioDetalle
-                            .sku ||
-                          "Sin SKU"
-                        }
+                        {formularioDetalle.sku ||
+                          "Sin SKU"}
                       </div>
                     </div>
 
@@ -2210,25 +1991,18 @@ const Inventario = () => {
                           estiloDatoConsulta
                         }
                       >
-                        {
-                          formularioDetalle
-                            .unidad_medida ||
-                          "Sin unidad de medida"
-                        }
+                        {formularioDetalle.unidad_medida ||
+                          "Sin unidad de medida"}
                       </div>
                     </div>
                   </div>
 
                   <div
                     style={{
-                      display:
-                        "flex",
-
+                      display: "flex",
                       justifyContent:
                         "flex-end",
-
-                      marginTop:
-                        "24px"
+                      marginTop: "24px"
                     }}
                   >
                     <button
@@ -2241,10 +2015,7 @@ const Inventario = () => {
                         cargandoDetalle
                       }
                     >
-                      <Pencil
-                        size={18}
-                      />
-
+                      <Pencil size={18} />
                       Editar
                     </button>
                   </div>
@@ -2257,14 +2028,10 @@ const Inventario = () => {
                 >
                   <div
                     style={{
-                      display:
-                        "grid",
-
+                      display: "grid",
                       gridTemplateColumns:
                         "repeat(auto-fit, minmax(220px, 1fr))",
-
-                      gap:
-                        "16px"
+                      gap: "16px"
                     }}
                   >
                     <div className="form-group">
@@ -2275,8 +2042,7 @@ const Inventario = () => {
                       <input
                         name="nombre"
                         value={
-                          formularioDetalle
-                            .nombre
+                          formularioDetalle.nombre
                         }
                         onChange={
                           handleDetalle
@@ -2293,8 +2059,7 @@ const Inventario = () => {
                       <select
                         name="categoria_id"
                         value={
-                          formularioDetalle
-                            .categoria_id
+                          formularioDetalle.categoria_id
                         }
                         onChange={
                           handleDetalle
@@ -2305,9 +2070,7 @@ const Inventario = () => {
                         </option>
 
                         {categorias.map(
-                          (
-                            item
-                          ) => (
+                          (item) => (
                             <option
                               key={
                                 item.id
@@ -2340,8 +2103,7 @@ const Inventario = () => {
                       name="descripcion"
                       rows="3"
                       value={
-                        formularioDetalle
-                          .descripcion
+                        formularioDetalle.descripcion
                       }
                       onChange={
                         handleDetalle
@@ -2350,16 +2112,64 @@ const Inventario = () => {
                     />
                   </div>
 
+                  <div className="form-group">
+                    <label>
+                      Imagen del producto
+                    </label>
+
+                    <div
+                      style={{
+                        ...estiloImagen,
+                        marginBottom:
+                          "12px"
+                      }}
+                    >
+                      {previewImagenDetalle ||
+                      imagenDetalleUrl ? (
+                        <img
+                          src={
+                            previewImagenDetalle ||
+                            imagenDetalleUrl
+                          }
+                          alt="Vista previa del producto"
+                          style={
+                            estiloImg
+                          }
+                        />
+                      ) : (
+                        <span className="table-secondary">
+                          Sin imagen
+                        </span>
+                      )}
+                    </div>
+
+                    <input
+                      ref={
+                        inputImagenDetalleRef
+                      }
+                      type="file"
+                      accept=".png,.jpg,.jpeg,image/png,image/jpeg"
+                      onChange={
+                        seleccionarImagenDetalle
+                      }
+                      disabled={
+                        guardando
+                      }
+                    />
+
+                    <small className="table-secondary">
+                      Formatos permitidos:
+                      PNG, JPG y JPEG.
+                      Máximo 5 MB.
+                    </small>
+                  </div>
+
                   <div
                     style={{
-                      display:
-                        "grid",
-
+                      display: "grid",
                       gridTemplateColumns:
                         "repeat(auto-fit, minmax(220px, 1fr))",
-
-                      gap:
-                        "16px"
+                      gap: "16px"
                     }}
                   >
                     <div className="form-group">
@@ -2373,8 +2183,7 @@ const Inventario = () => {
                         step="any"
                         name="existencias"
                         value={
-                          formularioDetalle
-                            .existencias
+                          formularioDetalle.existencias
                         }
                         onChange={
                           handleDetalle
@@ -2394,8 +2203,7 @@ const Inventario = () => {
                         step="any"
                         name="punto_reorden"
                         value={
-                          formularioDetalle
-                            .punto_reorden
+                          formularioDetalle.punto_reorden
                         }
                         onChange={
                           handleDetalle
@@ -2419,7 +2227,8 @@ const Inventario = () => {
                           event
                         ) =>
                           setMotivoExistencias(
-                            event.target
+                            event
+                              .target
                               .value
                           )
                         }
@@ -2428,21 +2237,18 @@ const Inventario = () => {
                       />
 
                       <small className="table-secondary">
-                        La justificación solamente es obligatoria porque modificaste las existencias.
+                        La justificación solamente es obligatoria
+                        porque modificaste las existencias.
                       </small>
                     </div>
                   )}
 
                   <div
                     style={{
-                      display:
-                        "grid",
-
+                      display: "grid",
                       gridTemplateColumns:
                         "repeat(auto-fit, minmax(220px, 1fr))",
-
-                      gap:
-                        "16px"
+                      gap: "16px"
                     }}
                   >
                     <div className="form-group">
@@ -2453,8 +2259,7 @@ const Inventario = () => {
                       <select
                         name="proveedor_id"
                         value={
-                          formularioDetalle
-                            .proveedor_id
+                          formularioDetalle.proveedor_id
                         }
                         onChange={
                           handleDetalle
@@ -2493,8 +2298,7 @@ const Inventario = () => {
                       <input
                         name="sku"
                         value={
-                          formularioDetalle
-                            .sku
+                          formularioDetalle.sku
                         }
                         onChange={
                           handleDetalle
@@ -2512,8 +2316,7 @@ const Inventario = () => {
                     <input
                       name="unidad_medida"
                       value={
-                        formularioDetalle
-                          .unidad_medida
+                        formularioDetalle.unidad_medida
                       }
                       onChange={
                         handleDetalle
@@ -2526,38 +2329,32 @@ const Inventario = () => {
                     style={{
                       padding:
                         "12px 14px",
-
                       border:
                         "1px solid #e2e8f0",
-
                       borderRadius:
                         "10px",
-
-                      marginTop:
-                        "8px"
+                      marginTop: "8px"
                     }}
                   >
                     <small className="table-secondary">
-                      Campos obligatorios: Nombre, Existencias y Unidad de medida. Descripción, Categoría, Punto de reorden, Proveedor y SKU son opcionales.
+                      Campos obligatorios:
+                      Nombre, Existencias y
+                      Unidad de medida.
+                      Descripción, Categoría,
+                      Punto de reorden,
+                      Proveedor, SKU e Imagen
+                      son opcionales.
                     </small>
                   </div>
 
                   <div
                     style={{
-                      display:
-                        "flex",
-
+                      display: "flex",
                       justifyContent:
                         "flex-end",
-
-                      gap:
-                        "10px",
-
-                      marginTop:
-                        "24px",
-
-                      flexWrap:
-                        "wrap"
+                      gap: "10px",
+                      marginTop: "24px",
+                      flexWrap: "wrap"
                     }}
                   >
                     <button
@@ -2580,9 +2377,7 @@ const Inventario = () => {
                         guardando
                       }
                     >
-                      <Save
-                        size={18}
-                      />
+                      <Save size={18} />
 
                       {guardando
                         ? "Guardando..."
@@ -2599,36 +2394,18 @@ const Inventario = () => {
         <div
           className="modal-overlay"
           style={{
-            position:
-              "fixed",
-
-            inset:
-              0,
-
-            zIndex:
-              999999,
-
-            display:
-              "flex",
-
-            alignItems:
-              "center",
-
-            justifyContent:
-              "center",
-
-            padding:
-              "16px",
-
+            position: "fixed",
+            inset: 0,
+            zIndex: 999999,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "16px",
             background:
               "rgba(15, 23, 42, 0.65)",
-
-            overflowY:
-              "auto"
+            overflowY: "auto"
           }}
-          onMouseDown={(
-            event
-          ) => {
+          onMouseDown={(event) => {
             if (
               event.target ===
               event.currentTarget
@@ -2640,30 +2417,15 @@ const Inventario = () => {
           <div
             className="modal-content"
             style={{
-              position:
-                "relative",
-
-              maxWidth:
-                "650px",
-
+              position: "relative",
+              maxWidth: "650px",
               width:
                 "calc(100% - 32px)",
-
-              maxHeight:
-                "90vh",
-
-              overflowY:
-                "auto",
-
-              background:
-                "#ffffff",
-
-              borderRadius:
-                "16px",
-
-              padding:
-                "24px",
-
+              maxHeight: "90vh",
+              overflowY: "auto",
+              background: "#ffffff",
+              borderRadius: "16px",
+              padding: "24px",
               boxShadow:
                 "0 24px 70px rgba(15, 23, 42, 0.28)"
             }}
@@ -2689,9 +2451,7 @@ const Inventario = () => {
                   importando
                 }
               >
-                <X
-                  size={22}
-                />
+                <X size={22} />
               </button>
             </div>
 
@@ -2709,30 +2469,21 @@ const Inventario = () => {
 
             <div
               style={{
-                padding:
-                  "16px",
-
+                padding: "16px",
                 border:
                   "1px dashed #cbd5e1",
-
                 borderRadius:
                   "10px",
-
                 marginBottom:
                   "20px"
               }}
             >
               <div
                 style={{
-                  display:
-                    "flex",
-
+                  display: "flex",
                   alignItems:
                     "center",
-
-                  gap:
-                    "10px",
-
+                  gap: "10px",
                   marginBottom:
                     "12px"
                 }}
@@ -2768,7 +2519,8 @@ const Inventario = () => {
                       "12px"
                   }}
                 >
-                  Archivo seleccionado:{" "}
+                  Archivo
+                  seleccionado:{" "}
                   <strong>
                     {
                       archivoCsv.name
@@ -2791,18 +2543,20 @@ const Inventario = () => {
               <p
                 className="table-secondary"
                 style={{
-                  marginTop:
-                    "8px"
+                  marginTop: "8px"
                 }}
               >
-                Las columnas obligatorias son nombre, unidad_medida y cantidad. SKU, descripción, categoria, categoria_nombre, categoria_id, punto_reorden y proveedor son opcionales. El proveedor puede escribirse por nombre usando la columna proveedor, o mediante proveedor_nombre o proveedor_id. La categoría puede escribirse por nombre; si no existe, se crea como categoría global.
+                Las columnas obligatorias son nombre,
+                unidad_medida y cantidad. SKU, descripción,
+                categoria y punto_reorden son opcionales.
+                La categoría puede escribirse por nombre; si no existe,
+                se crea como categoría global.
               </p>
 
               <div
                 style={{
                   overflowX:
                     "auto",
-
                   marginTop:
                     "12px"
                 }}
@@ -2813,29 +2567,20 @@ const Inventario = () => {
                       <th>
                         nombre
                       </th>
-
-                      <th>
-                        sku
-                      </th>
-
                       <th>
                         unidad_medida
                       </th>
-
                       <th>
                         cantidad
                       </th>
-
+                      <th>
+                        sku
+                      </th>
                       <th>
                         categoria
                       </th>
-
                       <th>
                         punto_reorden
-                      </th>
-
-                      <th>
-                        proveedor
                       </th>
                     </tr>
                   </thead>
@@ -2845,29 +2590,20 @@ const Inventario = () => {
                       <td>
                         Mouse Logitech
                       </td>
-
-                      <td>
-                        MOU-001
-                      </td>
-
                       <td>
                         pieza
                       </td>
-
                       <td>
                         10
                       </td>
-
-                      <td>
-                        Electrónica
-                      </td>
-
                       <td>
                         Opcional
                       </td>
-
                       <td>
-                        Proveedor ABC
+                        Opcional
+                      </td>
+                      <td>
+                        Opcional
                       </td>
                     </tr>
                   </tbody>
@@ -2880,7 +2616,6 @@ const Inventario = () => {
                 style={{
                   marginTop:
                     "20px",
-
                   marginBottom:
                     "20px"
                 }}
@@ -2907,12 +2642,10 @@ const Inventario = () => {
                       </span>
 
                       <strong>
-                        {
-                          resultadoImportacion
-                            .resumen
-                            ?.total_filas ||
-                          0
-                        }
+                        {resultadoImportacion
+                          .resumen
+                          ?.total_filas ||
+                          0}
                       </strong>
                     </div>
                   </div>
@@ -2924,16 +2657,14 @@ const Inventario = () => {
 
                     <div>
                       <span>
-                        Procesadas
+                        Agregadas
                       </span>
 
                       <strong>
-                        {
-                          resultadoImportacion
-                            .resumen
-                            ?.filas_procesadas ||
-                          0
-                        }
+                        {resultadoImportacion
+                          .resumen
+                          ?.agregados ||
+                          0}
                       </strong>
                     </div>
                   </div>
@@ -2949,19 +2680,18 @@ const Inventario = () => {
                       </span>
 
                       <strong>
-                        {
-                          resultadoImportacion
-                            .resumen
-                            ?.filas_con_error ||
-                          0
-                        }
+                        {resultadoImportacion
+                          .resumen
+                          ?.filas_con_error ||
+                          0}
                       </strong>
                     </div>
                   </div>
                 </div>
 
                 {resultadoImportacion
-                  .errores?.length >
+                  .errores
+                  ?.length >
                   0 && (
                   <div
                     style={{
@@ -2986,15 +2716,9 @@ const Inventario = () => {
                             <th>
                               Fila
                             </th>
-
                             <th>
                               Producto
                             </th>
-
-                            <th>
-                              SKU
-                            </th>
-
                             <th>
                               Error
                             </th>
@@ -3017,17 +2741,9 @@ const Inventario = () => {
                                 </td>
 
                                 <td>
-                                  {
-                                    item.nombre ||
-                                    "-"
-                                  }
-                                </td>
-
-                                <td>
-                                  {
+                                  {item.nombre ||
                                     item.sku ||
-                                    "-"
-                                  }
+                                    "-"}
                                 </td>
 
                                 <td>
@@ -3048,18 +2764,12 @@ const Inventario = () => {
 
             <div
               style={{
-                display:
-                  "flex",
-
+                display: "flex",
                 justifyContent:
                   "flex-end",
-
-                gap:
-                  "10px",
-
+                gap: "10px",
                 marginTop:
                   "20px",
-
                 flexWrap:
                   "wrap"
               }}
@@ -3105,36 +2815,18 @@ const Inventario = () => {
         <div
           className="modal-overlay"
           style={{
-            position:
-              "fixed",
-
-            inset:
-              0,
-
-            zIndex:
-              999999,
-
-            display:
-              "flex",
-
-            alignItems:
-              "center",
-
-            justifyContent:
-              "center",
-
-            padding:
-              "16px",
-
+            position: "fixed",
+            inset: 0,
+            zIndex: 999999,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "16px",
             background:
               "rgba(15, 23, 42, 0.65)",
-
-            overflowY:
-              "auto"
+            overflowY: "auto"
           }}
-          onMouseDown={(
-            event
-          ) => {
+          onMouseDown={(event) => {
             if (
               event.target ===
               event.currentTarget
@@ -3146,30 +2838,15 @@ const Inventario = () => {
           <div
             className="modal-content"
             style={{
-              position:
-                "relative",
-
-              maxWidth:
-                "650px",
-
+              position: "relative",
+              maxWidth: "650px",
               width:
                 "calc(100% - 32px)",
-
-              maxHeight:
-                "90vh",
-
-              overflowY:
-                "auto",
-
-              background:
-                "#ffffff",
-
-              borderRadius:
-                "16px",
-
-              padding:
-                "24px",
-
+              maxHeight: "90vh",
+              overflowY: "auto",
+              background: "#ffffff",
+              borderRadius: "16px",
+              padding: "24px",
               boxShadow:
                 "0 24px 70px rgba(15, 23, 42, 0.28)"
             }}
@@ -3195,9 +2872,7 @@ const Inventario = () => {
                   guardando
                 }
               >
-                <X
-                  size={22}
-                />
+                <X size={22} />
               </button>
             </div>
 
@@ -3220,8 +2895,7 @@ const Inventario = () => {
                 <select
                   name="producto_id"
                   value={
-                    formulario
-                      .producto_id
+                    formulario.producto_id
                   }
                   onChange={
                     handleFormulario
@@ -3266,8 +2940,7 @@ const Inventario = () => {
                   <select
                     name="ubicacion_id"
                     value={
-                      formulario
-                        .ubicacion_id
+                      formulario.ubicacion_id
                     }
                     onChange={
                       handleFormulario
@@ -3278,9 +2951,7 @@ const Inventario = () => {
                     </option>
 
                     {ubicaciones.map(
-                      (
-                        item
-                      ) => (
+                      (item) => (
                         <option
                           key={
                             item.id
@@ -3310,8 +2981,7 @@ const Inventario = () => {
                   step="any"
                   name="cantidad"
                   value={
-                    formulario
-                      .cantidad
+                    formulario.cantidad
                   }
                   onChange={
                     handleFormulario
@@ -3329,8 +2999,7 @@ const Inventario = () => {
                   name="motivo"
                   rows="3"
                   value={
-                    formulario
-                      .motivo
+                    formulario.motivo
                   }
                   onChange={
                     handleFormulario
@@ -3341,18 +3010,12 @@ const Inventario = () => {
 
               <div
                 style={{
-                  display:
-                    "flex",
-
+                  display: "flex",
                   justifyContent:
                     "flex-end",
-
-                  gap:
-                    "10px",
-
+                  gap: "10px",
                   marginTop:
                     "24px",
-
                   flexWrap:
                     "wrap"
                 }}
